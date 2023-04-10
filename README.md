@@ -13,13 +13,12 @@ and the Flutter guide for
 
 TODO: Htmlt to pdf widgets library convert html text to pdf widgets
 
-## Features
 
 
 
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
+
+
 
 ```dart
 import 'package:pdf/pdf.dart' as pdf;
