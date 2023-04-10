@@ -1,5 +1,9 @@
 library htmltopdfwidgets;
 
+export 'package:pdf/pdf.dart';
+export 'package:pdf/widgets.dart';
+export 'package:printing/printing.dart';
+
 /// A Calculator.
 import 'dart:collection';
 import 'dart:ui';
