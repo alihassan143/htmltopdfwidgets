@@ -312,12 +312,13 @@ class HtmlToPdfWidgets {
 
   Future<Widget> _handleImage(html.Element element) async {
     final src = element.attributes["src"];
-    final attributes = <String, dynamic>{};
+
     if (src != null) {
-      attributes["image_src"] = src;
+      final netImage = await networkImage(src);
+      return Image(netImage);
+    } else {
+      return Text("");
     }
-    final netImage = await networkImage('https://www.nfet.net/nfet.jpg');
-    return Image(netImage);
   }
 
   Future<List<Widget>> _handleUnorderedList(html.Element element) async {
