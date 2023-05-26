@@ -1,3 +1,6 @@
+## 0.0.3
+
+*  depedency updates
 ## 0.0.2
 
 *  network image fixes.

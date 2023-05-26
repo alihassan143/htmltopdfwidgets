@@ -239,11 +239,6 @@ class HtmlToPdfWidgets {
         style: _getDeltaAttributesFromHtmlAttributes(element.attributes),
       ));
     } else if (element.localName == HTMLTag.anchor) {
-      final hyperLink = element.attributes["href"];
-      Map<String, dynamic>? attributes;
-      if (hyperLink != null) {
-        attributes = {"href": hyperLink};
-      }
       delta.add(TextSpan(
         text: element.text,
         style: _getDeltaAttributesFromHtmlAttributes(element.attributes),
@@ -286,14 +281,6 @@ class HtmlToPdfWidgets {
     if (image != null) {
       final imageNode = await _handleImage(image);
       return imageNode;
-    }
-    final testInput = element.querySelector("input");
-    bool checked = false;
-    final isCheckbox =
-        testInput != null && testInput.attributes["type"] == "checkbox";
-    if (isCheckbox) {
-      checked = testInput.attributes.containsKey("checked") &&
-          testInput.attributes["checked"] != "false";
     }
 
     final delta = <TextSpan>[];
