@@ -1,3 +1,6 @@
+## 0.0.5
+
+*  missing image element added
 ## 0.0.4
 
 *  optimization

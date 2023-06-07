@@ -1,11 +1,10 @@
 name: htmltopdfwidgets
 description:  Htmlt to pdf widgets library convert html text to pdf widgets
-version: 0.0.4
+version: 0.0.5
 homepage: https://github.com/alihassan143/htmltopdfwidgets
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
-  flutter: ">=3.0.0"
+  sdk: ">=2.18.0 <4.0.0"
 
 dependencies:
   flutter:
