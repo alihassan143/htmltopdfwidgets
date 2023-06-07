@@ -1,6 +1,6 @@
 name: htmltopdfwidgets
 description:  Htmlt to pdf widgets library convert html text to pdf widgets
-version: 0.0.3
+version: 0.0.4
 homepage: https://github.com/alihassan143/htmltopdfwidgets
 
 environment:
