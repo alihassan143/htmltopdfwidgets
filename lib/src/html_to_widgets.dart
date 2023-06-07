@@ -255,11 +255,14 @@ class WidgetsHTMLDecoder {
 
   static Future<Widget> _parseImageElement(dom.Element element) async {
     final src = element.attributes["src"];
-    print("image");
-    if (src != null) {
-      final netImage = await networkImage(src);
-      return Image(netImage);
-    } else {
+    try {
+      if (src != null) {
+        final netImage = await networkImage(src);
+        return Image(netImage);
+      } else {
+        return Text("");
+      }
+    } catch (e) {
       return Text("");
     }
   }
