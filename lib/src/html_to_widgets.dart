@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'dart:convert';
 import 'dart:ui';
 import 'package:html/parser.dart' show parse;
 import 'package:html/dom.dart' as dom;
@@ -8,22 +7,19 @@ import 'package:printing/printing.dart';
 
 import '../htmltopdfwidgets.dart';
 
-class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
-  WidgetsHTMLDecoder();
-
-  @override
-  List<Widget> convert(String input) {
-    final document = parse(input);
+class WidgetsHTMLDecoder {
+  static Future<List<Widget>> convert(String html) async {
+    final document = parse(html);
     final body = document.body;
     if (body == null) {
       return [];
     }
-    List<Widget> nodes = [];
-    _parseElement(body.nodes).then((value) => {nodes.addAll(value)});
+    List<Widget> nodes = await _parseElement(body.nodes);
+
     return nodes;
   }
 
-  Future<List<Widget>> _parseElement(Iterable<dom.Node> domNodes) async {
+  static Future<List<Widget>> _parseElement(Iterable<dom.Node> domNodes) async {
     List<TextSpan> delta = [];
     final result = <Widget>[];
     for (final domNode in domNodes) {
@@ -53,7 +49,7 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     return result;
   }
 
-  Future<Iterable<Widget>> _parseSpecialElements(
+  static Future<Iterable<Widget>> _parseSpecialElements(
     dom.Element element, {
     required String type,
   }) async {
@@ -86,35 +82,43 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     }
   }
 
-  Text paragraphNode({required String text}) {
+  static Text paragraphNode({required String text}) {
     return Text(text);
   }
 
-  Future<TextStyle> _parserFormattingElementAttributes(
+  static Future<TextStyle> _parserFormattingElementAttributes(
       dom.Element element) async {
     final localName = element.localName;
     TextStyle attributes = const TextStyle();
+
     switch (localName) {
       case HTMLTags.bold:
-        attributes = attributes.copyWith(fontWeight: FontWeight.bold);
+        attributes = attributes.merge(TextStyle(fontWeight: FontWeight.bold));
         break;
       case HTMLTags.strong:
-        attributes = attributes.copyWith(fontWeight: FontWeight.bold);
+        attributes = attributes.merge(TextStyle(fontWeight: FontWeight.bold));
         break;
       case HTMLTags.em:
-        attributes = attributes.copyWith(
-            fontItalic: await PdfGoogleFonts.openSansItalic());
+        attributes = attributes.merge(TextStyle(fontStyle: FontStyle.italic));
         break;
       case HTMLTags.italic:
-        attributes = attributes.copyWith(
-            fontItalic: await PdfGoogleFonts.openSansItalic());
+        attributes = attributes.merge(TextStyle(fontStyle: FontStyle.italic));
         break;
       case HTMLTags.underline:
-        attributes = attributes.copyWith(decoration: TextDecoration.underline);
+        attributes = attributes.copyWith(
+            decoration: TextDecoration.combine([
+          attributes.decoration ?? TextDecoration.none,
+          TextDecoration.underline
+        ]));
+
         break;
       case HTMLTags.del:
-        attributes =
-            attributes.copyWith(decoration: TextDecoration.lineThrough);
+        attributes = attributes.copyWith(
+            decoration: TextDecoration.combine([
+          attributes.decoration ?? TextDecoration.none,
+          TextDecoration.lineThrough
+        ]));
+
         break;
 
       case HTMLTags.span:
@@ -128,27 +132,33 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
       case HTMLTags.anchor:
         final href = element.attributes['href'];
         if (href != null) {
-          attributes = attributes.copyWith(
-            decoration: TextDecoration.underline,
-            color: PdfColors.blue,
-          );
+          attributes = attributes
+              .merge(const TextStyle(decoration: TextDecoration.underline));
         }
         break;
       case HTMLTags.paragraph:
         attributes = attributes;
         break;
+      case HTMLTags.code:
+        attributes = attributes;
+        break;
       default:
-        assert(false, 'Unknown formatting element: $element');
         break;
     }
+
     for (final child in element.children) {
       final nattributes = await _parserFormattingElementAttributes(child);
-      attributes = attributes.merge(nattributes);
+      attributes = attributes.merge(nattributes.copyWith(
+          decoration: TextDecoration.combine([
+        attributes.decoration ?? TextDecoration.none,
+        nattributes.decoration ?? TextDecoration.none
+      ])));
     }
+
     return attributes;
   }
 
-  Future<Widget> _parseHeadingElement(
+  static Future<Widget> _parseHeadingElement(
     dom.Element element, {
     required int level,
   }) async {
@@ -163,13 +173,22 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
                 fontSize: await getHeadingSize(level),
                 fontWeight: FontWeight.bold)));
       } else {
-        delta.add(TextSpan(text: child.text));
+        delta.add(TextSpan(
+            text: child.text,
+            style: TextStyle(
+                fontSize: await getHeadingSize(level),
+                fontWeight: FontWeight.bold)));
       }
     }
-    return RichText(text: TextSpan(children: delta));
+    return RichText(
+        text: TextSpan(
+            children: delta,
+            style: TextStyle(
+                fontSize: await getHeadingSize(level),
+                fontWeight: FontWeight.bold)));
   }
 
-  Future<double> getHeadingSize(int level) async {
+  static Future<double> getHeadingSize(int level) async {
     if (level == 1) {
       return 32;
     } else if (level == 2) {
@@ -181,7 +200,8 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     }
   }
 
-  Future<List<Widget>> _parseBlockQuoteElement(dom.Element element) async {
+  static Future<List<Widget>> _parseBlockQuoteElement(
+      dom.Element element) async {
     final result = <Widget>[];
     for (final child in element.children) {
       result.addAll(
@@ -190,7 +210,8 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     return result;
   }
 
-  Future<Iterable<Widget>> _parseUnOrderListElement(dom.Element element) async {
+  static Future<Iterable<Widget>> _parseUnOrderListElement(
+      dom.Element element) async {
     final result = <Widget>[];
     for (final child in element.children) {
       result.addAll(await _parseListElement(child,
@@ -199,7 +220,8 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     return result;
   }
 
-  Future<Iterable<Widget>> _parseOrderListElement(dom.Element element) async {
+  static Future<Iterable<Widget>> _parseOrderListElement(
+      dom.Element element) async {
     final result = <Widget>[];
     for (var i = 0; i < element.children.length; i++) {
       final child = element.children[i];
@@ -209,7 +231,7 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     return result;
   }
 
-  Future<Iterable<Widget>> _parseListElement(
+  static Future<Iterable<Widget>> _parseListElement(
     dom.Element element, {
     required String type,
     int? index,
@@ -226,14 +248,14 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     }
   }
 
-  Future<Widget> _parseParagraphElement(dom.Element element) async {
+  static Future<Widget> _parseParagraphElement(dom.Element element) async {
     final delta = await _parseDeltaElement(element);
     return delta;
   }
 
-  Future<Widget> _parseImageElement(dom.Element element) async {
+  static Future<Widget> _parseImageElement(dom.Element element) async {
     final src = element.attributes["src"];
-
+    print("image");
     if (src != null) {
       final netImage = await networkImage(src);
       return Image(netImage);
@@ -242,12 +264,13 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     }
   }
 
-  Future<Widget> _parseDeltaElement(dom.Element element) async {
+  static Future<Widget> _parseDeltaElement(dom.Element element) async {
     final delta = <TextSpan>[];
     final children = element.nodes.toList();
     for (final child in children) {
       if (child is dom.Element) {
         final attributes = await _parserFormattingElementAttributes(child);
+
         delta.add(TextSpan(text: child.text, style: attributes));
       } else {
         delta.add(TextSpan(text: child.text));
@@ -256,7 +279,7 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     return RichText(text: TextSpan(children: delta));
   }
 
-  Map<String, String> _cssStringToMap(String? cssString) {
+  static Map<String, String> _cssStringToMap(String? cssString) {
     final result = <String, String>{};
     if (cssString == null) {
       return result;
@@ -274,7 +297,7 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     return result;
   }
 
-  TextStyle? _getDeltaAttributesFromHtmlAttributes(
+  static TextStyle? _getDeltaAttributesFromHtmlAttributes(
       LinkedHashMap<Object, String> htmlAttributes) {
     var style = const TextStyle();
     final styleString = htmlAttributes["style"];
@@ -315,7 +338,7 @@ class WidgetsHTMLDecoder extends Converter<String, List<Widget>> {
     return style;
   }
 
-  void _assignTextDecorations(TextStyle style, String decorationStr) {
+  static void _assignTextDecorations(TextStyle style, String decorationStr) {
     final decorations = decorationStr.split(" ");
     for (final d in decorations) {
       if (d == "line-through") {
@@ -391,14 +414,6 @@ Widget buildBulletwidget(Widget childValue) {
 class _BulletedListIcon extends StatelessWidget {
   _BulletedListIcon();
 
-  static final bulletedListIcons = [
-    '●',
-    '◯',
-    '□',
-  ];
-
-  String get icon => bulletedListIcons[0];
-
   @override
   Widget build(Context context) {
     return SizedBox(
@@ -407,11 +422,11 @@ class _BulletedListIcon extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(right: 5.0),
         child: Center(
-          child: Text(
-            icon,
-            textScaleFactor: 0.5,
-          ),
-        ),
+            child: Container(
+                width: 5,
+                height: 5,
+                decoration: const BoxDecoration(
+                    shape: BoxShape.circle, color: PdfColors.black))),
       ),
     );
   }
@@ -456,6 +471,7 @@ class HTMLTags {
     HTMLTags.h1,
     HTMLTags.h2,
     HTMLTags.h3,
+    HTMLTags.div,
     HTMLTags.unorderedList,
     HTMLTags.orderedList,
     HTMLTags.list,
