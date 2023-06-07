@@ -1,3 +1,6 @@
+## 0.0.4
+
+*  optimization
 ## 0.0.3
 
 *  depedency updates

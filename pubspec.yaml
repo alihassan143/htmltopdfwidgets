@@ -4,7 +4,7 @@ version: 0.0.3
 homepage: https://github.com/alihassan143/htmltopdfwidgets
 
 environment:
-  sdk: '>=2.19.6 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
   flutter: ">=3.0.0"
 
 dependencies:
