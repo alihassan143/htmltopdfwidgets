@@ -478,6 +478,7 @@ class HTMLTags {
     HTMLTags.paragraph,
     HTMLTags.blockQuote,
     HTMLTags.checkbox,
+    HTMLTags.image
   ];
 
   static bool isTopLevel(String tag) {
