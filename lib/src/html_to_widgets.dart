@@ -8,19 +8,31 @@ import 'package:printing/printing.dart';
 import '../htmltopdfwidgets.dart';
 
 class WidgetsHTMLDecoder {
-  static Future<List<Widget>> convert(String html) async {
+  final Font? font;
+  final List<Font> fontFallback;
+  const WidgetsHTMLDecoder({this.font, required this.fontFallback});
+
+  Future<List<Widget>> convert(
+    String html,
+  ) async {
+    final emoji = await PdfGoogleFonts.notoColorEmoji();
+    fontFallback.add(emoji);
     final document = parse(html);
     final body = document.body;
     if (body == null) {
       return [];
     }
-    List<Widget> nodes = await _parseElement(body.nodes);
+    List<Widget> nodes = await _parseElement(
+      body.nodes,
+    );
 
     return nodes;
   }
 
-  static Future<List<Widget>> _parseElement(Iterable<dom.Node> domNodes) async {
-    List<TextSpan> delta = [];
+  Future<List<Widget>> _parseElement(
+    Iterable<dom.Node> domNodes,
+  ) async {
+    final List<Widget> delta = [];
     final result = <Widget>[];
     for (final domNode in domNodes) {
       if (domNode is dom.Element) {
@@ -38,18 +50,19 @@ class WidgetsHTMLDecoder {
           );
         }
       } else if (domNode is dom.Text) {
-        delta.add(TextSpan(text: domNode.text));
+        delta.add(Text(domNode.text,
+            style: TextStyle(font: font, fontFallback: fontFallback)));
       } else {
         assert(false, 'Unknown node type: $domNode');
       }
     }
     if (delta.isNotEmpty) {
-      result.add(RichText(text: TextSpan(children: delta)));
+      result.add(Wrap(children: delta));
     }
     return result;
   }
 
-  static Future<Iterable<Widget>> _parseSpecialElements(
+  Future<Iterable<Widget>> _parseSpecialElements(
     dom.Element element, {
     required String type,
   }) async {
@@ -66,7 +79,6 @@ class WidgetsHTMLDecoder {
       case HTMLTags.orderedList:
         return await _parseOrderListElement(element);
       case HTMLTags.list:
-        //if list than default type will be blulleted because paragraph node will not be the part of the list
         return await _parseListElement(
           element,
           type: type,
@@ -74,50 +86,42 @@ class WidgetsHTMLDecoder {
       case HTMLTags.paragraph:
         return [await _parseParagraphElement(element)];
       case HTMLTags.blockQuote:
-        return _parseBlockQuoteElement(element);
+        return await _parseBlockQuoteElement(element);
       case HTMLTags.image:
         return [await _parseImageElement(element)];
       default:
-        return [paragraphNode(text: element.text)];
+        return [await _parseParagraphElement(element)];
     }
   }
 
-  static Text paragraphNode({required String text}) {
+  Text paragraphNode({required String text}) {
     return Text(text);
   }
 
-  static Future<TextStyle> _parserFormattingElementAttributes(
+  Future<TextStyle> _parserFormattingElementAttributes(
       dom.Element element) async {
     final localName = element.localName;
-    TextStyle attributes = const TextStyle();
 
+    TextStyle attributes = TextStyle(fontFallback: fontFallback, font: font);
+    final List<TextDecoration> decoration = [];
     switch (localName) {
       case HTMLTags.bold:
-        attributes = attributes.merge(TextStyle(fontWeight: FontWeight.bold));
+        attributes = attributes.copyWith(fontWeight: FontWeight.bold);
         break;
       case HTMLTags.strong:
-        attributes = attributes.merge(TextStyle(fontWeight: FontWeight.bold));
+        attributes = attributes.copyWith(fontWeight: FontWeight.bold);
         break;
       case HTMLTags.em:
-        attributes = attributes.merge(TextStyle(fontStyle: FontStyle.italic));
+        attributes = attributes.copyWith(fontStyle: FontStyle.italic);
         break;
       case HTMLTags.italic:
-        attributes = attributes.merge(TextStyle(fontStyle: FontStyle.italic));
+        attributes = attributes.copyWith(fontStyle: FontStyle.italic);
         break;
       case HTMLTags.underline:
-        attributes = attributes.copyWith(
-            decoration: TextDecoration.combine([
-          attributes.decoration ?? TextDecoration.none,
-          TextDecoration.underline
-        ]));
-
+        decoration.add(TextDecoration.underline);
         break;
       case HTMLTags.del:
-        attributes = attributes.copyWith(
-            decoration: TextDecoration.combine([
-          attributes.decoration ?? TextDecoration.none,
-          TextDecoration.lineThrough
-        ]));
+        decoration.add(TextDecoration.lineThrough);
 
         break;
 
@@ -125,15 +129,15 @@ class WidgetsHTMLDecoder {
         final deltaAttributes = _getDeltaAttributesFromHtmlAttributes(
           element.attributes,
         );
-        if (deltaAttributes != null) {
-          attributes = attributes.merge(deltaAttributes);
+        attributes = attributes.merge(deltaAttributes);
+        if (deltaAttributes.decoration != null) {
+          decoration.add(deltaAttributes.decoration!);
         }
         break;
       case HTMLTags.anchor:
         final href = element.attributes['href'];
         if (href != null) {
-          attributes = attributes
-              .merge(const TextStyle(decoration: TextDecoration.underline));
+          decoration.add(TextDecoration.underline);
         }
         break;
       case HTMLTags.paragraph:
@@ -148,17 +152,16 @@ class WidgetsHTMLDecoder {
 
     for (final child in element.children) {
       final nattributes = await _parserFormattingElementAttributes(child);
-      attributes = attributes.merge(nattributes.copyWith(
-          decoration: TextDecoration.combine([
-        attributes.decoration ?? TextDecoration.none,
-        nattributes.decoration ?? TextDecoration.none
-      ])));
+      attributes = attributes.merge(nattributes);
+      if (nattributes.decoration != null) {
+        decoration.add(nattributes.decoration!);
+      }
     }
 
-    return attributes;
+    return attributes.copyWith(decoration: TextDecoration.combine(decoration));
   }
 
-  static Future<Widget> _parseHeadingElement(
+  Future<Widget> _parseHeadingElement(
     dom.Element element, {
     required int level,
   }) async {
@@ -167,17 +170,11 @@ class WidgetsHTMLDecoder {
     for (final child in children) {
       if (child is dom.Element) {
         final attributes = await _parserFormattingElementAttributes(child);
-        delta.add(TextSpan(
-            text: child.text,
-            style: attributes.copyWith(
-                fontSize: await getHeadingSize(level),
-                fontWeight: FontWeight.bold)));
+        delta.add(TextSpan(text: child.text, style: attributes));
       } else {
         delta.add(TextSpan(
             text: child.text,
-            style: TextStyle(
-                fontSize: await getHeadingSize(level),
-                fontWeight: FontWeight.bold)));
+            style: TextStyle(font: font, fontFallback: fontFallback)));
       }
     }
     return RichText(
@@ -200,8 +197,7 @@ class WidgetsHTMLDecoder {
     }
   }
 
-  static Future<List<Widget>> _parseBlockQuoteElement(
-      dom.Element element) async {
+  Future<List<Widget>> _parseBlockQuoteElement(dom.Element element) async {
     final result = <Widget>[];
     for (final child in element.children) {
       result.addAll(
@@ -210,8 +206,7 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
-  static Future<Iterable<Widget>> _parseUnOrderListElement(
-      dom.Element element) async {
+  Future<Iterable<Widget>> _parseUnOrderListElement(dom.Element element) async {
     final result = <Widget>[];
     for (final child in element.children) {
       result.addAll(await _parseListElement(child,
@@ -220,8 +215,7 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
-  static Future<Iterable<Widget>> _parseOrderListElement(
-      dom.Element element) async {
+  Future<Iterable<Widget>> _parseOrderListElement(dom.Element element) async {
     final result = <Widget>[];
     for (var i = 0; i < element.children.length; i++) {
       final child = element.children[i];
@@ -231,7 +225,7 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
-  static Future<Iterable<Widget>> _parseListElement(
+  Future<Iterable<Widget>> _parseListElement(
     dom.Element element, {
     required String type,
     int? index,
@@ -248,12 +242,12 @@ class WidgetsHTMLDecoder {
     }
   }
 
-  static Future<Widget> _parseParagraphElement(dom.Element element) async {
+  Future<Widget> _parseParagraphElement(dom.Element element) async {
     final delta = await _parseDeltaElement(element);
     return delta;
   }
 
-  static Future<Widget> _parseImageElement(dom.Element element) async {
+  Future<Widget> _parseImageElement(dom.Element element) async {
     final src = element.attributes["src"];
     try {
       if (src != null) {
@@ -267,19 +261,20 @@ class WidgetsHTMLDecoder {
     }
   }
 
-  static Future<Widget> _parseDeltaElement(dom.Element element) async {
-    final delta = <TextSpan>[];
+  Future<Widget> _parseDeltaElement(dom.Element element) async {
+    final delta = <Widget>[];
     final children = element.nodes.toList();
     for (final child in children) {
       if (child is dom.Element) {
         final attributes = await _parserFormattingElementAttributes(child);
 
-        delta.add(TextSpan(text: child.text, style: attributes));
+        delta.add(Text(child.text, style: attributes));
       } else {
-        delta.add(TextSpan(text: child.text));
+        delta.add(Text(child.text ?? "",
+            style: TextStyle(font: font, fontFallback: fontFallback)));
       }
     }
-    return RichText(text: TextSpan(children: delta));
+    return Wrap(children: delta);
   }
 
   static Map<String, String> _cssStringToMap(String? cssString) {
@@ -300,9 +295,9 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
-  static TextStyle? _getDeltaAttributesFromHtmlAttributes(
+  static TextStyle _getDeltaAttributesFromHtmlAttributes(
       LinkedHashMap<Object, String> htmlAttributes) {
-    var style = const TextStyle();
+    TextStyle style = const TextStyle();
     final styleString = htmlAttributes["style"];
     final cssMap = _cssStringToMap(styleString);
 
@@ -320,7 +315,7 @@ class WidgetsHTMLDecoder {
 
     final textDecorationStr = cssMap["text-decoration"];
     if (textDecorationStr != null) {
-      _assignTextDecorations(style, textDecorationStr);
+      style = style.merge(_assignTextDecorations(style, textDecorationStr));
     }
 
     final backgroundColorStr = cssMap["background-color"];
@@ -329,89 +324,87 @@ class WidgetsHTMLDecoder {
         : ColorExtension.tryFromRgbaString(backgroundColorStr);
     if (backgroundColor != null) {
       style = style.copyWith(color: PdfColor.fromInt(backgroundColor.value));
-      // attrs[BuiltInAttributeKey.backgroundColor] =
-      //     '0x${backgroundColor.value.toRadixString(16)}';
     }
 
     if (cssMap["font-style"] == "italic") {
       style = style.copyWith(fontStyle: FontStyle.italic);
-      // attrs[BuiltInAttributeKey.italic] = true;
     }
 
     return style;
   }
 
-  static void _assignTextDecorations(TextStyle style, String decorationStr) {
+  static TextStyle _assignTextDecorations(
+      TextStyle style, String decorationStr) {
     final decorations = decorationStr.split(" ");
+    final textdecorations = <TextDecoration>[];
     for (final d in decorations) {
       if (d == "line-through") {
-        style = style.copyWith(decoration: TextDecoration.lineThrough);
-        // attrs[BuiltInAttributeKey.strike] = true;
+        textdecorations.add(TextDecoration.overline);
       } else if (d == "underline") {
-        style = style.copyWith(decoration: TextDecoration.underline);
+        textdecorations.add(TextDecoration.underline);
       }
     }
+    return style.copyWith(decoration: TextDecoration.combine(textdecorations));
   }
-}
 
-Widget defaultIndex(int index) {
-  return Container(
-    width: 20,
-    padding: const EdgeInsets.only(right: 5.0),
-    child: Text(
-      '$index.',
-    ),
-  );
-}
+  Widget defaultIndex(int index) {
+    return Container(
+      width: 20,
+      padding: const EdgeInsets.only(right: 5.0),
+      child: Text('$index.',
+          style: TextStyle(font: font, fontFallback: fontFallback)),
+    );
+  }
 
-Widget buildNumberwdget(Widget childValue, {required int index}) {
-  Widget child = Container(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        defaultIndex(index),
-        Flexible(child: childValue),
-      ],
-    ),
-  );
-  return child;
-}
+  Widget buildNumberwdget(Widget childValue, {required int index}) {
+    Widget child = Container(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          defaultIndex(index),
+          Flexible(child: childValue),
+        ],
+      ),
+    );
+    return child;
+  }
 
-Widget buildQuotewidget(
-  Widget childValue,
-) {
-  Widget child = Container(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-            width: 20,
-            height: 20,
-            child: VerticalDivider(color: PdfColors.black)),
-        Flexible(child: childValue),
-      ],
-    ),
-  );
-  return child;
-}
+  Widget buildQuotewidget(
+    Widget childValue,
+  ) {
+    Widget child = Container(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+              width: 20,
+              height: 20,
+              child: VerticalDivider(color: PdfColors.black)),
+          Flexible(child: childValue),
+        ],
+      ),
+    );
+    return child;
+  }
 
-Widget buildBulletwidget(Widget childValue) {
-  Widget child = Container(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _BulletedListIcon(),
-        Flexible(child: childValue),
-      ],
-    ),
-  );
-  return child;
+  Widget buildBulletwidget(Widget childValue) {
+    Widget child = Container(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _BulletedListIcon(),
+          Flexible(child: childValue),
+        ],
+      ),
+    );
+    return child;
+  }
 }
 
 class _BulletedListIcon extends StatelessWidget {
