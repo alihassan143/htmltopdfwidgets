@@ -1,3 +1,7 @@
+## 0.0.6
+
+*  multiple styles on same text
+*  font fallback and font added 
 ## 0.0.5
 
 *  missing image element added
