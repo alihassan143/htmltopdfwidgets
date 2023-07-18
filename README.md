@@ -1,41 +1,82 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
-
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/guides/libraries/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-library-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/developing-packages).
--->
-
-TODO: Htmlt to pdf widgets library convert html text to pdf widgets
+# HTMLtoPDFWidgets
 
 
+HTMLtoPDFWidgets is a Flutter package that allows you to convert HTML content into PDF documents with support for various Rich Text Editor formats. With this package, you can effortlessly generate PDF files that include elements such as lists, paragraphs, images, quotes, and headings.
 
+## Features
 
+- Convert HTML content to PDF documents in Flutter apps
+- Support for Rich Text Editor formats
+- Seamless integration with your Flutter project
+- Customizable output settings
+- Lightweight and easy to use
 
+## Installation
 
+Add the following dependency to your `pubspec.yaml` file:
 
-
-```dart
-import 'package:pdf/pdf.dart' as pdf;
-import 'package:pdf/widgets.dart' as pw;
-Strinng htmlText='''<p>&nbsp;</p>
-<h2>Is it Important to Remove Grammatical Errors?<br />It's definitely important to remove all the grammatical errors and make your content grammatically fit. There are many factors involved with grammar including spelling, punctuation, use of articles, and more.<br />It is not wrong to say that you need to eliminate grammatical errors if you want to get benefited from your content because it is tough to rank the content which is not grammatically perfect. If you want to complete this task in less time, you can opt for this grammar checker.</h2>
-<h2>What Factors Make a Grammar Checker the Best?<br /><br /></h2>
-<p>Here are a lot of different factors. Some are important and major, while some can be a bit overlooked by a lot of people. However, these should</p>
-<h2>Steps to create a PDF document programmatically in Web platform<br /><br /></h2>
-<ol>
-<li>Create a new Flutter application project.</li>
-</ol>
-<p><br />1.1Open Visual Studio Code (After installing the Dart and Flutter extensions as stated in this&nbsp;<a href="https://flutter.dev/docs/get-started/editor?tab=vscode" target="_blank" rel="noopener">setup editor</a>&nbsp;page)<br />1.2Click View -&gt; Command Palette&hellip;<br /><br /><img class="ql-image" src="https://www.syncfusion.com/uploads/user/kb/flut/flut-2327/flut-2327_img1.png" width="469" /><br />1.3Type&nbsp;Flutter&nbsp;and choose&nbsp;Flutter: New Project.<br /><br /><img class="ql-image" src="https://www.syncfusion.com/uploads/user/kb/flut/flut-2327/flut-2327_img2.png" width="535" /><br />1.4Enter the project name and press the Enter button </p>''';
-    final newpdf = pw.Document();
-    List<pw.Widget> widgets = await HTMLToNodesConverter(htmlText).toNodes();
+```yaml
+dependencies:
+  htmltopdfwidgets: ^1.0.0
 ```
 
-## Additional information
+## Usage
 
-[Appflowy-editor](https://github.com/AppFlowy-IO/appflowy-editor)  takes inspiration from appflowy editor html to node converter functions
+To use HTMLtoPDFWidgets in your Flutter project, follow these simple steps:
+
+1. Import the package:
+
+```dart
+import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
+```
+
+2. Convert HTML to PDF:
+
+```dart
+final htmlContent = '''
+  <h1>Heading Example</h1>
+  <p>This is a paragraph.</p>
+  <img src="image.jpg" alt="Example Image" />
+  <blockquote>This is a quote.</blockquote>
+  <ul>
+    <li>First item</li>
+    <li>Second item</li>
+    <li>Third item</li>
+  </ul>
+''';
+
+f var filePath = 'test/example.pdf';
+  var file = File(filePath);
+  final newpdf = Document();
+  List<Widget> widgets = await HTMLToPdf().convert(htmlText);
+  newpdf.addPage(MultiPage(
+      maxPages: 200,
+      build: (context) {
+        return widgets;
+      }));
+  await file.writeAsBytes(await newpdf.save());
+```
+
+For more details on usage and available options, please refer to the [API documentation](https://pub.dev/documentation/htmltopdfwidgets/latest).
+
+## Example
+
+You can find a complete example in the [example](https://github.com/alihassan143/htmltopdfwidgets/tree/main/example) directory of this repository.
+
+## License
+
+This package is licensed under the [MIT License](https://github.com/alihassan143/htmltopdfwidgets/blob/main/LICENSE).
+
+## Contributing
+
+Contributions are welcome! If you encounter any issues or have suggestions for improvements, please feel free to open an issue or submit a pull request on the [GitHub repository](https://github.com/alihassan143/htmltopdfwidgets).
+
+## Acknowledgments
+
+Special thanks to the following contributors for their valuable contributions to this project:
+
+- Appflowy ([@AppFlowy-IO](https://github.com/AppFlowy-IO/appflowy-editor))
+
+
+
+Happy PDF generation with HTMLtoPDFWidgets in your Flutter apps!

@@ -6,8 +6,6 @@ import 'package:html/parser.dart' show parse;
 import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:http/http.dart';
 
-// import 'package:printing/printing.dart';
-
 import '../htmltopdfwidgets.dart';
 
 class WidgetsHTMLDecoder {
@@ -37,7 +35,7 @@ class WidgetsHTMLDecoder {
     final result = <Widget>[];
     for (final domNode in domNodes) {
       if (domNode is dom.Element) {
-        final localName = domNode.className;
+        final localName = domNode.localName;
 
         if (HTMLTags.formattingElements.contains(localName)) {
           final attributes = await _parserFormattingElementAttributes(domNode);
@@ -91,6 +89,8 @@ class WidgetsHTMLDecoder {
         return await _parseBlockQuoteElement(element);
       case HTMLTags.image:
         return [await _parseImageElement(element)];
+      case HTMLTags.br:
+        return [Text("\n")];
       default:
         return [await _parseParagraphElement(element)];
     }
@@ -139,7 +139,10 @@ class WidgetsHTMLDecoder {
       case HTMLTags.anchor:
         final href = element.attributes['href'];
         if (href != null) {
-          decoration.add(TextDecoration.underline);
+          decoration.add(
+            TextDecoration.underline,
+          );
+          attributes = attributes.copyWith(color: PdfColors.blue);
         }
         break;
       case HTMLTags.paragraph:
@@ -472,6 +475,7 @@ class HTMLTags {
   static const italic = 'i';
   static const em = 'em';
   static const bold = 'b';
+  static const br = 'br';
   static const underline = 'u';
   static const del = 'del';
   static const strong = 'strong';
@@ -499,6 +503,7 @@ class HTMLTags {
     HTMLTags.h2,
     HTMLTags.h3,
     HTMLTags.div,
+    HTMLTags.br,
     HTMLTags.unorderedList,
     HTMLTags.orderedList,
     HTMLTags.list,
