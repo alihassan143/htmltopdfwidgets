@@ -8,7 +8,6 @@ HTMLtoPDFWidgets is a Flutter package that allows you to convert HTML content in
 - Convert HTML content to PDF documents in Flutter apps
 - Support for Rich Text Editor formats
 - Seamless integration with your Flutter project
-- Customizable output settings
 - Lightweight and easy to use
 
 ## Installation
