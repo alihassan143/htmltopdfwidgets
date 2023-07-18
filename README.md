@@ -73,7 +73,7 @@ Contributions are welcome! If you encounter any issues or have suggestions for i
 
 ## Acknowledgments
 
-Special thanks to the following contributors for their valuable contributions to this project:
+Special thanks to the Appflowy editor:
 
 - Appflowy ([@AppFlowy-IO](https://github.com/AppFlowy-IO/appflowy-editor))
 
