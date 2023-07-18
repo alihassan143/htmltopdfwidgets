@@ -1,3 +1,7 @@
+## 0.0.7
+
+*  support for dark sdk
+*  nested elements children support
 ## 0.0.6
 
 *  multiple styles on same text
