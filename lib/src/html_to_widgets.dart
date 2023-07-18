@@ -1,9 +1,12 @@
 import 'dart:collection';
-import 'dart:ui';
-import 'package:html/parser.dart' show parse;
+import 'dart:typed_data';
+
 import 'package:html/dom.dart' as dom;
+import 'package:html/parser.dart' show parse;
 import 'package:htmltopdfwidgets/src/attributes.dart';
-import 'package:printing/printing.dart';
+import 'package:http/http.dart';
+
+// import 'package:printing/printing.dart';
 
 import '../htmltopdfwidgets.dart';
 
@@ -15,8 +18,6 @@ class WidgetsHTMLDecoder {
   Future<List<Widget>> convert(
     String html,
   ) async {
-    final emoji = await PdfGoogleFonts.notoColorEmoji();
-    fontFallback.add(emoji);
     final document = parse(html);
     final body = document.body;
     if (body == null) {
@@ -36,7 +37,8 @@ class WidgetsHTMLDecoder {
     final result = <Widget>[];
     for (final domNode in domNodes) {
       if (domNode is dom.Element) {
-        final localName = domNode.localName;
+        final localName = domNode.className;
+
         if (HTMLTags.formattingElements.contains(localName)) {
           final attributes = await _parserFormattingElementAttributes(domNode);
 
@@ -144,7 +146,8 @@ class WidgetsHTMLDecoder {
         attributes = attributes;
         break;
       case HTMLTags.code:
-        attributes = attributes;
+        attributes = attributes.copyWith(
+            background: const BoxDecoration(color: PdfColors.red));
         break;
       default:
         break;
@@ -251,8 +254,8 @@ class WidgetsHTMLDecoder {
     final src = element.attributes["src"];
     try {
       if (src != null) {
-        final netImage = await networkImage(src);
-        return Image(netImage);
+        final netImage = await _saveImage(src);
+        return Image(MemoryImage(netImage));
       } else {
         return Text("");
       }
@@ -261,20 +264,48 @@ class WidgetsHTMLDecoder {
     }
   }
 
+  Future<Uint8List> _saveImage(String url) async {
+    try {
+      // Download image
+      final Response response = await get(Uri.parse(url));
+
+      // Get temporary directory
+
+      return response.bodyBytes;
+    } catch (e) {
+      throw Exception(e);
+    }
+  }
+
   Future<Widget> _parseDeltaElement(dom.Element element) async {
     final delta = <Widget>[];
     final children = element.nodes.toList();
+    final childNodes = <Widget>[];
     for (final child in children) {
       if (child is dom.Element) {
-        final attributes = await _parserFormattingElementAttributes(child);
-
-        delta.add(Text(child.text, style: attributes));
+        if (child.children.isNotEmpty) {
+          childNodes.addAll(await _parseElement(child.children));
+        } else {
+          if (HTMLTags.specialElements.contains(child.localName)) {
+            childNodes.addAll(
+              await _parseSpecialElements(
+                child,
+                type: BuiltInAttributeKey.bulletedList,
+              ),
+            );
+          } else {
+            final attributes = await _parserFormattingElementAttributes(child);
+            delta.add(Text(child.text, style: attributes));
+          }
+        }
       } else {
         delta.add(Text(child.text ?? "",
             style: TextStyle(font: font, fontFallback: fontFallback)));
       }
     }
-    return Wrap(children: delta);
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [Wrap(children: delta), ...childNodes]);
   }
 
   static Map<String, String> _cssStringToMap(String? cssString) {
@@ -323,7 +354,7 @@ class WidgetsHTMLDecoder {
         ? null
         : ColorExtension.tryFromRgbaString(backgroundColorStr);
     if (backgroundColor != null) {
-      style = style.copyWith(color: PdfColor.fromInt(backgroundColor.value));
+      style = style.copyWith(color: backgroundColor);
     }
 
     if (cssMap["font-style"] == "italic") {
@@ -488,10 +519,10 @@ class HTMLTags {
   }
 }
 
-extension ColorExtension on Color {
+extension ColorExtension on PdfColor {
   /// Try to parse the `rgba(red, greed, blue, alpha)`
   /// from the string.
-  static Color? tryFromRgbaString(String colorString) {
+  static PdfColor? tryFromRgbaString(String colorString) {
     final reg = RegExp(r'rgba\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)');
     final match = reg.firstMatch(colorString);
     if (match == null) {
@@ -515,10 +546,25 @@ extension ColorExtension on Color {
       return null;
     }
 
-    return Color.fromARGB(alpha, red, green, blue);
+    return PdfColor.fromInt(
+        hexOfRGBA(red, green, blue, opacity: alpha.toDouble()));
   }
 
   String toRgbaString() {
     return 'rgba($red, $green, $blue, $alpha)';
   }
+}
+
+int hexOfRGBA(int r, int g, int b, {double opacity = 1}) {
+  r = (r < 0) ? -r : r;
+  g = (g < 0) ? -g : g;
+  b = (b < 0) ? -b : b;
+  opacity = (opacity < 0) ? -opacity : opacity;
+  opacity = (opacity > 1) ? 255 : opacity * 255;
+  r = (r > 255) ? 255 : r;
+  g = (g > 255) ? 255 : g;
+  b = (b > 255) ? 255 : b;
+  int a = opacity.toInt();
+  return int.parse(
+      '0x${a.toRadixString(16)}${r.toRadixString(16)}${g.toRadixString(16)}${b.toRadixString(16)}');
 }
