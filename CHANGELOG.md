@@ -1,3 +1,7 @@
+## 0.0.8
+
+*  support custom styles
+
 ## 0.0.7
 
 *  support for dark sdk
