@@ -10,8 +10,12 @@ import '../htmltopdfwidgets.dart';
 
 class WidgetsHTMLDecoder {
   final Font? font;
+  final HtmlTagStyle customStyles;
   final List<Font> fontFallback;
-  const WidgetsHTMLDecoder({this.font, required this.fontFallback});
+  const WidgetsHTMLDecoder(
+      {this.font,
+      required this.fontFallback,
+      this.customStyles = const HtmlTagStyle()});
 
   Future<List<Widget>> convert(
     String html,
@@ -74,6 +78,12 @@ class WidgetsHTMLDecoder {
         return [await _parseHeadingElement(element, level: 2)];
       case HTMLTags.h3:
         return [await _parseHeadingElement(element, level: 3)];
+      case HTMLTags.h4:
+        return [await _parseHeadingElement(element, level: 4)];
+      case HTMLTags.h5:
+        return [await _parseHeadingElement(element, level: 5)];
+      case HTMLTags.h6:
+        return [await _parseHeadingElement(element, level: 6)];
       case HTMLTags.unorderedList:
         return await _parseUnOrderListElement(element);
       case HTMLTags.orderedList:
@@ -108,16 +118,20 @@ class WidgetsHTMLDecoder {
     final List<TextDecoration> decoration = [];
     switch (localName) {
       case HTMLTags.bold:
-        attributes = attributes.copyWith(fontWeight: FontWeight.bold);
+        attributes = attributes.copyWith(fontWeight: FontWeight.bold)
+          ..merge(customStyles.boldStyle);
         break;
       case HTMLTags.strong:
-        attributes = attributes.copyWith(fontWeight: FontWeight.bold);
+        attributes = attributes.copyWith(fontWeight: FontWeight.bold)
+          ..merge(customStyles.boldStyle);
         break;
       case HTMLTags.em:
-        attributes = attributes.copyWith(fontStyle: FontStyle.italic);
+        attributes = attributes.copyWith(fontStyle: FontStyle.italic)
+          ..merge(customStyles.italicStyle);
         break;
       case HTMLTags.italic:
-        attributes = attributes.copyWith(fontStyle: FontStyle.italic);
+        attributes = attributes.copyWith(fontStyle: FontStyle.italic)
+          ..merge(customStyles.italicStyle);
         break;
       case HTMLTags.underline:
         decoration.add(TextDecoration.underline);
@@ -142,15 +156,17 @@ class WidgetsHTMLDecoder {
           decoration.add(
             TextDecoration.underline,
           );
-          attributes = attributes.copyWith(color: PdfColors.blue);
+          attributes = attributes.copyWith(color: PdfColors.blue)
+            ..merge(customStyles.linkStyle);
         }
         break;
       case HTMLTags.paragraph:
-        attributes = attributes;
+        attributes = attributes..merge(customStyles.paragraphStyle);
         break;
       case HTMLTags.code:
         attributes = attributes.copyWith(
-            background: const BoxDecoration(color: PdfColors.red));
+            background: const BoxDecoration(color: PdfColors.red))
+          ..merge(customStyles.codeStyle);
         break;
       default:
         break;
@@ -187,19 +203,47 @@ class WidgetsHTMLDecoder {
         text: TextSpan(
             children: delta,
             style: TextStyle(
-                fontSize: await getHeadingSize(level),
-                fontWeight: FontWeight.bold)));
+                fontSize: getHeadingSize(level), fontWeight: FontWeight.bold)
+              ..merge(getHeadingStyle(level))));
   }
 
-  static Future<double> getHeadingSize(int level) async {
-    if (level == 1) {
-      return 32;
-    } else if (level == 2) {
-      return 28;
-    } else if (level == 3) {
-      return 22;
-    } else {
-      return 20;
+  static double getHeadingSize(int level) {
+    switch (level) {
+      case 1:
+        return 32;
+      case 2:
+        return 28;
+      case 3:
+        return 20;
+      case 4:
+        return 17;
+      case 5:
+        return 14;
+      case 6:
+        return 10;
+      default:
+        return 32;
+    }
+  }
+
+  TextStyle? getHeadingStyle(
+    int level,
+  ) {
+    switch (level) {
+      case 1:
+        return customStyles.h1Style;
+      case 2:
+        return customStyles.h2Style;
+      case 3:
+        return customStyles.h3Style;
+      case 4:
+        return customStyles.h4Style;
+      case 5:
+        return customStyles.h5Style;
+      case 6:
+        return customStyles.h6Style;
+      default:
+        return customStyles.h1Style;
     }
   }
 
@@ -258,7 +302,8 @@ class WidgetsHTMLDecoder {
     try {
       if (src != null) {
         final netImage = await _saveImage(src);
-        return Image(MemoryImage(netImage));
+        return Image(MemoryImage(netImage),
+            alignment: customStyles.imageAlignment);
       } else {
         return Text("");
       }
@@ -297,13 +342,15 @@ class WidgetsHTMLDecoder {
               ),
             );
           } else {
-            final attributes = await _parserFormattingElementAttributes(child);
+            final attributes = await _parserFormattingElementAttributes(child)
+              ..merge(customStyles.paragraphStyle);
             delta.add(Text(child.text, style: attributes));
           }
         }
       } else {
         delta.add(Text(child.text ?? "",
-            style: TextStyle(font: font, fontFallback: fontFallback)));
+            style: TextStyle(font: font, fontFallback: fontFallback)
+              ..merge(customStyles.paragraphStyle)));
       }
     }
     return Column(
@@ -329,7 +376,7 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
-  static TextStyle _getDeltaAttributesFromHtmlAttributes(
+  TextStyle _getDeltaAttributesFromHtmlAttributes(
       LinkedHashMap<Object, String> htmlAttributes) {
     TextStyle style = const TextStyle();
     final styleString = htmlAttributes["style"];
@@ -338,11 +385,13 @@ class WidgetsHTMLDecoder {
     final fontWeightStr = cssMap["font-weight"];
     if (fontWeightStr != null) {
       if (fontWeightStr == "bold") {
-        style = style.copyWith(fontWeight: FontWeight.bold);
+        style = style.copyWith(fontWeight: FontWeight.bold)
+          ..merge(customStyles.boldStyle);
       } else {
         int? weight = int.tryParse(fontWeightStr);
         if (weight != null && weight > 500) {
-          style = style.copyWith(fontWeight: FontWeight.bold);
+          style = style.copyWith(fontWeight: FontWeight.bold)
+            ..merge(customStyles.boldStyle);
         }
       }
     }
@@ -361,7 +410,8 @@ class WidgetsHTMLDecoder {
     }
 
     if (cssMap["font-style"] == "italic") {
-      style = style.copyWith(fontStyle: FontStyle.italic);
+      style = style.copyWith(fontStyle: FontStyle.italic)
+        ..merge(customStyles.italicStyle);
     }
 
     return style;
@@ -386,7 +436,10 @@ class WidgetsHTMLDecoder {
       width: 20,
       padding: const EdgeInsets.only(right: 5.0),
       child: Text('$index.',
-          style: TextStyle(font: font, fontFallback: fontFallback)),
+          style: TextStyle(
+            font: font,
+            fontFallback: fontFallback,
+          )..merge(customStyles.listIndexStyle)),
     );
   }
 
@@ -417,7 +470,8 @@ class WidgetsHTMLDecoder {
           SizedBox(
               width: 20,
               height: 20,
-              child: VerticalDivider(color: PdfColors.black)),
+              child: VerticalDivider(
+                  color: customStyles.quoteBarColor ?? PdfColors.black)),
           Flexible(child: childValue),
         ],
       ),
@@ -432,7 +486,7 @@ class WidgetsHTMLDecoder {
         mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _BulletedListIcon(),
+          _BulletedListIcon(style: customStyles),
           Flexible(child: childValue),
         ],
       ),
@@ -442,7 +496,8 @@ class WidgetsHTMLDecoder {
 }
 
 class _BulletedListIcon extends StatelessWidget {
-  _BulletedListIcon();
+  final HtmlTagStyle style;
+  _BulletedListIcon({required this.style});
 
   @override
   Widget build(Context context) {
@@ -455,8 +510,9 @@ class _BulletedListIcon extends StatelessWidget {
             child: Container(
                 width: 5,
                 height: 5,
-                decoration: const BoxDecoration(
-                    shape: BoxShape.circle, color: PdfColors.black))),
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: style.bulletListIconColor ?? PdfColors.black))),
       ),
     );
   }
@@ -466,6 +522,9 @@ class HTMLTags {
   static const h1 = 'h1';
   static const h2 = 'h2';
   static const h3 = 'h3';
+  static const h4 = 'h4';
+  static const h5 = 'h5';
+  static const h6 = 'h6';
   static const orderedList = 'ol';
   static const unorderedList = 'ul';
   static const list = 'li';
@@ -502,6 +561,9 @@ class HTMLTags {
     HTMLTags.h1,
     HTMLTags.h2,
     HTMLTags.h3,
+    HTMLTags.h4,
+    HTMLTags.h5,
+    HTMLTags.h6,
     HTMLTags.div,
     HTMLTags.br,
     HTMLTags.unorderedList,
@@ -517,6 +579,9 @@ class HTMLTags {
     return tag == h1 ||
         tag == h2 ||
         tag == h3 ||
+        tag == h4 ||
+        tag == h5 ||
+        tag == h6 ||
         tag == checkbox ||
         tag == paragraph ||
         tag == div ||
