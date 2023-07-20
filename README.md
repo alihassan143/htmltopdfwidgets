@@ -73,6 +73,7 @@ Contributions are welcome! If you encounter any issues or have suggestions for i
 ## Acknowledgments
 
 Special thanks to the Appflowy editor:
+I use their Html To Document plugin as reference
 
 - Appflowy ([@AppFlowy-IO](https://github.com/AppFlowy-IO/appflowy-editor))
 
