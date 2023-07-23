@@ -1,10 +1,13 @@
+## 0.0.8+1
+
+*  update reamdme.md
 ## 0.0.8
 
 *  support custom styles
 
 ## 0.0.7
 
-*  support for dark sdk
+*  support for dart sdk
 *  nested elements children support
 ## 0.0.6
 
