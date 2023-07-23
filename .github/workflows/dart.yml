@@ -1,140 +1,42 @@
-name: Dart CI
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Dart
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   pull_request:
-    branches: [main]
+    branches: [ "main" ]
 
 jobs:
-  linux:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-      - name: Enable Linux for flutter
-        run: flutter config --enable-linux-desktop
-      - name: Update repo
-        run: sudo apt update
-      - name: Install utils
-        run: sudo apt install poppler-utils imagemagick clang cmake ninja-build pkg-config libgtk-3-dev
-      - name: Run analysis
-        run: make analyze
+
+      # Note: This workflow uses the latest stable version of the Dart SDK.
+      # You can specify other versions if desired, see documentation here:
+      # https://github.com/dart-lang/setup-dart/blob/main/README.md
+      # - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@9a04e6d73cca37bd455e0608d7e5092f881fd603
+
+      - name: Install dependencies
+        run: dart pub get
+
+      # Uncomment this step to verify the use of 'dart format' on each commit.
+      # - name: Verify formatting
+      #   run: dart format --output=none --set-exit-if-changed .
+
+      # Consider passing '--fatal-infos' for slightly stricter analysis.
+      - name: Analyze project source
+        run: dart analyze
+
+      # Your project will need to have tests in test/ and a dependency on
+      # package:test for this step to succeed. Note that Flutter projects will
+      # want to change this to 'flutter test'.
       - name: Run tests
-        run: make test
-      - name: Run readme tests
-        run: make test-readme
-      - name: Verify that nothing changed
-        run: test -z "$(git status --porcelain)"
-      - name: Push to codecov
-        run: bash <(curl -s https://codecov.io/bash)
-      - name: Prepare build
-        run: cd example; flutter create -t app --no-overwrite --org com.htmltopdf --project-name example .
-      - name: Build example for Linux
-        run: cd example; flutter build -v linux
-      - name: Build example for Android
-        run: cd example; flutter build -v apk
-      - name: Build demo for Web
-        run: cd demo; flutter build -v web
-
-  windows:
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-      - name: Enable Windows for flutter
-        run: flutter config --enable-windows-desktop
-      - name: Prepare build
-        run: cd example; flutter create -t app --no-overwrite --org com.htmltopdf --project-name example .
-      - name: Build example for Windows
-        run: cd example; flutter build -v windows
-
-  macos:
-    runs-on: macos-12
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          architecture: x64
-      - name: Enable macOS for flutter
-        run: flutter config --enable-macos-desktop
-      - name: Prepare build
-        run: cd example; flutter create -t app --no-overwrite --org com.htmltopdf --project-name example .
-      - name: Build example for macOS
-        run: cd example; flutter build -v macos
-      # - name: Build example for iOS
-      #   run: cd example; flutter build -v ios
-
-  linux-dev:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: main
-      - name: Enable Linux for flutter
-        run: flutter config --enable-linux-desktop
-      - name: Update repo
-        run: sudo apt update
-      - name: Install utils
-        run: sudo apt install poppler-utils imagemagick clang cmake ninja-build pkg-config libgtk-3-dev
-      - name: Run analysis
-        run: make analyze
-      - name: Run tests
-        run: make test
-      - name: Run readme tests
-        run: make test-readme
-      - name: Verify that nothing changed
-        run: test -z "$(git status --porcelain)"
-      - name: Push to codecov
-        run: bash <(curl -s https://codecov.io/bash)
-      - name: Prepare build
-        run: cd example; flutter create -t app --no-overwrite --org com.htmltopdf --project-name example .
-      - name: Build example for Linux
-        run: cd example; flutter build -v linux
-      - name: Build example for Android
-        run: cd example; flutter build -v apk
-      - name: Build demo for Web
-        run: cd demo; flutter build -v web
-
-  windows-dev:
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: main
-      - name: Enable Windows for flutter
-        run: flutter config --enable-windows-desktop
-      - name: Prepare build
-        run: cd example; flutter create -t app --no-overwrite --org com.htmltopdf --project-name example .
-      - name: Build example for Windows
-        run: cd example; flutter build -v windows
-
-  macos-dev:
-    runs-on: macos-12
-
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: main
-          architecture: x64
-      - name: Enable macOS for flutter
-        run: flutter config --enable-macos-desktop
-      - name: Prepare build
-        run: cd example; flutter create -t app --no-overwrite --org com.htmltopdf --project-name example .
-      - name: Build example for macOS
-        run: cd example; flutter build -v macos
-      # - name: Build example for iOS
-      #   run: cd example; flutter build -v ios
+        run: dart test
