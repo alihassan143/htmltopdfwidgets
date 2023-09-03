@@ -333,9 +333,6 @@ class WidgetsHTMLDecoder {
     final children = element.nodes.toList();
     final childNodes = <Widget>[];
     for (final child in children) {
-  
-
-            print(child.parent!.outerHtml);
 PdfColor? selectedcolor ;
 if(child.text!.isEmpty){
   child.text = "." ;
@@ -353,47 +350,13 @@ if(child.text!.isEmpty){
               ),
             );
           } else {
-Map<String,double> fontss = {
-"1" : 8 ,
-"2" : 10 ,
-"3" : 12 ,
-"4" : 14 ,
-"5" : 18 ,
-"6" : 24 ,
-"7" : 36 ,
-}           ; 
-Alignment alignmentfortext = Alignment.center ;
-double? fontsizee ; 
-if(child.parent!.outerHtml.contains("size=")){
-  fontsizee = fontss[child.parent!.outerHtml.substring(child.parent!.outerHtml.indexOf("size=",)+6,child.parent!.outerHtml.indexOf("size=",)+7)];
-}
-if(child.parent!.outerHtml.contains("font color=")){
-  selectedcolor = PdfColor.fromHex(child.parent!.outerHtml.substring(child.parent!.outerHtml.indexOf("font color=",)+12,child.parent!.outerHtml.indexOf("font color=",)+19));
-}
-if(child.parent!.outerHtml.contains("rtl")){
-  alignmentfortext = Alignment.centerRight ; 
-}else{
-   alignmentfortext = Alignment.centerLeft ; 
-}
-
-
-if(child.parent!.outerHtml.contains("text-align: left;")){
-  alignmentfortext = Alignment.centerLeft ; 
-}
-else if (child.parent!.outerHtml.contains("text-align: center;")){
-   alignmentfortext = Alignment.center ; 
-}
-else if (child.parent!.outerHtml.contains("text-align: right;")){
-   alignmentfortext = Alignment.centerRight ; 
-}
-
-if(child.text! =="."){
+CssProberties instance = _handleCss(child.parent!.outerHtml)  ;
+Alignment alignmentfortext = instance.alignmentfortext?? Alignment.center  ;
+double? fontsizee = instance.fontsize  ;  
+selectedcolor = instance.selectedcolor  ;
+if(child.text =="."){
   selectedcolor = PdfColors.white ;
 }
-
-
-
-            print("hiiieeeee") ;
             final attributes = await _parserFormattingElementAttributes(child)
               ..merge(customStyles.paragraphStyle);
             delta.add(  Align(
@@ -401,47 +364,13 @@ if(child.text! =="."){
           }
         }
       } else {
-Map<String,double> fontss = {
-"1" : 8 ,
-"2" : 10 ,
-"3" : 12 ,
-"4" : 14 ,
-"5" : 18 ,
-"6" : 24 ,
-"7" : 36 ,
-}           ; 
-Alignment alignmentfortext = Alignment.center ;
-double? fontsizee ; 
-if(child.parent!.outerHtml.contains("size=")){
-  fontsizee = fontss[child.parent!.outerHtml.substring(child.parent!.outerHtml.indexOf("size=",)+6,child.parent!.outerHtml.indexOf("size=",)+7)];
-}
-if(child.parent!.outerHtml.contains("font color=")){
-  selectedcolor = PdfColor.fromHex(child.parent!.outerHtml.substring(child.parent!.outerHtml.indexOf("font color=",)+12,child.parent!.outerHtml.indexOf("font color=",)+19));
-}
-if(child.parent!.outerHtml.contains("rtl")){
-  alignmentfortext = Alignment.centerRight ; 
-}else{
-   alignmentfortext = Alignment.centerLeft ; 
-}
-
-
-if(child.parent!.outerHtml.contains("text-align: left;")){
-  alignmentfortext = Alignment.centerLeft ; 
-}
-else if (child.parent!.outerHtml.contains("text-align: center;")){
-   alignmentfortext = Alignment.center ; 
-}
-else if (child.parent!.outerHtml.contains("text-align: right;")){
-   alignmentfortext = Alignment.centerRight ; 
-}
-
-if(child.text! =="."){
+CssProberties instance = _handleCss(child.parent!.outerHtml)  ;
+Alignment alignmentfortext = instance.alignmentfortext ?? Alignment.center  ;
+double? fontsizee = instance.fontsize  ;  
+selectedcolor = instance.selectedcolor ;
+if(child.text =="."){
   selectedcolor = PdfColors.white ;
 }
-
-
-
-           print("hiiiooooo") ;
         delta.add(
           Align(
             alignment:alignmentfortext,
@@ -473,6 +402,34 @@ if(child.text! =="."){
 
     return result;
   }
+
+CssProberties _handleCss(String outerhtml) { 
+CssProberties instance = CssProberties()   ;
+if(outerhtml.contains(Css.size)){
+  instance.fontsize = Css.fontss[outerhtml.substring(outerhtml.indexOf(Css.size,)+6,outerhtml.indexOf(Css.size,)+7)];
+}
+if(outerhtml.contains(Css.color)){
+  instance.selectedcolor = PdfColor.fromHex(outerhtml.substring(outerhtml.indexOf(Css.color,)+12,outerhtml.indexOf(Css.color,)+19));
+}
+if(outerhtml.contains(Css.rtl)){
+  instance.alignmentfortext = Alignment.centerRight ; 
+}else{
+   instance.alignmentfortext = Alignment.centerLeft ; 
+}
+if(outerhtml.contains(Css.alignLeft)){
+  instance.alignmentfortext = Alignment.centerLeft ; 
+}
+else if (outerhtml.contains(Css.alignCenter)){
+   instance.alignmentfortext = Alignment.center ; 
+}
+else if (outerhtml.contains(Css.alignRight)){
+   instance.alignmentfortext = Alignment.centerRight ; 
+}
+  return instance;
+} 
+
+
+
 
   TextStyle _getDeltaAttributesFromHtmlAttributes(
       LinkedHashMap<Object, String> htmlAttributes) {
@@ -686,6 +643,34 @@ class HTMLTags {
         tag == blockQuote;
   }
 }
+class Css{
+  static const size = "size=" ; 
+  static const color ="font color=" ; 
+  static const rtl ="rtl" ; 
+  static const alignLeft ="text-align: left;" ; 
+  static const alignCenter ="text-align: center;" ; 
+  static const alignRight ="text-align: right;" ; 
+  static  Map<String,double> fontss = {
+  "1" : 8 ,
+  "2" : 10 ,
+  "3" : 12 ,
+  "4" : 14 ,
+  "5" : 18 ,
+  "6" : 24 ,
+  "7" : 36 ,
+}    ;
+}
+class CssProberties {
+ double? fontsize;
+  PdfColor? selectedcolor;
+  Alignment? alignmentfortext;
+  CssProberties(
+      {this.fontsize,
+      this.selectedcolor,
+      this.alignmentfortext,
+}  )  ;  
+}
+
 
 extension ColorExtension on PdfColor {
   /// Try to parse the `rgba(red, greed, blue, alpha)`
