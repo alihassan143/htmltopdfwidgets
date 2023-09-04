@@ -7,6 +7,8 @@ import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:http/http.dart';
 
 import '../htmltopdfwidgets.dart';
+import 'color_extension.dart';
+import 'css_properties.dart';
 
 class WidgetsHTMLDecoder {
   final Font? font;
@@ -54,7 +56,7 @@ class WidgetsHTMLDecoder {
           );
         }
       } else if (domNode is dom.Text) {
-        delta.add(Text(domNode.text, 
+        delta.add(Text(domNode.text,
             style: TextStyle(font: font, fontFallback: fontFallback)));
       } else {
         assert(false, 'Unknown node type: $domNode');
@@ -200,7 +202,6 @@ class WidgetsHTMLDecoder {
       }
     }
     return RichText(
-      
         text: TextSpan(
             children: delta,
             style: TextStyle(
@@ -304,7 +305,7 @@ class WidgetsHTMLDecoder {
     try {
       if (src != null) {
         final netImage = await _saveImage(src);
-      
+
         return Image(MemoryImage(netImage),
             alignment: customStyles.imageAlignment);
       } else {
@@ -333,11 +334,11 @@ class WidgetsHTMLDecoder {
     final children = element.nodes.toList();
     final childNodes = <Widget>[];
     for (final child in children) {
-PdfColor? selectedcolor ;
-if(child.text!.isEmpty){
-  child.text = "." ;
-  selectedcolor = PdfColors.white ;
-}
+      PdfColor? selectedcolor;
+      if (child.text!.isEmpty) {
+        child.text = ".";
+        selectedcolor = PdfColors.white;
+      }
       if (child is dom.Element) {
         if (child.children.isNotEmpty) {
           childNodes.addAll(await _parseElement(child.children));
@@ -350,34 +351,40 @@ if(child.text!.isEmpty){
               ),
             );
           } else {
-CssProberties instance = _handleCss(child.parent!.outerHtml)  ;
-Alignment alignmentfortext = instance.alignmentfortext?? Alignment.center  ;
-double? fontsizee = instance.fontsize  ;  
-selectedcolor = instance.selectedcolor  ;
-if(child.text =="."){
-  selectedcolor = PdfColors.white ;
-}
+            CssProperties instance = _handleCss(child.parent!.outerHtml);
+            Alignment alignmentfortext =
+                instance.alignmentfortext ?? Alignment.center;
+            double? fontsizee = instance.fontsize;
+            selectedcolor = instance.selectedcolor;
+            if (child.text == ".") {
+              selectedcolor = PdfColors.white;
+            }
             final attributes = await _parserFormattingElementAttributes(child)
               ..merge(customStyles.paragraphStyle);
-            delta.add(  Align(
-            alignment:alignmentfortext, child:Text(child.text , style: attributes.copyWith(fontSize: fontsizee ,color: selectedcolor))));
+            delta.add(Align(
+                alignment: alignmentfortext,
+                child: Text(child.text,
+                    style: attributes.copyWith(
+                        fontSize: fontsizee, color: selectedcolor))));
           }
         }
       } else {
-CssProberties instance = _handleCss(child.parent!.outerHtml)  ;
-Alignment alignmentfortext = instance.alignmentfortext ?? Alignment.center  ;
-double? fontsizee = instance.fontsize  ;  
-selectedcolor = instance.selectedcolor ;
-if(child.text =="."){
-  selectedcolor = PdfColors.white ;
-}
-        delta.add(
-          Align(
-            alignment:alignmentfortext,
-            child: Text(child.text  ?? "" ,
-            style: TextStyle(font: font, fontFallback: fontFallback,).copyWith(fontSize: fontsizee ,color: selectedcolor)
-              ..merge(customStyles.paragraphStyle)))
-          );
+        CssProperties instance = _handleCss(child.parent!.outerHtml);
+        Alignment alignmentfortext =
+            instance.alignmentfortext ?? Alignment.center;
+        double? fontsizee = instance.fontsize;
+        selectedcolor = instance.selectedcolor;
+        if (child.text == ".") {
+          selectedcolor = PdfColors.white;
+        }
+        delta.add(Align(
+            alignment: alignmentfortext,
+            child: Text(child.text ?? "",
+                style: TextStyle(
+                  font: font,
+                  fontFallback: fontFallback,
+                ).copyWith(fontSize: fontsizee, color: selectedcolor)
+                  ..merge(customStyles.paragraphStyle))));
       }
     }
     return Column(
@@ -403,33 +410,44 @@ if(child.text =="."){
     return result;
   }
 
-CssProberties _handleCss(String outerhtml) { 
-CssProberties instance = CssProberties()   ;
-if(outerhtml.contains(Css.size)){
-  instance.fontsize = Css.fontss[outerhtml.substring(outerhtml.indexOf(Css.size,)+6,outerhtml.indexOf(Css.size,)+7)];
-}
-if(outerhtml.contains(Css.color)){
-  instance.selectedcolor = PdfColor.fromHex(outerhtml.substring(outerhtml.indexOf(Css.color,)+12,outerhtml.indexOf(Css.color,)+19));
-}
-if(outerhtml.contains(Css.rtl)){
-  instance.alignmentfortext = Alignment.centerRight ; 
-}else{
-   instance.alignmentfortext = Alignment.centerLeft ; 
-}
-if(outerhtml.contains(Css.alignLeft)){
-  instance.alignmentfortext = Alignment.centerLeft ; 
-}
-else if (outerhtml.contains(Css.alignCenter)){
-   instance.alignmentfortext = Alignment.center ; 
-}
-else if (outerhtml.contains(Css.alignRight)){
-   instance.alignmentfortext = Alignment.centerRight ; 
-}
-  return instance;
-} 
-
-
-
+  CssProperties _handleCss(String outerhtml) {
+    CssProperties instance = CssProperties();
+    if (outerhtml.contains(Css.size)) {
+      instance.fontsize = Css.fontss[outerhtml.substring(
+          outerhtml.indexOf(
+                Css.size,
+              ) +
+              6,
+          outerhtml.indexOf(
+                Css.size,
+              ) +
+              7)];
+    }
+    if (outerhtml.contains(Css.color)) {
+      instance.selectedcolor = PdfColor.fromHex(outerhtml.substring(
+          outerhtml.indexOf(
+                Css.color,
+              ) +
+              12,
+          outerhtml.indexOf(
+                Css.color,
+              ) +
+              19));
+    }
+    if (outerhtml.contains(Css.rtl)) {
+      instance.alignmentfortext = Alignment.centerRight;
+    } else {
+      instance.alignmentfortext = Alignment.centerLeft;
+    }
+    if (outerhtml.contains(Css.alignLeft)) {
+      instance.alignmentfortext = Alignment.centerLeft;
+    } else if (outerhtml.contains(Css.alignCenter)) {
+      instance.alignmentfortext = Alignment.center;
+    } else if (outerhtml.contains(Css.alignRight)) {
+      instance.alignmentfortext = Alignment.centerRight;
+    }
+    return instance;
+  }
 
   TextStyle _getDeltaAttributesFromHtmlAttributes(
       LinkedHashMap<Object, String> htmlAttributes) {
@@ -643,81 +661,21 @@ class HTMLTags {
         tag == blockQuote;
   }
 }
-class Css{
-  static const size = "size=" ; 
-  static const color ="font color=" ; 
-  static const rtl ="rtl" ; 
-  static const alignLeft ="text-align: left;" ; 
-  static const alignCenter ="text-align: center;" ; 
-  static const alignRight ="text-align: right;" ; 
-  static  Map<String,double> fontss = {
-  "1" : 8 ,
-  "2" : 10 ,
-  "3" : 12 ,
-  "4" : 14 ,
-  "5" : 18 ,
-  "6" : 24 ,
-  "7" : 36 ,
-}    ;
-}
-class CssProberties {
- double? fontsize;
-  PdfColor? selectedcolor;
-  Alignment? alignmentfortext;
-  CssProberties(
-      {this.fontsize,
-      this.selectedcolor,
-      this.alignmentfortext,
-}  )  ;  
-}
 
-
-extension ColorExtension on PdfColor {
-  /// Try to parse the `rgba(red, greed, blue, alpha)`
-  /// from the string.
-  static PdfColor? tryFromRgbaString(String colorString) {
-    final reg = RegExp(r'rgba\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)');
-    final match = reg.firstMatch(colorString);
-    if (match == null) {
-      return null;
-    }
-
-    if (match.groupCount < 4) {
-      return null;
-    }
-    final redStr = match.group(1);
-    final greenStr = match.group(2);
-    final blueStr = match.group(3);
-    final alphaStr = match.group(4);
-
-    final red = redStr != null ? int.tryParse(redStr) : null;
-    final green = greenStr != null ? int.tryParse(greenStr) : null;
-    final blue = blueStr != null ? int.tryParse(blueStr) : null;
-    final alpha = alphaStr != null ? int.tryParse(alphaStr) : null;
-
-    if (red == null || green == null || blue == null || alpha == null) {
-      return null;
-    }
-
-    return PdfColor.fromInt(
-        hexOfRGBA(red, green, blue, opacity: alpha.toDouble()));
-  }
-
-  String toRgbaString() {
-    return 'rgba($red, $green, $blue, $alpha)';
-  }
-}
-
-int hexOfRGBA(int r, int g, int b, {double opacity = 1}) {
-  r = (r < 0) ? -r : r;
-  g = (g < 0) ? -g : g;
-  b = (b < 0) ? -b : b;
-  opacity = (opacity < 0) ? -opacity : opacity;
-  opacity = (opacity > 1) ? 255 : opacity * 255;
-  r = (r > 255) ? 255 : r;
-  g = (g > 255) ? 255 : g;
-  b = (b > 255) ? 255 : b;
-  int a = opacity.toInt();
-  return int.parse(
-      '0x${a.toRadixString(16)}${r.toRadixString(16)}${g.toRadixString(16)}${b.toRadixString(16)}');
+class Css {
+  static const size = "size=";
+  static const color = "font color=";
+  static const rtl = "rtl";
+  static const alignLeft = "text-align: left;";
+  static const alignCenter = "text-align: center;";
+  static const alignRight = "text-align: right;";
+  static Map<String, double> fontss = {
+    "1": 8,
+    "2": 10,
+    "3": 12,
+    "4": 14,
+    "5": 18,
+    "6": 24,
+    "7": 36,
+  };
 }
