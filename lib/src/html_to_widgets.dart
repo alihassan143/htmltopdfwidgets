@@ -12,6 +12,7 @@ import 'extension/color_extension.dart';
 import 'html_tags.dart';
 import 'pdfwidgets/bullet_list.dart';
 import 'pdfwidgets/number_list.dart';
+import 'pdfwidgets/quote_widget.dart';
 
 //html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
@@ -302,7 +303,7 @@ class WidgetsHTMLDecoder {
       ];
       // Build a quote  widget
     } else if (type == BuiltInAttributeKey.quote) {
-      return [buildQuotewidget(delta)];
+      return [buildQuotewidget(delta, customStyles: customStyles)];
     } else {
       return [delta];
     }
@@ -462,26 +463,4 @@ class WidgetsHTMLDecoder {
 //return the number list child with its current number
 
 //return the quote widget
-  Widget buildQuotewidget(
-    Widget childValue,
-  ) {
-    Widget child = Container(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-              width: 20,
-              height: 20,
-              child: VerticalDivider(
-                  color: customStyles.quoteBarColor ?? PdfColors.black)),
-          Flexible(child: childValue),
-        ],
-      ),
-    );
-    return child;
-  }
 }
-//return bullet widget with childreen
- 
