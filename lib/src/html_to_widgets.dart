@@ -114,6 +114,8 @@ class WidgetsHTMLDecoder {
       // Handle ordered list and converts its childrens to widgets
       case HTMLTags.orderedList:
         return await _parseOrderListElement(element);
+      case HTMLTags.table:
+        return await _parseTable(element);
       //if simple list is found it will handle accoridingly
       case HTMLTags.list:
         return await _parseListElement(
@@ -221,8 +223,104 @@ class WidgetsHTMLDecoder {
         decoration.add(nattributes.decoration!);
       }
     }
-
+//will combine style get from the children
     return attributes.copyWith(decoration: TextDecoration.combine(decoration));
+  }
+
+  Future<Iterable<Widget>> _parseTable(dom.Element element) async {
+    final List<TableRow> tablenodes = [];
+
+    for (final data in element.children) {
+      final rwdata = await _parsetableRows(data);
+
+      tablenodes.addAll(rwdata);
+    }
+
+    return [
+      Table(
+          border: TableBorder.all(color: PdfColors.black),
+          children: tablenodes),
+    ];
+  }
+
+  Future<List<TableRow>> _parsetableRows(dom.Element element) async {
+    final List<TableRow> nodes = [];
+
+    for (final data in element.children) {
+      final tabledata = await _parsetableData(data);
+
+      nodes.add(tabledata);
+    }
+    return nodes;
+  }
+
+  Future<TableRow> _parsetableData(
+    dom.Element element,
+  ) async {
+    final List<Widget> nodes = [];
+
+    for (final data in element.children) {
+      if (data.children.isEmpty) {
+        final node = paragraphNode(text: data.text);
+
+        nodes.add(node);
+      } else {
+        final newnodes = await _parseTableSpecialNodes(data);
+
+        nodes.addAll(newnodes);
+      }
+    }
+
+    return TableRow(
+        decoration: BoxDecoration(border: Border.all(color: PdfColors.black)),
+        children: nodes);
+  }
+
+  Future<Iterable<Widget>> _parseTableSpecialNodes(dom.Element element) async {
+    final List<Widget> nodes = [];
+
+    if (element.children.isNotEmpty) {
+      for (final childrens in element.children) {
+        nodes.addAll(await _parseTableDataElementsData(childrens));
+      }
+    } else {
+      nodes.addAll(await _parseTableDataElementsData(element));
+    }
+    return nodes;
+  }
+
+  Future<List<Widget>> _parseTableDataElementsData(dom.Element element) async {
+    final List<Widget> delta = [];
+    final result = <Widget>[];
+    //find dom node in and check if its element or not than convert it according to its specs
+
+    final localName = element.localName;
+    // Check if the element is a simple formatting element like <span>, <bold>, or <italic>
+    if (HTMLTags.formattingElements.contains(localName)) {
+      final attributes = await _parserFormattingElementAttributes(element);
+
+      result.add(Text(element.text, style: attributes));
+    } else if (HTMLTags.specialElements.contains(localName)) {
+      // Handle special elements (e.g., headings, lists, images)
+      result.addAll(
+        await _parseSpecialElements(
+          element,
+          type: BuiltInAttributeKey.bulletedList,
+        ),
+      );
+    } else if (element is dom.Text) {
+      // Process text nodes and add them to delta
+      delta.add(Text(element.text,
+          style: TextStyle(font: font, fontFallback: fontFallback)));
+    } else {
+      assert(false, 'Unknown node type: $element');
+    }
+
+    // If there are text nodes in delta, wrap them in a Wrap widget and add to the result
+    if (delta.isNotEmpty) {
+      result.add(Wrap(children: delta));
+    }
+    return result;
   }
 
   // Function to parse a heading element and return a RichText widget
@@ -410,7 +508,7 @@ class WidgetsHTMLDecoder {
     //extract styls from the inline css
     final styleString = htmlAttributes["style"];
     final cssMap = _cssStringToMap(styleString);
-
+//get font weight
     final fontWeightStr = cssMap["font-weight"];
     if (fontWeightStr != null) {
       if (fontWeightStr == "bold") {
@@ -424,12 +522,12 @@ class WidgetsHTMLDecoder {
         }
       }
     }
-
+//apply different text decorations like undrline line through
     final textDecorationStr = cssMap["text-decoration"];
     if (textDecorationStr != null) {
       style = style.merge(_assignTextDecorations(style, textDecorationStr));
     }
-
+//apply background color on text
     final backgroundColorStr = cssMap["background-color"];
     final backgroundColor = backgroundColorStr == null
         ? null
@@ -437,6 +535,7 @@ class WidgetsHTMLDecoder {
     if (backgroundColor != null) {
       style = style.copyWith(color: backgroundColor);
     }
+    //apply italic tag
 
     if (cssMap["font-style"] == "italic") {
       style = style.copyWith(fontStyle: FontStyle.italic)
@@ -446,6 +545,7 @@ class WidgetsHTMLDecoder {
     return style;
   }
 
+//this function apply thee text decorations from html inline style css
   static TextStyle _assignTextDecorations(
       TextStyle style, String decorationStr) {
     final decorations = decorationStr.split(" ");
@@ -459,8 +559,4 @@ class WidgetsHTMLDecoder {
     }
     return style.copyWith(decoration: TextDecoration.combine(textdecorations));
   }
-
-//return the number list child with its current number
-
-//return the quote widget
 }

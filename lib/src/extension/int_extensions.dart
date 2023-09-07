@@ -2,6 +2,7 @@ import 'package:htmltopdfwidgets/src/htmltagstyles.dart';
 import 'package:pdf/widgets.dart';
 
 extension IntConverter on int {
+  //givee default font size for the heading tag
   double get getHeadingSize {
     switch (this) {
       case 1:
@@ -21,6 +22,7 @@ extension IntConverter on int {
     }
   }
 
+//it apply custom user style from provided constructor
   TextStyle? getHeadingStyle(
     HtmlTagStyle customStyles,
   ) {

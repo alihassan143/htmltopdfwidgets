@@ -14,8 +14,8 @@ class HTMLTags {
   static const italic = 'i';
   static const em = 'em';
   static const bold = 'b';
-  static const br = 'br';
   static const underline = 'u';
+  static const strikethrough = 's';
   static const del = 'del';
   static const strong = 'strong';
   static const checkbox = 'input';
@@ -24,6 +24,11 @@ class HTMLTags {
   static const blockQuote = 'blockquote';
   static const div = 'div';
   static const divider = 'hr';
+  static const table = 'table';
+  static const tableRow = 'tr';
+  static const br = 'br';
+  static const tableheader = "th";
+  static const tabledata = "td";
 
   static List<String> formattingElements = [
     HTMLTags.anchor,
@@ -35,6 +40,7 @@ class HTMLTags {
     HTMLTags.strong,
     HTMLTags.span,
     HTMLTags.code,
+    HTMLTags.strikethrough,
   ];
 
   static List<String> specialElements = [
@@ -44,6 +50,7 @@ class HTMLTags {
     HTMLTags.h4,
     HTMLTags.h5,
     HTMLTags.h6,
+    HTMLTags.table,
     HTMLTags.div,
     HTMLTags.br,
     HTMLTags.unorderedList,
@@ -62,6 +69,7 @@ class HTMLTags {
         tag == h4 ||
         tag == h5 ||
         tag == h6 ||
+        tag == table ||
         tag == checkbox ||
         tag == paragraph ||
         tag == div ||
@@ -69,3 +77,4 @@ class HTMLTags {
   }
 }
 
+enum AttributeType { table, tablerow, none }
