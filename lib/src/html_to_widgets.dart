@@ -227,9 +227,10 @@ class WidgetsHTMLDecoder {
     return attributes.copyWith(decoration: TextDecoration.combine(decoration));
   }
 
+//convert table tag into the table pdf widget
   Future<Iterable<Widget>> _parseTable(dom.Element element) async {
     final List<TableRow> tablenodes = [];
-
+//iterate over html table tag body
     for (final data in element.children) {
       final rwdata = await _parsetableRows(data);
 
@@ -243,9 +244,10 @@ class WidgetsHTMLDecoder {
     ];
   }
 
+//converts html table tag body to table row widgets
   Future<List<TableRow>> _parsetableRows(dom.Element element) async {
     final List<TableRow> nodes = [];
-
+//iterate over <tr> tag and convert its children to related pdf widget
     for (final data in element.children) {
       final tabledata = await _parsetableData(data);
 
@@ -254,33 +256,38 @@ class WidgetsHTMLDecoder {
     return nodes;
   }
 
+//parse html data and convert to table row
   Future<TableRow> _parsetableData(
     dom.Element element,
   ) async {
     final List<Widget> nodes = [];
-
+//iterate over <tr>children
     for (final data in element.children) {
       if (data.children.isEmpty) {
+        //if single <th> or<td> tag found
         final node = paragraphNode(text: data.text);
 
         nodes.add(node);
       } else {
+        //if nested <p><br> in <tag> found
         final newnodes = await _parseTableSpecialNodes(data);
 
         nodes.addAll(newnodes);
       }
     }
-
+//returns the tale row
     return TableRow(
         decoration: BoxDecoration(border: Border.all(color: PdfColors.black)),
         children: nodes);
   }
 
+//parse the nodes and handle theem accordingly
   Future<Iterable<Widget>> _parseTableSpecialNodes(dom.Element element) async {
     final List<Widget> nodes = [];
-
+//iterate over multiple childrens
     if (element.children.isNotEmpty) {
       for (final childrens in element.children) {
+        //parse them according to their widget
         nodes.addAll(await _parseTableDataElementsData(childrens));
       }
     } else {
@@ -288,6 +295,7 @@ class WidgetsHTMLDecoder {
     }
     return nodes;
   }
+  //check if children contains the <p> <li> or any other tag
 
   Future<List<Widget>> _parseTableDataElementsData(dom.Element element) async {
     final List<Widget> delta = [];
