@@ -14,7 +14,25 @@ const htmlText = '''  <h1>Heading Example</h1>
     <li>First item</li>
     <li>Second item</li>
     <li>Third item</li>
-  </ul>"''';
+  </ul>
+  <table>
+  <tr>
+    <th>Company</th>
+    <th>Contact</th>
+    <th>Country</th>
+  </tr>
+  <tr>
+    <td>Alfreds Futterkiste</td>
+    <td>Maria Anders</td>
+    <td>Germany</td>
+  </tr>
+  <tr>
+    <td>Centro comercial Moctezuma</td>
+    <td>Francisco Chang</td>
+    <td>Mexico</td>
+  </tr>
+</table>
+  ''';
 
 createDocument() async {
   var filePath = 'example.pdf';
