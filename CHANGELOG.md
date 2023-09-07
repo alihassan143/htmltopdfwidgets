@@ -1,3 +1,6 @@
+## 0.0.8+2
+
+*  support for html table tag added
 ## 0.0.8+1
 
 *  update reamdme.md
