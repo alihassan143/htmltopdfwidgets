@@ -16,7 +16,7 @@ Add the following dependency to your `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  htmltopdfwidgets: ^0.0.8+2
+  htmltopdfwidgets: ^0.0.9+1
 ```
 
 ## Usage

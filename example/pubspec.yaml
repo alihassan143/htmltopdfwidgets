@@ -14,7 +14,6 @@ dependencies:
   htmltopdfwidgets:
     path: ../
 
-
 dev_dependencies:
  
 
