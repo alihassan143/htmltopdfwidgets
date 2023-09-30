@@ -29,6 +29,9 @@ class HTMLTags {
   static const br = 'br';
   static const tableheader = "th";
   static const tabledata = "td";
+  static const section = 'section';
+  static const font = 'font';
+  static const mark = 'mark';
 
   static List<String> formattingElements = [
     HTMLTags.anchor,
@@ -41,6 +44,8 @@ class HTMLTags {
     HTMLTags.span,
     HTMLTags.code,
     HTMLTags.strikethrough,
+    HTMLTags.font,
+    HTMLTags.mark,
   ];
 
   static List<String> specialElements = [
@@ -59,22 +64,9 @@ class HTMLTags {
     HTMLTags.paragraph,
     HTMLTags.blockQuote,
     HTMLTags.checkbox,
-    HTMLTags.image
+    HTMLTags.image,
+    HTMLTags.section,
   ];
-
-  static bool isTopLevel(String tag) {
-    return tag == h1 ||
-        tag == h2 ||
-        tag == h3 ||
-        tag == h4 ||
-        tag == h5 ||
-        tag == h6 ||
-        tag == table ||
-        tag == checkbox ||
-        tag == paragraph ||
-        tag == div ||
-        tag == blockQuote;
-  }
 }
 
 enum AttributeType { table, tablerow, none }

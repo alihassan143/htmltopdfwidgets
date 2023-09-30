@@ -1,3 +1,9 @@
+## 0.0.9
+
+*  optimiz parse logic
+*  documentation fixs
+*  using override dependency for pdf due to underline and italic issues 
+
 ## 0.0.8+2
 
 *  support for html table tag added
