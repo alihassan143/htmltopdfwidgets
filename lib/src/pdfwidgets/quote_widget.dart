@@ -3,7 +3,8 @@ import '../../htmltopdfwidgets.dart';
 
 // Define a function named 'buildQuotewidget' that takes a 'childValue' Widget
 // and a required 'customStyles' parameter of type 'HtmlTagStyle'.
-Widget buildQuotewidget(Widget childValue, {required HtmlTagStyle customStyles}) {
+Widget buildQuotewidget(Widget childValue,
+    {required HtmlTagStyle customStyles}) {
   // Create a Widget named 'child' which will be returned by this function.
   Widget child = Container(
     // Create a Container widget to hold the child elements.
@@ -26,7 +27,9 @@ Widget buildQuotewidget(Widget childValue, {required HtmlTagStyle customStyles})
             // otherwise use PdfColors.black as the default color.
           ),
         ),
-        Flexible(child: childValue), // Add the 'childValue' Widget inside a Flexible container.
+        Flexible(
+            child:
+                childValue), // Add the 'childValue' Widget inside a Flexible container.
       ],
     ),
   );
