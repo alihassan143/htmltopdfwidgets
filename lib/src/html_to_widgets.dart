@@ -175,6 +175,7 @@ class WidgetsHTMLDecoder {
         final deltaAttributes = _getDeltaAttributesFromHtmlAttributes(
           element.attributes,
         );
+
         attributes = attributes.merge(deltaAttributes);
         if (deltaAttributes.decoration != null) {
           decoration.add(deltaAttributes.decoration!);
@@ -457,7 +458,7 @@ class WidgetsHTMLDecoder {
 
   // Function to parse a complex HTML element and return a widget
   Future<Widget> _parseDeltaElement(dom.Element element) async {
-    final delta = <Widget>[];
+    final delta = <TextSpan>[];
     final children = element.nodes.toList();
     final childNodes = <Widget>[];
 
@@ -480,21 +481,24 @@ class WidgetsHTMLDecoder {
             // Parse text and attributes within the paragraph
             final attributes = _parserFormattingElementAttributes(child)
               ..merge(customStyles.paragraphStyle);
-            delta.add(Text(child.text.replaceAll(RegExp(r'\n+$'), ''),
+            delta.add(TextSpan(
+                text: child.text.replaceAll(RegExp(r'\n+$'), ''),
                 style: attributes));
           }
         }
       } else {
         // Process text nodes and add them to delta variable
-        delta.add(Text(child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
+        delta.add(TextSpan(
+            text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
             style: TextStyle(font: font, fontFallback: fontFallback)
               ..merge(customStyles.paragraphStyle)));
       }
     }
+
     // Create a column with wrapped text and child nodes
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [Wrap(children: delta), ...childNodes]);
+    return Wrap(
+        alignment: WrapAlignment.start,
+        children: [RichText(text: TextSpan(children: delta)), ...childNodes]);
   }
 
   // Utility function to convert a CSS string to a map of CSS properties
@@ -538,7 +542,9 @@ class WidgetsHTMLDecoder {
 //apply different text decorations like undrline line through
     final textDecorationStr = cssMap["text-decoration"];
     if (textDecorationStr != null) {
-      style = style.merge(_assignTextDecorations(style, textDecorationStr));
+      style = style.copyWith(
+          decoration:
+              _assignTextDecorations(style, textDecorationStr).decoration);
     }
 //apply background color on text
     final backgroundColorStr = cssMap["background-color"];
@@ -565,7 +571,7 @@ class WidgetsHTMLDecoder {
     final textdecorations = <TextDecoration>[];
     for (final d in decorations) {
       if (d == "line-through") {
-        textdecorations.add(TextDecoration.overline);
+        textdecorations.add(TextDecoration.lineThrough);
       } else if (d == "underline") {
         textdecorations.add(TextDecoration.underline);
       }

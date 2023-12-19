@@ -1,3 +1,5 @@
+## 0.0.9+2
+*  fix internal css decoration not working
 ## 0.0.9+1
 
 *  optimiz parse logic
