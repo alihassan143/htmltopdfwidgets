@@ -57,7 +57,6 @@ class HTMLTags {
     HTMLTags.h6,
     HTMLTags.table,
     HTMLTags.div,
-    HTMLTags.br,
     HTMLTags.unorderedList,
     HTMLTags.orderedList,
     HTMLTags.list,

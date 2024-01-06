@@ -1,3 +1,8 @@
+## 1.0.0
+*  fix line break
+*  fix Can't manage to render colors    
+
+
 ## 0.0.9+2
 *  fix internal css decoration not working
 ## 0.0.9+1
