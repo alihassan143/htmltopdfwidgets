@@ -1,3 +1,5 @@
+## 1.0.1
+* update readme
 ## 1.0.0
 *  fix line break
 *  fix Can't manage to render colors    
