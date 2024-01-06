@@ -1,6 +1,7 @@
 ## 1.0.0
 *  fix line break
 *  fix Can't manage to render colors    
+*  text alignment feature added    
 
 
 ## 0.0.9+2

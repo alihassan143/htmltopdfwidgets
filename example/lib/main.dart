@@ -6,7 +6,7 @@ void main() {
   createDocument();
 }
 
-const htmlText = ''' <h1>AppFlowyEditor</h1>
+const htmlText = '''<h1>AppFlowyEditor</h1>
 <h2>👋 <strong>Welcome to</strong> <strong><em><a href="appflowy.io">AppFlowy Editor</a></em></strong></h2>
   <p>AppFlowy Editor is a <strong>highly customizable</strong> <em>rich-text editor</em></p>
 <hr />
@@ -47,7 +47,9 @@ createDocument() async {
   const filePath = 'example.pdf';
   final file = File(filePath);
   final newpdf = Document();
-  final List<Widget> widgets = await HTMLToPdf().convert(htmlText);
+  final List<Widget> widgets = await HTMLToPdf().convert(
+    htmlText,
+  );
 
   newpdf.addPage(MultiPage(
       maxPages: 200,
