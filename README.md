@@ -44,10 +44,10 @@ final htmlContent = '''
   </ul>
 ''';
 
-f var filePath = 'test/example.pdf';
+  var filePath = 'test/example.pdf';
   var file = File(filePath);
   final newpdf = Document();
-  List<Widget> widgets = await HTMLToPdf().convert(htmlText);
+  List<Widget> widgets = await HTMLToPdf().convert(htmlContent);
   newpdf.addPage(MultiPage(
       maxPages: 200,
       build: (context) {
