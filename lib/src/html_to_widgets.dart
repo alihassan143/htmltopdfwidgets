@@ -372,7 +372,8 @@ class WidgetsHTMLDecoder {
     final localName = element.localName;
 
     /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-    if (HTMLTags.formattingElements.contains(localName)) {
+    if (localName == HTMLTags.br) {
+    } else if (HTMLTags.formattingElements.contains(localName)) {
       final attributes = _parserFormattingElementAttributes(element);
 
       result.add(Text(element.text, style: attributes.$2));
