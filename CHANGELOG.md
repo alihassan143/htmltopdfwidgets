@@ -1,3 +1,6 @@
+## 1.0.2
+* update readme
+*([#20](https://github.com/alihassan143/htmltopdfwidgets/issues/20))
 ## 1.0.1
 * update readme
 ## 1.0.0
