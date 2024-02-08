@@ -1,3 +1,6 @@
+## 1.0.3
+* Intial support for checkboxes
+*([#25](https://github.com/alihassan143/htmltopdfwidgets/issues/25))
 ## 1.0.2
 * update readme
 *([#20](https://github.com/alihassan143/htmltopdfwidgets/issues/20))

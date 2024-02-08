@@ -5,6 +5,7 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' show parse;
 import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
+import 'package:htmltopdfwidgets/src/utils/app_assets.dart';
 import 'package:http/http.dart';
 
 import '../htmltopdfwidgets.dart';
@@ -58,6 +59,8 @@ class WidgetsHTMLDecoder {
     final result = <Widget>[];
     final delta = <TextSpan>[];
     TextAlign? textAlign;
+    bool checkbox = false;
+    bool alreadyChecked = false;
 
     ///find dom node in and check if its element or not than convert it according to its specs
     for (final domNode in domNodes) {
@@ -87,14 +90,38 @@ class WidgetsHTMLDecoder {
 
             delta.clear();
           }
+          if (checkbox) {
+            checkbox = false;
+
+            result.add(Row(children: [
+              SvgImage(
+                  svg: alreadyChecked
+                      ? AppAssets.checkedIcon
+                      : AppAssets.unCheckedIcon),
+              ...await _parseSpecialElements(
+                domNode,
+                type: BuiltInAttributeKey.bulletedList,
+              ),
+            ]));
+            alreadyChecked = false;
+          } else {
+            if (localName == HTMLTags.checkbox) {
+              final checked = domNode.attributes["type"];
+              if (checked != null && checked == "checkbox") {
+                checkbox = true;
+
+                alreadyChecked = domNode.attributes.keys.contains("checked");
+              }
+            }
+            result.addAll(
+              await _parseSpecialElements(
+                domNode,
+                type: BuiltInAttributeKey.bulletedList,
+              ),
+            );
+          }
 
           /// Handle special elements (e.g., headings, lists, images)
-          result.addAll(
-            await _parseSpecialElements(
-              domNode,
-              type: BuiltInAttributeKey.bulletedList,
-            ),
-          );
         }
       } else if (domNode is dom.Text) {
         if (delta.isNotEmpty && domNode.text.trim().isNotEmpty) {

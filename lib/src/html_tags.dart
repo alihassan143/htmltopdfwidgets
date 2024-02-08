@@ -25,6 +25,7 @@ class HTMLTags {
   static const div = 'div';
   static const divider = 'hr';
   static const table = 'table';
+  static const label = 'label';
   static const tableRow = 'tr';
   static const br = 'br';
   static const tableheader = "th";
@@ -65,6 +66,7 @@ class HTMLTags {
     HTMLTags.checkbox,
     HTMLTags.image,
     HTMLTags.section,
+    HTMLTags.label,
   ];
 }
 

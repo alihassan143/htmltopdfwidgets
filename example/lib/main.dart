@@ -40,7 +40,13 @@ const htmlText = '''<h1>AppFlowyEditor</h1>
 <img src="http://appflowy.io" alt="AppFlowy">
 <p>You can also use <strong><em>AppFlowy Editor</em></strong> as a component to build your own app.</p>
 <h3>Awesome features</h3>
+
 <p>If you have questions or feedback, please submit an issue on Github or join the community along with 1000+ builders!</p>
+  <h3>Checked Boxes</h3>
+ <input type="checkbox" id="option2" checked> 
+  <label for="option2">Option 2</label>
+  <input type="checkbox" id="option3"> 
+  <label for="option3">Option 3</label>
   ''';
 
 createDocument() async {
