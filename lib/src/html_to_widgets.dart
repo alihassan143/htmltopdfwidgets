@@ -14,6 +14,11 @@ import 'html_tags.dart';
 import 'pdfwidgets/bullet_list.dart';
 import 'pdfwidgets/number_list.dart';
 import 'pdfwidgets/quote_widget.dart';
+import 'dart:convert';
+
+RegExp base64RegExp = RegExp(
+  r'^(?:[A-Za-z0-9+/][A-Za-z0-9+/][A-Za-z0-9+/][A-Za-z0-9+/])*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})$',
+);
 
 ////html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
@@ -549,9 +554,30 @@ class WidgetsHTMLDecoder {
     final src = element.attributes["src"];
     try {
       if (src != null) {
-        final netImage = await _saveImage(src);
-        return Image(MemoryImage(netImage),
-            alignment: customStyles.imageAlignment);
+        if (src.startsWith("data:image")) {
+          // To handle a case if someone added a space after base64 string
+          List components = src.split("base64, ");
+          if (components.isEmpty) {
+            components = src.split("base64,");
+          }
+
+          if (components.length > 1) {
+            var base64Encoded = components[1];
+            Uint8List listData = base64Decode(base64Encoded);
+            return Image(MemoryImage(listData),
+                alignment: customStyles.imageAlignment);
+          } else {
+            return Text("");
+          }
+        } else if (base64RegExp.hasMatch(src)) {
+          Uint8List listData = base64Decode(src);
+          return Image(MemoryImage(listData),
+              alignment: customStyles.imageAlignment);
+        } else {
+          final netImage = await _saveImage(src);
+          return Image(MemoryImage(netImage),
+              alignment: customStyles.imageAlignment);
+        }
       } else {
         return Text("");
       }
