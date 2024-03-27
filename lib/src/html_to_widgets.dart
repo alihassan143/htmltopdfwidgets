@@ -16,10 +16,6 @@ import 'pdfwidgets/number_list.dart';
 import 'pdfwidgets/quote_widget.dart';
 import 'dart:convert';
 
-RegExp base64RegExp = RegExp(
-  r'^(?:[A-Za-z0-9+/][A-Za-z0-9+/][A-Za-z0-9+/][A-Za-z0-9+/])*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})$',
-);
-
 ////html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
   ///default font font the pdf if it not provided custo
