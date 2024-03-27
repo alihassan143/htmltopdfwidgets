@@ -554,33 +554,24 @@ class WidgetsHTMLDecoder {
     final src = element.attributes["src"];
     try {
       if (src != null) {
-        if (src.startsWith("data:image")) {
+        if (src.startsWith("data:image/")) {
           // To handle a case if someone added a space after base64 string
-          List components = src.split("base64, ");
-          if (components.isEmpty) {
-            components = src.split("base64,");
-          }
+          final List<String> components = src.split(",");
 
           if (components.length > 1) {
-            var base64Encoded = components[1];
+            var base64Encoded = components.last;
             Uint8List listData = base64Decode(base64Encoded);
             return Image(MemoryImage(listData),
                 alignment: customStyles.imageAlignment);
-          } else {
-            return Text("");
           }
-        } else if (base64RegExp.hasMatch(src)) {
-          Uint8List listData = base64Decode(src);
-          return Image(MemoryImage(listData),
-              alignment: customStyles.imageAlignment);
-        } else {
-          final netImage = await _saveImage(src);
-          return Image(MemoryImage(netImage),
-              alignment: customStyles.imageAlignment);
+          return Text("");
         }
-      } else {
-        return Text("");
+
+        final netImage = await _saveImage(src);
+        return Image(MemoryImage(netImage),
+            alignment: customStyles.imageAlignment);
       }
+      return Text("");
     } catch (e) {
       return Text("");
     }
