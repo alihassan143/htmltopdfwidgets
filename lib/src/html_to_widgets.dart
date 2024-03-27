@@ -14,6 +14,7 @@ import 'html_tags.dart';
 import 'pdfwidgets/bullet_list.dart';
 import 'pdfwidgets/number_list.dart';
 import 'pdfwidgets/quote_widget.dart';
+import 'dart:convert';
 
 ////html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
@@ -549,12 +550,24 @@ class WidgetsHTMLDecoder {
     final src = element.attributes["src"];
     try {
       if (src != null) {
+        if (src.startsWith("data:image/")) {
+          // To handle a case if someone added a space after base64 string
+          final List<String> components = src.split(",");
+
+          if (components.length > 1) {
+            var base64Encoded = components.last;
+            Uint8List listData = base64Decode(base64Encoded);
+            return Image(MemoryImage(listData),
+                alignment: customStyles.imageAlignment);
+          }
+          return Text("");
+        }
+
         final netImage = await _saveImage(src);
         return Image(MemoryImage(netImage),
             alignment: customStyles.imageAlignment);
-      } else {
-        return Text("");
       }
+      return Text("");
     } catch (e) {
       return Text("");
     }
