@@ -29,16 +29,21 @@ class HtmlTagStyle {
   final TextStyle? paragraphStyle;
   //code tag style that will merge with default style
   final TextStyle? codeStyle;
-  //heading style style that will merge with default style
+  //heading style that will merge with default style
   final TextStyle? headingStyle;
-  //list index style style that will merge with default style
+  //list index style that will merge with default style
   final TextStyle? listIndexStyle;
-  //href link style style that will merge with default style
+  //href link style that will merge with default style
   final TextStyle? linkStyle;
   //quote bar style that will merge with default style
   final PdfColor? quoteBarColor;
-  //bullet list style style that will merge with default style
+  //bullet list style that will merge with default style
   final PdfColor? bulletListIconColor;
+  //bullet list style that will merge with default style
+  final double bulletListDotSize;
+  //bullet list style that will merge with default style
+  final double bulletListIconSize;
+
   const HtmlTagStyle({
     this.boldStyle,
     this.italicStyle,
@@ -58,5 +63,7 @@ class HtmlTagStyle {
     this.linkStyle,
     this.quoteBarColor,
     this.bulletListIconColor,
+    this.bulletListDotSize = 5.0,
+    this.bulletListIconSize = 22.0
   });
 }
