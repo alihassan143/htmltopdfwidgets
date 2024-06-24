@@ -553,12 +553,18 @@ class WidgetsHTMLDecoder {
     try {
       if (src == null) return Text("");
 
-      if (src.startsWith("data:")) {
-        Uint8List listData = base64Decode(src.substring("data:".length));
-        return Image(
+      if (src.startsWith("data:image/")) {
+        // Separate from the base64 metadata, if there is any
+        final List<String> components = src.split(",");
+        if (components.length > 1) {
+          var base64Encoded = components.last;
+          Uint8List listData = base64Decode(base64Encoded);
+          return Image(
             MemoryImage(listData),
-            alignment: customStyles.imageAlignment
-        );
+            alignment: customStyles.imageAlignment,
+          );
+        }
+        return Text("");
       }
 
       if (src.startsWith("asset:") && src.endsWith(".svg")) {
@@ -576,6 +582,14 @@ class WidgetsHTMLDecoder {
       }
 
       final netImage = await _saveImage(src);
+
+      if(src.endsWith(".svg")) {
+        return SvgImage(
+            svg: utf8.decode(netImage),
+            alignment: customStyles.imageAlignment
+        );
+      }
+
       return Image(
           MemoryImage(netImage),
           alignment: customStyles.imageAlignment
