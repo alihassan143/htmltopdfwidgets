@@ -556,6 +556,7 @@ class WidgetsHTMLDecoder {
       if (src.startsWith("data:image/")) {
         // Separate from the base64 metadata, if there is any
         final List<String> components = src.split(",");
+
         if (components.length > 1) {
           var base64Encoded = components.last;
           Uint8List listData = base64Decode(base64Encoded);
