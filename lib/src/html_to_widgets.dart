@@ -6,6 +6,7 @@ import 'package:html/parser.dart' show parse;
 import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
 import 'package:htmltopdfwidgets/src/utils/app_assets.dart';
+import 'package:htmltopdfwidgets/src/utils/utils.dart';
 import 'package:http/http.dart';
 import 'package:printing/printing.dart';
 
@@ -549,21 +550,28 @@ class WidgetsHTMLDecoder {
   Future<Widget> _parseImageElement(dom.Element element) async {
     final src = element.attributes["src"];
     try {
-      if (src != null) {
-        if (src.startsWith("asset:")) {
-          return Image(
-              await imageFromAssetBundle(src.substring("asset:".length)),
-              alignment: customStyles.imageAlignment
-          );
-        }
+      if (src == null) return Text("");
 
-        final netImage = await _saveImage(src);
+      if (src.startsWith("asset:") && src.endsWith(".svg")) {
+        String? svgData = await readStringFromAssets(src.substring("asset:".length));
+        if(svgData == null) return Text("");
+        return SvgImage(
+            svg: svgData,
+            alignment: customStyles.imageAlignment
+        );
+      } else if (src.startsWith("asset:")) {
         return Image(
-            MemoryImage(netImage),
+            await imageFromAssetBundle(src.substring("asset:".length)),
             alignment: customStyles.imageAlignment
         );
       }
-      return Text("");
+
+      final netImage = await _saveImage(src);
+      return Image(
+          MemoryImage(netImage),
+          alignment: customStyles.imageAlignment
+      );
+
     } catch (e) {
       return Text("");
     }
