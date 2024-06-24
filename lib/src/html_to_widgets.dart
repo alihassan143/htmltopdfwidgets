@@ -7,6 +7,7 @@ import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
 import 'package:htmltopdfwidgets/src/utils/app_assets.dart';
 import 'package:http/http.dart';
+import 'package:printing/printing.dart';
 
 import '../htmltopdfwidgets.dart';
 import 'extension/color_extension.dart';
@@ -549,12 +550,20 @@ class WidgetsHTMLDecoder {
     final src = element.attributes["src"];
     try {
       if (src != null) {
+        if (src.startsWith("asset:")) {
+          return Image(
+              await imageFromAssetBundle(src.substring("asset:".length)),
+              alignment: customStyles.imageAlignment
+          );
+        }
+
         final netImage = await _saveImage(src);
-        return Image(MemoryImage(netImage),
-            alignment: customStyles.imageAlignment);
-      } else {
-        return Text("");
+        return Image(
+            MemoryImage(netImage),
+            alignment: customStyles.imageAlignment
+        );
       }
+      return Text("");
     } catch (e) {
       return Text("");
     }

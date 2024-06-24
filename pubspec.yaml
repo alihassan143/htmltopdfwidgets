@@ -10,6 +10,7 @@ dependencies:
   pdf: ">=3.10.3 <4.0.0"
   html: ">=0.15.3 <1.0.0"
   http: ">=0.13.1 <2.0.0"
+  printing: ">=5.9.1 <6.0.0"
 dependency_overrides:
   pdf:
     git:
