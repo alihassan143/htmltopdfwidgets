@@ -575,7 +575,8 @@ class WidgetsHTMLDecoder {
     // final delta = await _parseDeltaElement(element);
     final child = Column(
         children: await WidgetsHTMLDecoder(
-            fontFallback: fontFallback
+            fontFallback: fontFallback,
+            customStyles: customStyles
         ).convert(element.text)
     );
 
