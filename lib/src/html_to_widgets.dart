@@ -191,19 +191,21 @@ class WidgetsHTMLDecoder {
       case HTMLTags.h6:
         return [_parseHeadingElement(element, level: 6)];
 
-      /// Handle unorder list
+      /// Handle unordered list
       case HTMLTags.unorderedList:
         return await _parseUnOrderListElement(element);
 
-      /// Handle ordered list and converts its childrens to widgets
+      /// Handle ordered list and converts its children to widgets
       case HTMLTags.orderedList:
         return await _parseOrderListElement(element);
+
+      /// Handle table
       case HTMLTags.table:
         return await _parseTable(element);
 
-      ///if simple list is found it will handle accoridingly
-      case HTMLTags.list:
-        return await _parseListElement(
+      ///if simple list is found it will handle accordingly
+      case HTMLTags.listItem:
+        return await _parseListItemElement(
           element,
           type: type,
         );
@@ -222,7 +224,7 @@ class WidgetsHTMLDecoder {
 
       /// Handle the line break tag
 
-      /// if no special element is found it treated as simple parahgraph
+      /// if no special element is found it treated as simple paragraph
       default:
         return [await _parseParagraphElement(element)];
     }
@@ -274,7 +276,7 @@ class WidgetsHTMLDecoder {
 
         break;
 
-      /// Handle <span>  <mark> element
+      /// Handle <span> and <mark> element
       case HTMLTags.span || HTMLTags.mark:
         final deltaAttributes = _getDeltaAttributesFromHtmlAttributes(
           element.attributes,
@@ -477,7 +479,7 @@ class WidgetsHTMLDecoder {
     if (element.children.isNotEmpty) {
       for (final child in element.children) {
         result.addAll(
-            await _parseListElement(child, type: BuiltInAttributeKey.quote));
+            await _parseListItemElement(child, type: BuiltInAttributeKey.quote));
       }
     } else {
       result.add(
@@ -488,53 +490,76 @@ class WidgetsHTMLDecoder {
 
   /// Function to parse an unordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseUnOrderListElement(dom.Element element) async {
-    final result = <Widget>[];
-
-    if (element.children.isNotEmpty) {
-      for (final child in element.children) {
-        result.addAll(await _parseListElement(child,
-            type: BuiltInAttributeKey.bulletedList));
-      }
-    } else {
-      result.add(
-          buildBulletwidget(
-              Column(
-                  children: await WidgetsHTMLDecoder(
-                      fontFallback: fontFallback
-                  ).convert(element.text)
-              ),
-              customStyles: customStyles
-          )
-      );
+    
+    if (element.children.isEmpty) {
+      return [
+        buildBulletWidget(Text(element.text), customStyles: customStyles)
+      ];
     }
+
+    final result = <Widget>[];
+    for (final child in element.children) {
+      result.addAll(await _parseListItemElement(child,
+          type: BuiltInAttributeKey.bulletedList));
+    }
+    
+    return result;
+    
+
+    result.add(
+        buildBulletWidget(
+            Column(
+                children: await WidgetsHTMLDecoder(
+                    fontFallback: fontFallback
+                ).convert(element.text)
+            ),
+            customStyles: customStyles
+        )
+    );
+
+    // if (element.children.isNotEmpty) {
+    //   for (final child in element.children) {
+    //     result.addAll(await _parseListItemElement(
+    //         child,
+    //         type: BuiltInAttributeKey.bulletedList
+    //     ));
+    //   }
+    // } else {
+    //   result.add(
+    //       buildBulletwidget(
+    //           Column(
+    //               children: await WidgetsHTMLDecoder(
+    //                   fontFallback: fontFallback
+    //               ).convert(element.text)
+    //           ),
+    //           customStyles: customStyles
+    //       )
+    //   );
+    // }
     return result;
   }
 
   /// Function to parse an ordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseOrderListElement(dom.Element element) async {
-    final result = <Widget>[];
 
-    if (element.children.isNotEmpty) {
-      for (var i = 0; i < element.children.length; i++) {
-        final child = element.children[i];
-        result.addAll(
-            await _parseListElement(
-                child,
-                type: BuiltInAttributeKey.numberList, index: i + 1
-            )
-        );
-      }
-    } else {
-      result.add(
-          buildNumberwdget(
-              Column(
-                  children: await WidgetsHTMLDecoder(
-                      fontFallback: fontFallback
-                  ).convert(element.text)
-              ),
-              fontFallback: fontFallback,
-              customStyles: customStyles,
-              index: 1
+    if (element.children.isEmpty) {
+      return [
+        buildNumberWidget(
+            Text(element.text),
+            fontFallback: fontFallback,
+            customStyles: customStyles,
+            index: 1
+        )
+      ];
+    }
+
+    final result = <Widget>[];
+    for (var i = 0; i < element.children.length; i++) {
+      final child = element.children[i];
+      result.addAll(
+          await _parseListItemElement(
+              child,
+              type: BuiltInAttributeKey.numberList, index: i + 1
           )
       );
     }
@@ -542,32 +567,39 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse a list element (unordered or ordered) and return a list of widgets
-  Future<Iterable<Widget>> _parseListElement(
+  Future<Iterable<Widget>> _parseListItemElement(
     dom.Element element, {
     required String type,
     int? index,
   }) async {
-    final delta = await _parseDeltaElement(element);
+    // final delta = await _parseDeltaElement(element);
+    final child = Column(
+        children: await WidgetsHTMLDecoder(
+            fontFallback: fontFallback
+        ).convert(element.text)
+    );
 
     /// Build a bullet list widget
     if (type == BuiltInAttributeKey.bulletedList) {
-      return [buildBulletwidget(delta, customStyles: customStyles)];
+      return [buildBulletWidget(child, customStyles: customStyles)];
 
       /// Build a numbered list widget
     } else if (type == BuiltInAttributeKey.numberList) {
       return [
-        buildNumberwdget(delta,
+        buildNumberWidget(
+            child,
             index: index!,
             customStyles: customStyles,
             font: font,
-            fontFallback: fontFallback)
+            fontFallback: fontFallback
+        )
       ];
 
       /// Build a quote  widget
     } else if (type == BuiltInAttributeKey.quote) {
-      return [buildQuotewidget(delta, customStyles: customStyles)];
+      return [buildQuotewidget(child, customStyles: customStyles)];
     } else {
-      return [delta];
+      return [child];
     }
   }
 

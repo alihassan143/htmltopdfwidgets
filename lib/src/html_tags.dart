@@ -7,7 +7,7 @@ class HTMLTags {
   static const h6 = 'h6';
   static const orderedList = 'ol';
   static const unorderedList = 'ul';
-  static const list = 'li';
+  static const listItem = 'li';
   static const paragraph = 'p';
   static const image = 'img';
   static const anchor = 'a';
@@ -60,7 +60,7 @@ class HTMLTags {
     HTMLTags.div,
     HTMLTags.unorderedList,
     HTMLTags.orderedList,
-    HTMLTags.list,
+    HTMLTags.listItem,
     HTMLTags.paragraph,
     HTMLTags.blockQuote,
     HTMLTags.checkbox,

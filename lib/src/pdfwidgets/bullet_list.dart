@@ -3,21 +3,23 @@ import '../../htmltopdfwidgets.dart';
 
 // This function creates a bullet list child widget with a bullet icon and content.
 // It takes a 'childValue' widget and 'customStyles' for styling.
-Widget buildBulletwidget(Widget childValue,
-    {required HtmlTagStyle customStyles}) {
+Widget buildBulletWidget(
+    Widget child,
+    {
+      required HtmlTagStyle customStyles
+    }) {
   // Create a container to hold the child elements.
-  Widget child = Container(
+  return Container(
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         _BulletedListIcon(style: customStyles), // Include the bullet icon.
-        Flexible(child: childValue), // Include the main content child widget.
+        Flexible(child: child), // Include the main content child widget.
       ],
     ),
   );
-  return child; // Return the resulting child widget.
 }
 
 // This private class represents the bullet list icon.
