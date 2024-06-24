@@ -554,13 +554,7 @@ class WidgetsHTMLDecoder {
     int? index,
   }) async {
     // final delta = await _parseDeltaElement(element);
-    final child = Column(
-        children: await WidgetsHTMLDecoder(
-          font: font,
-          fontFallback: fontFallback,
-          customStyles: customStyles
-        ).convert(element.text)
-    );
+    final child = Column(children: await _parseElement(element.nodes));
 
     /// Build a bullet list widget
     if (type == BuiltInAttributeKey.bulletedList) {
