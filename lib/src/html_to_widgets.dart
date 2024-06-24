@@ -20,7 +20,7 @@ import 'pdfwidgets/quote_widget.dart';
 
 ////html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
-  ///default font font the pdf if it not provided custo
+  /// default font of the pdf if it not provided custo
   /// Constructor for the HTML decoder
   final Font? font;
 
@@ -493,50 +493,28 @@ class WidgetsHTMLDecoder {
     
     if (element.children.isEmpty) {
       return [
-        buildBulletWidget(Text(element.text), customStyles: customStyles)
+        buildBulletWidget(
+            Text(
+              element.text,
+              style: customStyles.paragraphStyle,
+            ),
+            customStyles: customStyles
+        )
       ];
     }
 
     final result = <Widget>[];
     for (final child in element.children) {
-      result.addAll(await _parseListItemElement(child,
-          type: BuiltInAttributeKey.bulletedList));
+      result.addAll(
+          await _parseListItemElement(
+              child,
+              type: BuiltInAttributeKey.bulletedList
+          )
+      );
     }
     
     return result;
-    
 
-    result.add(
-        buildBulletWidget(
-            Column(
-                children: await WidgetsHTMLDecoder(
-                    fontFallback: fontFallback
-                ).convert(element.text)
-            ),
-            customStyles: customStyles
-        )
-    );
-
-    // if (element.children.isNotEmpty) {
-    //   for (final child in element.children) {
-    //     result.addAll(await _parseListItemElement(
-    //         child,
-    //         type: BuiltInAttributeKey.bulletedList
-    //     ));
-    //   }
-    // } else {
-    //   result.add(
-    //       buildBulletwidget(
-    //           Column(
-    //               children: await WidgetsHTMLDecoder(
-    //                   fontFallback: fontFallback
-    //               ).convert(element.text)
-    //           ),
-    //           customStyles: customStyles
-    //       )
-    //   );
-    // }
-    return result;
   }
 
   /// Function to parse an ordered list element and return a list of widgets
@@ -545,7 +523,10 @@ class WidgetsHTMLDecoder {
     if (element.children.isEmpty) {
       return [
         buildNumberWidget(
-            Text(element.text),
+            Text(
+              element.text,
+              style: customStyles.paragraphStyle,
+            ),
             fontFallback: fontFallback,
             customStyles: customStyles,
             index: 1
