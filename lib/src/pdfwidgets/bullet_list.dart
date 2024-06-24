@@ -30,8 +30,8 @@ class _BulletedListIcon extends StatelessWidget {
   @override
   Widget build(Context context) {
     return SizedBox(
-      width: style.listIndexStyle?.fontSize??style.bulletListIconSize,
-      height: style.listIndexStyle?.fontSize??style.bulletListIconSize,
+      width: style.bulletListIconSize,
+      height: style.bulletListIconSize,
       child: Padding(
         padding: const EdgeInsets.only(right: 5.0),
         child: Center(
