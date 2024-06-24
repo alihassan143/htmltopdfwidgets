@@ -7,6 +7,8 @@ class HtmlTagStyle {
   final TextStyle? boldStyle;
   //italic style that will merge with default style
   final TextStyle? italicStyle;
+  //bold and italic style that will merge with default style
+  final TextStyle? boldItalicStyle;
   //h1 tag style that will merge with default style
   final TextStyle? h1Style;
   //h2 tag style that will merge with default style
@@ -40,6 +42,7 @@ class HtmlTagStyle {
   const HtmlTagStyle({
     this.boldStyle,
     this.italicStyle,
+    this.boldItalicStyle,
     this.h1Style,
     this.h2Style,
     this.h3Style,

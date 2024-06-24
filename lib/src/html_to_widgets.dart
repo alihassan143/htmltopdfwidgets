@@ -240,6 +240,7 @@ class WidgetsHTMLDecoder {
     TextStyle attributes = TextStyle(fontFallback: fontFallback, font: font);
     final List<TextDecoration> decoration = [];
     switch (localName) {
+
       /// Handle <bold> element
       case HTMLTags.bold || HTMLTags.strong:
         attributes = attributes
@@ -253,6 +254,13 @@ class WidgetsHTMLDecoder {
             .copyWith(fontStyle: FontStyle.italic)
             .merge(customStyles.italicStyle);
 
+        break;
+
+      /// Handle <bold> and <i> element
+      case (HTMLTags.bold || HTMLTags.strong) && (HTMLTags.italic || HTMLTags.em):
+        attributes = attributes
+            .copyWith(fontStyle: FontStyle.italic, fontWeight: FontWeight.bold)
+            .merge(customStyles.boldItalicStyle);
         break;
 
       /// Handle <u> element
@@ -489,7 +497,15 @@ class WidgetsHTMLDecoder {
       }
     } else {
       result.add(
-          buildBulletwidget(Text(element.text), customStyles: customStyles));
+          buildBulletwidget(
+              Column(
+                  children: await WidgetsHTMLDecoder(
+                      fontFallback: fontFallback
+                  ).convert(element.text)
+              ),
+              customStyles: customStyles
+          )
+      );
     }
     return result;
   }
@@ -501,12 +517,26 @@ class WidgetsHTMLDecoder {
     if (element.children.isNotEmpty) {
       for (var i = 0; i < element.children.length; i++) {
         final child = element.children[i];
-        result.addAll(await _parseListElement(child,
-            type: BuiltInAttributeKey.numberList, index: i + 1));
+        result.addAll(
+            await _parseListElement(
+                child,
+                type: BuiltInAttributeKey.numberList, index: i + 1
+            )
+        );
       }
     } else {
-      result.add(buildNumberwdget(Text(element.text),
-          fontFallback: fontFallback, customStyles: customStyles, index: 1));
+      result.add(
+          buildNumberwdget(
+              Column(
+                  children: await WidgetsHTMLDecoder(
+                      fontFallback: fontFallback
+                  ).convert(element.text)
+              ),
+              fontFallback: fontFallback,
+              customStyles: customStyles,
+              index: 1
+          )
+      );
     }
     return result;
   }
