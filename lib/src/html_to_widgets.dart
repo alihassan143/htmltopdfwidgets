@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:html/dom.dart' as dom;
@@ -546,11 +547,19 @@ class WidgetsHTMLDecoder {
     return delta;
   }
 
-  /// Function to parse an image element and download image as bytes  and return an Image widget
+  /// Function to parse an image element and return an Image widget
   Future<Widget> _parseImageElement(dom.Element element) async {
     final src = element.attributes["src"];
     try {
       if (src == null) return Text("");
+
+      if (src.startsWith("data:")) {
+        Uint8List listData = base64Decode(src.substring("data:".length));
+        return Image(
+            MemoryImage(listData),
+            alignment: customStyles.imageAlignment
+        );
+      }
 
       if (src.startsWith("asset:") && src.endsWith(".svg")) {
         String? svgData = await readStringFromAssets(src.substring("asset:".length));
