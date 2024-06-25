@@ -707,47 +707,62 @@ class WidgetsHTMLDecoder {
     TextAlign? textAlign;
     for (final child in children) {
       /// Recursively parse child elements
-      if (child is dom.Element) {
-        if (child.children.isNotEmpty &&
-            HTMLTags.formattingElements.contains(child.localName) == false) {
-          childNodes.addAll(await _parseElement(child.children));
-        } else {
-          /// Handle special elements (e.g., headings, lists) within a paragraph
-          if (HTMLTags.specialElements.contains(child.localName)) {
-            childNodes.addAll(
-              await _parseSpecialElements(
-                child,
-                type: BuiltInAttributeKey.bulletedList,
-              ),
-            );
-          } else {
-            if (child.localName == HTMLTags.br) {
-              delta.add(const TextSpan(
-                text: "\n",
-              ));
-            } else {
-              /// Parse text and attributes within the paragraph
-              final attributes = _parserFormattingElementAttributes(child);
-              textAlign = attributes.$1;
 
-              delta.add(TextSpan(
-                  text: "${child.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
-                  style: attributes.$2.merge(customStyles.paragraphStyle)));
-            }
-          }
-        }
-      } else {
-        final attributes =
-            _getDeltaAttributesFromHtmlAttributes(element.attributes);
+      if(child is! dom.Element){
+        final attributes = _getDeltaAttributesFromHtmlAttributes(
+            element.attributes
+        );
         textAlign = attributes.$1;
 
         /// Process text nodes and add them to delta variable
-        delta.add(TextSpan(
-            text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
-            style: attributes.$2
-                .copyWith(font: font, fontFallback: fontFallback)
-                .merge(customStyles.paragraphStyle)));
+        delta.add(
+            TextSpan(
+                text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
+                style: attributes.$2.copyWith(
+                    font: font,
+                    fontFallback: fontFallback
+                ).merge(customStyles.paragraphStyle)
+            )
+        );
+        continue;
       }
+
+      if (child.children.isNotEmpty && !HTMLTags.formattingElements.contains(child.localName)
+      ) {
+        childNodes.addAll(await _parseElement(child.children));
+        continue;
+      }
+
+      /// Handle special elements (e.g., headings, lists) within a paragraph
+      if (HTMLTags.specialElements.contains(child.localName)) {
+        childNodes.addAll(
+          await _parseSpecialElements(
+            child,
+            type: BuiltInAttributeKey.bulletedList,
+          ),
+        );
+        continue;
+      }
+
+      /// Handle new line breaks within the paragraph
+      if (child.localName == HTMLTags.br) {
+        delta.add(const TextSpan(
+          text: "\n",
+        ));
+        continue;
+      }
+
+      /// Parse text and attributes within the paragraph
+      final attributes = _parserFormattingElementAttributes(child);
+      textAlign = attributes.$1;
+
+      delta.add(
+          TextSpan(
+            text: "${child.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
+            style: attributes.$2.merge(customStyles.paragraphStyle)
+          )
+      );
+
     }
 
     /// Create a column with wrapped text and child nodes
