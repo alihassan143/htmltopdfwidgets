@@ -59,8 +59,8 @@ class WidgetsHTMLDecoder {
   Future<List<Widget>> _parseElement(
     Iterable<dom.Node> nodes,
   ) async {
-    final List<Widget> result = [];
     final List<TextSpan> delta = [];
+    final List<Widget> result = [];
     TextAlign? textAlign;
     bool checkbox = false;
     bool alreadyChecked = false;
@@ -76,15 +76,12 @@ class WidgetsHTMLDecoder {
           /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
           final attributes = _parserFormattingElementAttributes(node);
           textAlign = attributes.$1;
-
-          result.addAll(await _parseElement(node.nodes));
-          
-          // delta.add(
-          //     TextSpan(
-          //         text: "${domNode.text.replaceAll(RegExp(r'\n+$'), '')}",
-          //         style: attributes.$2
-          //     )
-          // );
+          delta.add(
+              TextSpan(
+                  text: "${node.text.replaceAll(RegExp(r'\n+$'), '')}",
+                  style: attributes.$2
+              )
+          );
           
         } else if (HTMLTags.specialElements.contains(localName)) {
           if (delta.isNotEmpty) {
@@ -239,7 +236,7 @@ class WidgetsHTMLDecoder {
 
       /// it handles the simple paragraph element
       case HTMLTags.paragraph:
-        return await _parseParagraphElement(element);
+        return [await _parseParagraphElement(element)];
 
       /// Handle block quote tag
       case HTMLTags.blockQuote:
@@ -253,7 +250,7 @@ class WidgetsHTMLDecoder {
 
       /// if no special element is found it treated as simple paragraph
       default:
-        return await _parseParagraphElement(element);
+        return [await _parseParagraphElement(element)];
     }
   }
 
@@ -653,9 +650,8 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse a paragraph element and return a widget
-  Future<List<Widget>> _parseParagraphElement(dom.Element element) async {
-    final delta = await _parseElement(element.children);
-    // final delta = await _parseDeltaElement(element);
+  Future<Widget> _parseParagraphElement(dom.Element element) async {
+    final delta = await _parseDeltaElement(element);
     return delta;
   }
 
@@ -730,14 +726,13 @@ class WidgetsHTMLDecoder {
   /// Function to parse a complex HTML element and return a widget
   Future<Widget> _parseDeltaElement(dom.Element element) async {
     final List<TextSpan> delta = [];
-    final List<dom.Node> children = element.nodes.toList();
-    final List<Widget> childNodes = [];
+    final List<Widget> result = [];
     TextAlign? textAlign;
 
-    for (final child in children) {
+    for (final node in element.nodes) {
       /// Recursively parse child elements
 
-      if(child is! dom.Element){
+      if(node is! dom.Element){
         final attributes = _getDeltaAttributesFromHtmlAttributes(
             element.attributes
         );
@@ -746,7 +741,7 @@ class WidgetsHTMLDecoder {
         /// Process text nodes and add them to delta variable
         delta.add(
             TextSpan(
-                text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
+                text: node.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
                 style: attributes.$2.copyWith(
                     font: font,
                     fontFallback: fontFallback
@@ -756,17 +751,41 @@ class WidgetsHTMLDecoder {
         continue;
       }
 
-      if (child.children.isNotEmpty && !HTMLTags.formattingElements.contains(child.localName)
+      if (node.children.isNotEmpty && !HTMLTags.formattingElements.contains(node.localName)
       ) {
-        childNodes.addAll(await _parseElement(child.children));
+        if (delta.isNotEmpty) {
+          result.add(
+              RichText(
+                text: TextSpan(children: List<TextSpan>.from(delta)),
+                textAlign: textAlign,
+              )
+          );
+
+          textAlign = null;
+          delta.clear();
+        }
+
+        result.addAll(await _parseElement(node.children));
         continue;
       }
 
       /// Handle special elements (e.g., headings, lists) within a paragraph
-      if (HTMLTags.specialElements.contains(child.localName)) {
-        childNodes.addAll(
+      if (HTMLTags.specialElements.contains(node.localName)) {
+        if (delta.isNotEmpty) {
+          result.add(
+              RichText(
+                text: TextSpan(children: List<TextSpan>.from(delta)),
+                textAlign: textAlign,
+              )
+          );
+
+          textAlign = null;
+          delta.clear();
+        }
+
+        result.addAll(
           await _parseSpecialElements(
-            child,
+            node,
             type: BuiltInAttributeKey.bulletedList,
           ),
         );
@@ -774,24 +793,35 @@ class WidgetsHTMLDecoder {
       }
 
       /// Handle new line breaks within the paragraph
-      if (child.localName == HTMLTags.br) {
-        delta.add(const TextSpan(
-          text: "\n",
-        ));
+      if (node.localName == HTMLTags.br) {
+        delta.add(const TextSpan(text: "\n"));
         continue;
       }
 
       /// Parse text and attributes within the paragraph
-      final attributes = _parserFormattingElementAttributes(child);
+      final attributes = _parserFormattingElementAttributes(node);
       textAlign = attributes.$1;
 
       delta.add(
           TextSpan(
-            text: "${child.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
+            text: "${node.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
             style: attributes.$2.merge(customStyles.paragraphStyle)
           )
       );
 
+    }
+
+    if (delta.isNotEmpty) {
+      result.add(
+          RichText(
+            text: TextSpan(children: List<TextSpan>.from(delta)),
+            textAlign: textAlign,
+          )
+      );
+
+      // TODO(iwanicki):
+      textAlign = null;
+      delta.clear();
     }
 
     /// Create a column with wrapped text and child nodes
@@ -800,7 +830,7 @@ class WidgetsHTMLDecoder {
         width: double.infinity,
         child: RichText(textAlign: textAlign, text: TextSpan(children: delta)),
       ),
-      ...childNodes
+      ...result
     ]);
   }
 
