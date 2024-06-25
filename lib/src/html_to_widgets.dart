@@ -522,8 +522,7 @@ class WidgetsHTMLDecoder {
 
     final result = <Widget>[];
 
-    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
-      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+    result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
     for (int i=0; i<element.children.length; i++) {
       final childElement = element.children[i];
