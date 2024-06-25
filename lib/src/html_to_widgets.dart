@@ -209,6 +209,7 @@ class WidgetsHTMLDecoder {
         return await _parseListItemElement(
           element,
           type: type,
+          nestedList: hasListInParent(element),
         );
 
       /// it handles the simple paragraph element
@@ -481,7 +482,12 @@ class WidgetsHTMLDecoder {
     if (element.children.isNotEmpty) {
       for (final child in element.children) {
         result.addAll(
-            await _parseListItemElement(child, type: BuiltInAttributeKey.quote));
+            await _parseListItemElement(
+              child,
+              type: BuiltInAttributeKey.quote,
+              nestedList: hasListInParent(child)
+            )
+        );
       }
     } else {
       result.add(
@@ -490,9 +496,17 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
+  bool hasListInParent(dom.Element element){
+    if(element.parent == null) return false;
+    if(element.parent!.localName == HTMLTags.listItem) return true;
+    return hasListInParent(element.parent!);
+  }
+
   /// Function to parse an unordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseUnOrderListElement(dom.Element element) async {
-    
+
+    bool nestedList = hasListInParent(element);
+
     if (element.children.isEmpty) {
       return [
         buildBulletWidget(
@@ -500,18 +514,24 @@ class WidgetsHTMLDecoder {
               element.text,
               style: customStyles.paragraphStyle,
             ),
-            customStyles: customStyles
+            customStyles: customStyles,
+            nestedList: nestedList
         )
       ];
     }
 
     final result = <Widget>[];
+
+    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
+      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+
     for (int i=0; i<element.children.length; i++) {
       final childElement = element.children[i];
       result.addAll(
           await _parseListItemElement(
               childElement,
-              type: BuiltInAttributeKey.bulletedList
+              type: BuiltInAttributeKey.bulletedList,
+              nestedList: nestedList
           )
       );
 
@@ -519,13 +539,18 @@ class WidgetsHTMLDecoder {
         result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
     }
-    
+
+    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
+      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+
     return result;
 
   }
 
   /// Function to parse an ordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseOrderListElement(dom.Element element) async {
+
+    bool nestedList = hasListInParent(element);
 
     if (element.children.isEmpty) {
       return [
@@ -542,12 +567,17 @@ class WidgetsHTMLDecoder {
     }
 
     final result = <Widget>[];
+
+    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
+      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+
     for (var i = 0; i < element.children.length; i++) {
       final childElement = element.children[i];
       result.addAll(
           await _parseListItemElement(
-              childElement,
-              type: BuiltInAttributeKey.numberList, index: i + 1
+            childElement,
+            type: BuiltInAttributeKey.numberList, index: i + 1,
+            nestedList: nestedList
           )
       );
 
@@ -555,6 +585,10 @@ class WidgetsHTMLDecoder {
         result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
     }
+
+    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
+      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+
     return result;
   }
 
@@ -563,13 +597,14 @@ class WidgetsHTMLDecoder {
     dom.Element element, {
     required String type,
     int? index,
+    required bool nestedList,
   }) async {
     // final delta = await _parseDeltaElement(element);
     final child = Column(children: await _parseElement(element.nodes));
 
     /// Build a bullet list widget
     if (type == BuiltInAttributeKey.bulletedList) {
-      return [buildBulletWidget(child, customStyles: customStyles)];
+      return [buildBulletWidget(child, customStyles: customStyles, nestedList: nestedList)];
 
       /// Build a numbered list widget
     } else if (type == BuiltInAttributeKey.numberList) {
