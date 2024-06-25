@@ -70,9 +70,8 @@ class WidgetsHTMLDecoder {
       if (domNode is dom.Element) {
         final localName = domNode.localName;
         if (localName == HTMLTags.br) {
-          delta.add(const TextSpan(
-            text: "\n",
-          ));
+          delta.add(const TextSpan(text: "\n"));
+
         } else if (HTMLTags.formattingElements.contains(localName)) {
           /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
           final attributes = _parserFormattingElementAttributes(domNode);
@@ -83,39 +82,49 @@ class WidgetsHTMLDecoder {
               style: attributes.$2));
         } else if (HTMLTags.specialElements.contains(localName)) {
           if (delta.isNotEmpty) {
-            final newlist = List<TextSpan>.from(delta);
-            result.add((SizedBox(
-                width: double.infinity,
-                child: RichText(
-                    textAlign: textAlign, text: TextSpan(children: newlist)))));
+            result.add(
+                SizedBox(
+                  width: double.infinity,
+                  child: RichText(
+                    text: TextSpan(children: List<TextSpan>.from(delta)),
+                    textAlign: textAlign,
+                  )
+                )
+            );
 
             textAlign = null;
-
             delta.clear();
           }
+
           if (checkbox) {
             checkbox = false;
 
-            result.add(Row(children: [
-              SvgImage(
-                  svg: alreadyChecked
-                      ? AppAssets.checkedIcon
-                      : AppAssets.unCheckedIcon),
-              ...await _parseSpecialElements(
-                domNode,
-                type: BuiltInAttributeKey.bulletedList,
-              ),
-            ]));
+            result.add(
+                Row(
+                    children: [
+                      SvgImage(
+                          svg:
+                          alreadyChecked?
+                          AppAssets.checkedIcon:
+                          AppAssets.unCheckedIcon
+                      ),
+                      ...await _parseSpecialElements(
+                        domNode,
+                        type: BuiltInAttributeKey.bulletedList,
+                      ),
+                    ]
+                )
+            );
             alreadyChecked = false;
           } else {
             if (localName == HTMLTags.checkbox) {
               final checked = domNode.attributes["type"];
               if (checked != null && checked == "checkbox") {
                 checkbox = true;
-
                 alreadyChecked = domNode.attributes.keys.contains("checked");
               }
             }
+
             result.addAll(
               await _parseSpecialElements(
                 domNode,
@@ -128,19 +137,26 @@ class WidgetsHTMLDecoder {
         }
       } else if (domNode is dom.Text) {
         if (delta.isNotEmpty && domNode.text.trim().isNotEmpty) {
-          final newlist = List<TextSpan>.from(delta);
-          result.add((SizedBox(
+          result.add(
+              SizedBox(
               width: double.infinity,
               child: RichText(
-                  textAlign: textAlign, text: TextSpan(children: newlist)))));
+                  textAlign: textAlign,
+                  text: TextSpan(children: List<TextSpan>.from(delta))
+              )
+            )
+          );
 
           textAlign = null;
-
           delta.clear();
         }
 
-        result.add(Text(domNode.text,
-            style: TextStyle(font: font, fontFallback: fontFallback)));
+        result.add(
+            Text(
+                domNode.text,
+                style: TextStyle(font: font, fontFallback: fontFallback)
+            )
+        );
 
         /// Process text nodes and add them to delta
       } else {
@@ -149,11 +165,14 @@ class WidgetsHTMLDecoder {
     }
 
     if (delta.isNotEmpty) {
-      final newlist = List<TextSpan>.from(delta);
-      result.add((SizedBox(
-          width: double.infinity,
-          child: RichText(
-              textAlign: textAlign, text: TextSpan(children: newlist)))));
+      result.add(
+          SizedBox(
+              width: double.infinity,
+              child: RichText(
+                  textAlign: textAlign,
+                  text: TextSpan(children: List<TextSpan>.from(delta)))
+          )
+      );
     }
 
     /// If there are text nodes in delta, wrap them in a Wrap widget and add to the result
@@ -209,12 +228,12 @@ class WidgetsHTMLDecoder {
         return await _parseListItemElement(
           element,
           type: type,
-          nestedList: hasListInParent(element),
+          nestedList: hasInParent(element, [HTMLTags.listItem]),
         );
 
       /// it handles the simple paragraph element
       case HTMLTags.paragraph:
-        return [await _parseParagraphElement(element)];
+        return await _parseParagraphElement(element);
 
       /// Handle block quote tag
       case HTMLTags.blockQuote:
@@ -228,7 +247,7 @@ class WidgetsHTMLDecoder {
 
       /// if no special element is found it treated as simple paragraph
       default:
-        return [await _parseParagraphElement(element)];
+        return await _parseParagraphElement(element);
     }
   }
 
@@ -485,7 +504,7 @@ class WidgetsHTMLDecoder {
             await _parseListItemElement(
               child,
               type: BuiltInAttributeKey.quote,
-              nestedList: hasListInParent(child)
+              nestedList: hasInParent(child, [HTMLTags.listItem])
             )
         );
       }
@@ -496,16 +515,18 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
-  bool hasListInParent(dom.Element element){
+  bool hasInParent(dom.Element element, List<String> tags){
     if(element.parent == null) return false;
-    if(element.parent!.localName == HTMLTags.listItem) return true;
-    return hasListInParent(element.parent!);
+    for(String tag in tags)
+      if(element.parent!.localName == tag) return true;
+
+    return hasInParent(element.parent!, tags);
   }
 
   /// Function to parse an unordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseUnOrderListElement(dom.Element element) async {
 
-    bool nestedList = hasListInParent(element);
+    bool nestedList = hasInParent(element, [HTMLTags.listItem]);
 
     if (element.children.isEmpty) {
       return [
@@ -549,7 +570,7 @@ class WidgetsHTMLDecoder {
   /// Function to parse an ordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseOrderListElement(dom.Element element) async {
 
-    bool nestedList = hasListInParent(element);
+    bool nestedList = hasInParent(element, [HTMLTags.listItem]);
 
     if (element.children.isEmpty) {
       return [
@@ -626,8 +647,9 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse a paragraph element and return a widget
-  Future<Widget> _parseParagraphElement(dom.Element element) async {
-    final delta = await _parseDeltaElement(element);
+  Future<List<Widget>> _parseParagraphElement(dom.Element element) async {
+    final delta = await _parseElement(element.children);
+    // final delta = await _parseDeltaElement(element);
     return delta;
   }
 
@@ -701,10 +723,11 @@ class WidgetsHTMLDecoder {
 
   /// Function to parse a complex HTML element and return a widget
   Future<Widget> _parseDeltaElement(dom.Element element) async {
-    final delta = <TextSpan>[];
-    final children = element.nodes.toList();
-    final childNodes = <Widget>[];
+    final List<TextSpan> delta = [];
+    final List<dom.Node> children = element.nodes.toList();
+    final List<Widget> childNodes = [];
     TextAlign? textAlign;
+
     for (final child in children) {
       /// Recursively parse child elements
 
