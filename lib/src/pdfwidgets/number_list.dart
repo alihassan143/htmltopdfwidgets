@@ -10,7 +10,7 @@ Widget defaultIndex(int index,
     required HtmlTagStyle customStyles}) {
   return Container(
     width: 20,
-    padding: const EdgeInsets.only(right: 5.0),
+    padding: customStyles.listItemIndicatorPadding,
     child: Text('$index.', // Display the index as text.
         style: TextStyle(
           font: font, // Apply the specified font.

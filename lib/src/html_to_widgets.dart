@@ -147,6 +147,7 @@ class WidgetsHTMLDecoder {
         assert(false, 'Unknown node type: $domNode');
       }
     }
+
     if (delta.isNotEmpty) {
       final newlist = List<TextSpan>.from(delta);
       result.add((SizedBox(
@@ -236,7 +237,8 @@ class WidgetsHTMLDecoder {
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
   (TextAlign?, TextStyle) _parserFormattingElementAttributes(
-      dom.Element element) {
+      dom.Element element
+  ) {
     final localName = element.localName;
     TextAlign? textAlign;
     TextStyle attributes = TextStyle(fontFallback: fontFallback, font: font);
@@ -504,10 +506,10 @@ class WidgetsHTMLDecoder {
     }
 
     final result = <Widget>[];
-    for (final child in element.children) {
+    for (final element in element.children) {
       result.addAll(
           await _parseListItemElement(
-              child,
+              element,
               type: BuiltInAttributeKey.bulletedList
           )
       );
@@ -536,10 +538,10 @@ class WidgetsHTMLDecoder {
 
     final result = <Widget>[];
     for (var i = 0; i < element.children.length; i++) {
-      final child = element.children[i];
+      final childElement = element.children[i];
       result.addAll(
           await _parseListItemElement(
-              child,
+              childElement,
               type: BuiltInAttributeKey.numberList, index: i + 1
           )
       );

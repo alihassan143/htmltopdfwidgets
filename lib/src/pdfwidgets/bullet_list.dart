@@ -35,7 +35,7 @@ class _BulletedListIcon extends StatelessWidget {
       width: style.bulletListIconSize,
       height: style.bulletListIconSize,
       child: Padding(
-        padding: const EdgeInsets.only(right: 5.0),
+        padding: style.listItemIndicatorPadding,
         child: Center(
           child: Container(
             width: style.bulletListDotSize,
