@@ -24,6 +24,7 @@ Widget buildBulletWidget(
 
 // This private class represents the bullet list icon.
 class _BulletedListIcon extends StatelessWidget {
+
   final HtmlTagStyle style;
 
   // Constructor to initialize the 'style' property.

@@ -506,13 +506,18 @@ class WidgetsHTMLDecoder {
     }
 
     final result = <Widget>[];
-    for (final element in element.children) {
+    for (int i=0; i<element.children.length; i++) {
+      final childElement = element.children[i];
       result.addAll(
           await _parseListItemElement(
-              element,
+              childElement,
               type: BuiltInAttributeKey.bulletedList
           )
       );
+
+      if(i < element.children.length - 1 && customStyles.listItemVerticalSeparatorSize > 0)
+        result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+
     }
     
     return result;
@@ -545,6 +550,10 @@ class WidgetsHTMLDecoder {
               type: BuiltInAttributeKey.numberList, index: i + 1
           )
       );
+
+      if(i < element.children.length - 1 && customStyles.listItemVerticalSeparatorSize > 0)
+        result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+
     }
     return result;
   }
