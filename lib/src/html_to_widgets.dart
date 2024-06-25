@@ -57,29 +57,35 @@ class WidgetsHTMLDecoder {
   //// and returns the list of widgets
 
   Future<List<Widget>> _parseElement(
-    Iterable<dom.Node> domNodes,
+    Iterable<dom.Node> nodes,
   ) async {
-    final result = <Widget>[];
-    final delta = <TextSpan>[];
+    final List<Widget> result = [];
+    final List<TextSpan> delta = [];
     TextAlign? textAlign;
     bool checkbox = false;
     bool alreadyChecked = false;
 
     ///find dom node in and check if its element or not than convert it according to its specs
-    for (final domNode in domNodes) {
-      if (domNode is dom.Element) {
-        final localName = domNode.localName;
+    for (final node in nodes) {
+      if (node is dom.Element) {
+        final localName = node.localName;
         if (localName == HTMLTags.br) {
           delta.add(const TextSpan(text: "\n"));
 
         } else if (HTMLTags.formattingElements.contains(localName)) {
           /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-          final attributes = _parserFormattingElementAttributes(domNode);
-
+          final attributes = _parserFormattingElementAttributes(node);
           textAlign = attributes.$1;
-          delta.add(TextSpan(
-              text: "${domNode.text.replaceAll(RegExp(r'\n+$'), '')} ",
-              style: attributes.$2));
+
+          result.addAll(await _parseElement(node.nodes));
+          
+          // delta.add(
+          //     TextSpan(
+          //         text: "${domNode.text.replaceAll(RegExp(r'\n+$'), '')}",
+          //         style: attributes.$2
+          //     )
+          // );
+          
         } else if (HTMLTags.specialElements.contains(localName)) {
           if (delta.isNotEmpty) {
             result.add(
@@ -109,7 +115,7 @@ class WidgetsHTMLDecoder {
                           AppAssets.unCheckedIcon
                       ),
                       ...await _parseSpecialElements(
-                        domNode,
+                        node,
                         type: BuiltInAttributeKey.bulletedList,
                       ),
                     ]
@@ -118,16 +124,16 @@ class WidgetsHTMLDecoder {
             alreadyChecked = false;
           } else {
             if (localName == HTMLTags.checkbox) {
-              final checked = domNode.attributes["type"];
+              final checked = node.attributes["type"];
               if (checked != null && checked == "checkbox") {
                 checkbox = true;
-                alreadyChecked = domNode.attributes.keys.contains("checked");
+                alreadyChecked = node.attributes.keys.contains("checked");
               }
             }
 
             result.addAll(
               await _parseSpecialElements(
-                domNode,
+                node,
                 type: BuiltInAttributeKey.bulletedList,
               ),
             );
@@ -135,8 +141,8 @@ class WidgetsHTMLDecoder {
 
           /// Handle special elements (e.g., headings, lists, images)
         }
-      } else if (domNode is dom.Text) {
-        if (delta.isNotEmpty && domNode.text.trim().isNotEmpty) {
+      } else if (node is dom.Text) {
+        if (delta.isNotEmpty && node.text.trim().isNotEmpty) {
           result.add(
               SizedBox(
               width: double.infinity,
@@ -153,14 +159,14 @@ class WidgetsHTMLDecoder {
 
         result.add(
             Text(
-                domNode.text,
+                node.text,
                 style: TextStyle(font: font, fontFallback: fontFallback)
             )
         );
 
         /// Process text nodes and add them to delta
       } else {
-        assert(false, 'Unknown node type: $domNode');
+        assert(false, 'Unknown node type: $node');
       }
     }
 
