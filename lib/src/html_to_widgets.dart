@@ -283,12 +283,12 @@ class WidgetsHTMLDecoder {
 
         break;
 
-      /// Handle <bold> and <i> element
-      case (HTMLTags.bold || HTMLTags.strong) && (HTMLTags.italic || HTMLTags.em):
-        attributes = attributes
-            .copyWith(fontStyle: FontStyle.italic, fontWeight: FontWeight.bold)
-            .merge(customStyles.boldItalicStyle);
-        break;
+      // /// Handle <bold> and <i> element
+      // case (HTMLTags.bold || HTMLTags.strong) && (HTMLTags.italic || HTMLTags.em):
+      //   attributes = attributes
+      //       .copyWith(fontStyle: FontStyle.italic, fontWeight: FontWeight.bold)
+      //       .merge(customStyles.boldItalicStyle);
+      //   break;
 
       /// Handle <u> element
       case HTMLTags.underline:
