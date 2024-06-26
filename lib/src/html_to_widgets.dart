@@ -102,7 +102,7 @@ class WidgetsHTMLDecoder {
 
       } else if (HTMLTags.formattingElements.contains(localName)) {
         /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-        final attributes = _parserFormattingElementAttributes(node);
+        final attributes = _parseFormattingElementAttributes(node);
         textAlign = attributes.$1;
         delta.add(
             TextSpan(
@@ -236,7 +236,7 @@ class WidgetsHTMLDecoder {
   }
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
-  (TextAlign?, TextStyle) _parserFormattingElementAttributes(
+  (TextAlign?, TextStyle) _parseFormattingElementAttributes(
       dom.Element element
   ) {
     final localName = element.localName;
@@ -316,7 +316,7 @@ class WidgetsHTMLDecoder {
     }
 
     for (final child in element.children) {
-      final nattributes = _parserFormattingElementAttributes(child);
+      final nattributes = _parseFormattingElementAttributes(child);
       attributes = attributes.merge(nattributes.$2);
       if (nattributes.$2.decoration != null) {
         decoration.add(nattributes.$2.decoration!);
@@ -418,7 +418,7 @@ class WidgetsHTMLDecoder {
     /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
     if (localName == HTMLTags.br) {
     } else if (HTMLTags.formattingElements.contains(localName)) {
-      final attributes = _parserFormattingElementAttributes(element);
+      final attributes = _parseFormattingElementAttributes(element);
 
       result.add(Text(element.text, style: attributes.$2));
     } else if (HTMLTags.specialElements.contains(localName)) {
@@ -454,7 +454,7 @@ class WidgetsHTMLDecoder {
     final children = element.nodes.toList();
     for (final child in children) {
       if (child is dom.Element) {
-        final attributes = _parserFormattingElementAttributes(child);
+        final attributes = _parseFormattingElementAttributes(child);
         textAlign = attributes.$1;
         delta.add(TextSpan(text: child.text, style: attributes.$2));
       } else {
@@ -508,9 +508,11 @@ class WidgetsHTMLDecoder {
   /// Function to parse an unordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseUnOrderListElement(dom.Element element) async {
 
+    // Check if the list is nested within another list
     bool nestedList = hasInParent(element, [HTMLTags.listItem]);
 
-    if (element.children.isEmpty) {
+    // If the list has no children, return a single bullet widget
+    if (element.children.isEmpty)
       return [
         buildBulletWidget(
             Text(
@@ -521,14 +523,17 @@ class WidgetsHTMLDecoder {
             nestedList: nestedList
         )
       ];
-    }
 
     final result = <Widget>[];
 
+    // Add vertical space before the list
     result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
+    // Parse each list item and add it to the result
     for (int i=0; i<element.children.length; i++) {
       final childElement = element.children[i];
+
+      // Parse the list item element and add it to the result
       result.addAll(
           await _parseListItemElement(
               childElement,
@@ -537,11 +542,13 @@ class WidgetsHTMLDecoder {
           )
       );
 
+      // Add vertical space between list items
       if(i < element.children.length - 1 && customStyles.listItemVerticalSeparatorSize > 0)
         result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
     }
 
+    // Add vertical space after the list if it is not nested
     if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
       result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
@@ -552,9 +559,11 @@ class WidgetsHTMLDecoder {
   /// Function to parse an ordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseOrderListElement(dom.Element element) async {
 
+    // Check if the list is nested within another list
     bool nestedList = hasInParent(element, [HTMLTags.listItem]);
 
-    if (element.children.isEmpty) {
+    // If the list has no children, return a single number widget
+    if (element.children.isEmpty)
       return [
         buildNumberWidget(
             Text(
@@ -566,15 +575,18 @@ class WidgetsHTMLDecoder {
             index: 1
         )
       ];
-    }
 
     final result = <Widget>[];
 
+    // Add vertical space before the list
     if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
       result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
+    // Parse each list item and add it to the result
     for (var i = 0; i < element.children.length; i++) {
       final childElement = element.children[i];
+
+      // Parse the list item element and add it to the result
       result.addAll(
           await _parseListItemElement(
             childElement,
@@ -583,11 +595,13 @@ class WidgetsHTMLDecoder {
           )
       );
 
+      // Add vertical space between list items
       if(i < element.children.length - 1 && customStyles.listItemVerticalSeparatorSize > 0)
         result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
     }
 
+    // Add vertical space after the list if it is not nested
     if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
       result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
@@ -638,6 +652,7 @@ class WidgetsHTMLDecoder {
     try {
       if (src == null) return Text("");
 
+      // Handle base64 image provided as string
       if (src.startsWith("data:image/")) {
         // Separate from the base64 metadata, if there is any
         final List<String> components = src.split(",");
@@ -653,6 +668,7 @@ class WidgetsHTMLDecoder {
         return Text("");
       }
 
+      // Handle svg image provided as an asset
       if (src.startsWith("asset:") && src.endsWith(".svg")) {
         String? svgData = await readStringFromAssets(src.substring("asset:".length));
         if(svgData == null) return Text("");
@@ -660,6 +676,8 @@ class WidgetsHTMLDecoder {
             svg: svgData,
             alignment: customStyles.imageAlignment
         );
+        
+      // Handle raster (pixel) image provided as an asset
       } else if (src.startsWith("asset:")) {
         return Image(
             await imageFromAssetBundle(src.substring("asset:".length)),
@@ -669,6 +687,7 @@ class WidgetsHTMLDecoder {
 
       final netImage = await _saveImage(src);
 
+      // Handle svg image provided as a web URL
       if(src.endsWith(".svg")) {
         return SvgImage(
             svg: utf8.decode(netImage),
@@ -676,6 +695,7 @@ class WidgetsHTMLDecoder {
         );
       }
 
+      // Handle raster (pixel) image provided as a web URL
       return Image(
           MemoryImage(netImage),
           alignment: customStyles.imageAlignment
@@ -700,116 +720,90 @@ class WidgetsHTMLDecoder {
     }
   }
 
-  /// Function to parse a complex HTML element and return a widget
-  Future<Widget> _parseDeltaElement(dom.Element element) async {
+  Future<Widget> _parseDeltaElement(dom.Element element, {TextAlign? align, TextStyle? style}) async {
+
+    var (newAlign, newStyle) = _getDeltaAttributesFromHtmlAttributes(
+        element.attributes
+    );
+
+    newAlign ??= align ?? TextAlign.left;
+    newStyle.merge(style ?? customStyles.paragraphStyle);
+
     final List<TextSpan> delta = [];
     final List<Widget> result = [];
-    TextAlign? textAlign;
 
     void deltaToResult(){
       if (delta.isEmpty) return;
-
       result.add(
-        RichText(
-          text: TextSpan(children: List.of(delta)), textAlign: textAlign,
-        )
+          RichText(
+              text: TextSpan(
+                  children: List.of(delta),
+                  style: style
+              ),
+              textAlign: align
+          )
       );
-
-      textAlign = null;
-      delta.clear();
-
     }
 
-    for (final node in element.nodes) {
-      /// Recursively parse child elements
+    for (final dom.Node node in element.nodes) {
 
+      // Not of type `Element` - convert to text and add to delta.
       if(node is! dom.Element){
-        final attributes = _getDeltaAttributesFromHtmlAttributes(
-            element.attributes
-        );
-        textAlign = attributes.$1;
-
-        /// Process text nodes and add them to delta variable
         delta.add(
           TextSpan(
             text: node.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
-            style: attributes.$2.copyWith(
-                font: font,
-                fontFallback: fontFallback
-            ).merge(customStyles.paragraphStyle)
+            style: style
           )
         );
         continue;
       }
 
-      if (node.children.isNotEmpty && !HTMLTags.formattingElements.contains(node.localName)) {
-        deltaToResult();
-
-        result.addAll(await _parseElement(node.children));
-        continue;
-      }
-
-      /// Handle special elements (e.g., headings, lists) within a paragraph
-      if (HTMLTags.specialElements.contains(node.localName)) {
-        deltaToResult();
-
-        result.addAll(
-          await _parseSpecialElements(
-            node,
-            type: BuiltInAttributeKey.bulletedList,
-          ),
-        );
-        continue;
-      }
-
-      /// Handle new line breaks within the paragraph
+      // Handle new line breaks within the paragraph
       if (node.localName == HTMLTags.br) {
         delta.add(const TextSpan(text: "\n"));
         continue;
       }
 
-      /// Parse text and attributes within the paragraph
-      final attributes = _parserFormattingElementAttributes(node);
-      textAlign = attributes.$1;
+      // Handle simple formatting elements (e.g., <bold>, <italic>, <underline>)
+      if(HTMLTags.formattingElements.contains(node.localName)) {
+        deltaToResult();
 
-      for(final child in node.nodes){
-        if(child is dom.Element){
-          if(child.localName == HTMLTags.br){
-            delta.add(const TextSpan(text: "\n"));
-            continue;
-          }
+        final (newAlign, newStyle) = _parseFormattingElementAttributes(node);
+        result.add(
+            await _parseDeltaElement(
+                node,
+                align: newAlign ?? align,
+                style: newStyle.merge(style)
+            )
+        );
 
-          final childAttributes = _parserFormattingElementAttributes(child);
-          textAlign = childAttributes.$1;
-
-          delta.add(
-              TextSpan(
-                  text: child.text,
-                  style: childAttributes.$2.merge(attributes.$2)
-              )
-          );
-        } else {
-          delta.add(
-              TextSpan(
-                  text: child.text,
-                  style: attributes.$2.merge(TextStyle(font: font, fontFallback: fontFallback))
-              )
-          );
-        }
+        continue;
       }
+
+      // Handle special elements (e.g., headings, lists) within a paragraph
+      if(HTMLTags.specialElements.contains(node.localName)) {
+        deltaToResult();
+
+        result.addAll(
+          await _parseSpecialElements(
+            node, type: BuiltInAttributeKey.bulletedList,
+          )
+        );
+        continue;
+      }
+
+      // No match so far - parse text and attributes within the paragraph
+      deltaToResult();
+      result.add(
+          await _parseDeltaElement(node, align: align, style: style)
+      );
 
     }
 
     deltaToResult();
 
     /// Create a column with wrapped text and child nodes
-    return Wrap(children: [
-      SizedBox(
-        width: double.infinity,
-        child: RichText(textAlign: textAlign, text: TextSpan(children: delta)),
-      ),
-      ...result
-    ]);
+    return Wrap(children: result);
   }
 
   /// Utility function to convert a CSS string to a map of CSS properties

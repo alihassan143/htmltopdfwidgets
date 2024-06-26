@@ -44,12 +44,12 @@ void main() {
     <li>Second item<br><i>With an italics newline</i></li>
     <li>Third item<br><b>With a bold newline</b></li>
   </ol>
-  
-  <br>
   <br>
   <p><b>Hello there bold</b></p>
   <br>
   <p><b>Hello there bold<br>With a newline</b></p>
+  <br>
+  <br><p><b><i>Hello there bold and italic<br>With a newline</i></b></p>
   <br>
   <table>
   <tr>
