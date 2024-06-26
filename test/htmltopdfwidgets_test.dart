@@ -68,7 +68,8 @@ void main() {
   <p><b>Bold text<br>Bold text (after a newline)</b></p>
   <p><b><i>Bold and italic text<br>Bold and italic text (after a newline)</i></b></p>
   <p><b><i><u>Bold, italic and underline text<br>Bold, italic and underline text (after a newline)</u></i></b></p>
-  <p><i><u>Italic and underline text<br><b>Bold, italic and underline text (after a newline)</b></u></i></p>
+  <p><b><i>Bold and italic text<br><u>Bold, italic and underline text (after a newline)</u></i></b></p>
+  <p><i><u>Italic and underline text<b><br>Bold, italic and underline text (after a newline)</b></u></i></p>
 
   <h4>Test text alignment</h4>
   
@@ -102,6 +103,8 @@ void main() {
   });
 
   test('convertion_test', () async {
+
+    String htmlText = "<p><i><u>Italic and underline text<b><br>Bold, italic and underline text (after a newline)</b></u></i></p>";
 
     List<Widget> widgets = await HTMLToPdf().convert(htmlText);
     pdf.addPage(MultiPage(

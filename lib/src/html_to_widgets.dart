@@ -242,9 +242,15 @@ class WidgetsHTMLDecoder {
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
   (TextAlign?, TextStyle) _parseFormattingElement(dom.Element element) {
-    TextAlign? align;
-    TextStyle style = TextStyle(fontFallback: fontFallback, font: font);
+
+    // Check if the element is a simple formatting tag like <span>, <bold>,
+    // or <italic> as well as formatting tags or attributes in all of its parent
+    // elements and return the corresponding text alignment and style.
+
     final List<TextDecoration> decoration = [];
+    var (align, style) = _getDeltaAttributesFromHtmlAttributes(
+      element.attributes,
+    );
 
     switch (element.localName) {
 
@@ -275,14 +281,7 @@ class WidgetsHTMLDecoder {
 
       /// Handle <span> and <mark> element
       case HTMLTags.span || HTMLTags.mark:
-        final deltaAttributes = _getDeltaAttributesFromHtmlAttributes(
-          element.attributes,
-        );
-        align = deltaAttributes.$1;
-        style = style.merge(deltaAttributes.$2);
-        if (deltaAttributes.$2.decoration != null) {
-          decoration.add(deltaAttributes.$2.decoration!);
-        }
+        // Nothing to do here
         break;
 
       /// Handle <a> element
@@ -650,7 +649,7 @@ class WidgetsHTMLDecoder {
 
   /// Function to parse a paragraph element and return a widget
   Future<Widget> _parseParagraphElement(dom.Element element) async {
-    return await _parseDeltaElement(element);
+    return Wrap(children: await _parseDeltaElement(element));
   }
 
   /// Function to parse an image element and return an Image widget
@@ -727,11 +726,15 @@ class WidgetsHTMLDecoder {
     }
   }
 
-  Future<Widget> _parseDeltaElement(dom.Element element, {TextAlign? align, TextStyle? style}) async {
+  Future<List<Widget>> _parseDeltaElement(dom.Element element, {TextAlign? align, TextStyle? style}) async {
 
-    var (newAlign, newStyle) = _getDeltaAttributesFromHtmlAttributes(
-        element.attributes
-    );
+    print("_parseDeltaElement: ${element.localName}, ${element.nodes}");
+
+    var (newAlign, newStyle) = _parseFormattingElement(element);
+
+    // var (newAlign, newStyle) = _getDeltaAttributesFromHtmlAttributes(
+    //     element.attributes
+    // );
 
     align = newAlign ?? align ?? TextAlign.left;
     style = newStyle.merge(style ?? customStyles.paragraphStyle);
@@ -780,7 +783,7 @@ class WidgetsHTMLDecoder {
 
         final (newAlign, newStyle) = _parseFormattingElement(node);
 
-        result.add(
+        result.addAll(
             await _parseDeltaElement(
                 node,
                 align: newAlign ?? align,
@@ -805,7 +808,7 @@ class WidgetsHTMLDecoder {
 
       // No match so far - parse text and attributes within the paragraph
       deltaToResult();
-      result.add(
+      result.addAll(
           await _parseDeltaElement(node, align: align, style: style)
       );
 
@@ -813,8 +816,9 @@ class WidgetsHTMLDecoder {
 
     deltaToResult();
 
+    print(result);
     /// Create a column with wrapped text and child nodes
-    return Wrap(children: result);
+    return result;
   }
 
   /// Function to parse a complex HTML element and return a widget
@@ -899,7 +903,7 @@ class WidgetsHTMLDecoder {
   (TextAlign?, TextStyle) _getDeltaAttributesFromHtmlAttributes(
       LinkedHashMap<Object, String> htmlAttributes
   ) {
-    TextStyle style = const TextStyle();
+    TextStyle style = TextStyle(font: font, fontFallback: fontFallback);
     TextAlign? textAlign;
 
     ///extract styls from the inline css
