@@ -540,7 +540,6 @@ class WidgetsHTMLDecoder {
               childElement,
               type: BuiltInAttributeKey.bulletedList,
               nestedList: nestedList,
-              withIndicator: !isElementSublist(childElement)
           )
       );
 
@@ -593,7 +592,6 @@ class WidgetsHTMLDecoder {
             childElement,
             type: BuiltInAttributeKey.numberList, index: i + 1,
             nestedList: nestedList,
-            withIndicator: !isElementSublist(childElement)
           )
       );
 

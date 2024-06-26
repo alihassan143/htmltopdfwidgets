@@ -45,6 +45,13 @@ void main() {
     <li>First item<br>With a newline</li>
     <li>Second item<br><i>With an italics newline</i></li>
     <li>Third item<br><b>With a bold newline</b></li>
+    <li>
+    <ol>
+      <li>First subitem<br>With a newline</li>
+      <li>Second subitem<br><i>With an italics newline</i></li>
+      <li>Third subitem<br><b>With a bold newline</b></li>
+    </ol>
+    </li>
   </ol>
   <br>
   

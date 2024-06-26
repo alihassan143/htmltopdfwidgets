@@ -11,16 +11,3 @@ Future<String?> readStringFromAssets(String path) async {
     return null;
   }
 }
-
-bool isElementSublist(Element element) {
-
-  if(element.localName != HTMLTags.listItem)
-    return false;
-
-  for(Element childElement in element.children)
-    if(childElement.localName == HTMLTags.unorderedList ||
-        childElement.localName == HTMLTags.orderedList)
-      return true;
-
-  return false;
-}
