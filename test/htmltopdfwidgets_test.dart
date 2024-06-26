@@ -30,7 +30,27 @@ void main() {
     <li>First item</li>
     <li>Second item</li>
     <li>Third item</li>
+    <li>
+    <ul>
+    <li>1st subitem</li>
+    <li>2nd subitem</li>
+    <li>3rd subitem</li>
+    </ul>
+    </li>
   </ul>
+  
+  <ol>
+    <li>First item<br>With a newline</li>
+    <li>Second item<br><i>With an italics newline</i></li>
+    <li>Third item<br><b>With a bold newline</b></li>
+  </ol>
+  
+  <br>
+  <br>
+  <p><b>Hello there bold</b></p>
+  <br>
+  <p><b>Hello there bold<br>With a newline</b></p>
+  <br>
   <table>
   <tr>
     <th>Company</th>

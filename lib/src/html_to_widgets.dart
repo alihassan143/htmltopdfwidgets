@@ -65,120 +65,97 @@ class WidgetsHTMLDecoder {
     bool checkbox = false;
     bool alreadyChecked = false;
 
+    void deltaToResult(){
+      if (delta.isEmpty) return;
+
+      result.add(
+          RichText(
+            text: TextSpan(children: List.of(delta)), textAlign: textAlign,
+          )
+      );
+
+      textAlign = null;
+      delta.clear();
+
+    }
+
     ///find dom node in and check if its element or not than convert it according to its specs
     for (final node in nodes) {
-      if (node is dom.Element) {
-        final localName = node.localName;
-        if (localName == HTMLTags.br) {
-          delta.add(const TextSpan(text: "\n"));
-
-        } else if (HTMLTags.formattingElements.contains(localName)) {
-          /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-          final attributes = _parserFormattingElementAttributes(node);
-          textAlign = attributes.$1;
-          delta.add(
-              TextSpan(
-                  text: "${node.text.replaceAll(RegExp(r'\n+$'), '')}",
-                  style: attributes.$2
-              )
-          );
-          
-        } else if (HTMLTags.specialElements.contains(localName)) {
-          if (delta.isNotEmpty) {
-            result.add(
-                SizedBox(
-                  width: double.infinity,
-                  child: RichText(
-                    text: TextSpan(children: List<TextSpan>.from(delta)),
-                    textAlign: textAlign,
-                  )
-                )
-            );
-
-            textAlign = null;
-            delta.clear();
-          }
-
-          if (checkbox) {
-            checkbox = false;
-
-            result.add(
-                Row(
-                    children: [
-                      SvgImage(
-                          svg:
-                          alreadyChecked?
-                          AppAssets.checkedIcon:
-                          AppAssets.unCheckedIcon
-                      ),
-                      ...await _parseSpecialElements(
-                        node,
-                        type: BuiltInAttributeKey.bulletedList,
-                      ),
-                    ]
-                )
-            );
-            alreadyChecked = false;
-          } else {
-            if (localName == HTMLTags.checkbox) {
-              final checked = node.attributes["type"];
-              if (checked != null && checked == "checkbox") {
-                checkbox = true;
-                alreadyChecked = node.attributes.keys.contains("checked");
-              }
-            }
-
-            result.addAll(
-              await _parseSpecialElements(
-                node,
-                type: BuiltInAttributeKey.bulletedList,
-              ),
-            );
-          }
-
-          /// Handle special elements (e.g., headings, lists, images)
-        }
-      } else if (node is dom.Text) {
-        if (delta.isNotEmpty && node.text.trim().isNotEmpty) {
-          result.add(
-              SizedBox(
-              width: double.infinity,
-              child: RichText(
-                  textAlign: textAlign,
-                  text: TextSpan(children: List<TextSpan>.from(delta))
-              )
-            )
-          );
-
-          textAlign = null;
-          delta.clear();
-        }
-
-        result.add(
-            Text(
-                node.text,
+      if (node is dom.Text) {
+        delta.add(
+            TextSpan(
+                text: node.text,
                 style: TextStyle(font: font, fontFallback: fontFallback)
             )
         );
+        continue;
+      }
 
-        /// Process text nodes and add them to delta
-      } else {
+      if (node is! dom.Element){
         assert(false, 'Unknown node type: $node');
+        continue;
+      }
+
+      final localName = node.localName;
+      if (localName == HTMLTags.br) {
+        delta.add(const TextSpan(text: "\n"));
+
+      } else if (HTMLTags.formattingElements.contains(localName)) {
+        /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
+        final attributes = _parserFormattingElementAttributes(node);
+        textAlign = attributes.$1;
+        delta.add(
+            TextSpan(
+                text: "${node.text.replaceAll(RegExp(r'\n+$'), '')}",
+                style: attributes.$2
+            )
+        );
+
+      } else if (HTMLTags.specialElements.contains(localName)) {
+        deltaToResult();
+
+        if (checkbox) {
+          checkbox = false;
+
+          result.add(
+              Row(
+                  children: [
+                    SvgImage(
+                        svg:
+                        alreadyChecked?
+                        AppAssets.checkedIcon:
+                        AppAssets.unCheckedIcon
+                    ),
+                    ...await _parseSpecialElements(
+                      node,
+                      type: BuiltInAttributeKey.bulletedList,
+                    ),
+                  ]
+              )
+          );
+          alreadyChecked = false;
+        } else {
+          if (localName == HTMLTags.checkbox) {
+            final checked = node.attributes["type"];
+            if (checked != null && checked == "checkbox") {
+              checkbox = true;
+              alreadyChecked = node.attributes.keys.contains("checked");
+            }
+          }
+
+          result.addAll(
+            await _parseSpecialElements(
+              node,
+              type: BuiltInAttributeKey.bulletedList,
+            ),
+          );
+        }
+
+        /// Handle special elements (e.g., headings, lists, images)
       }
     }
 
-    if (delta.isNotEmpty) {
-      result.add(
-          SizedBox(
-              width: double.infinity,
-              child: RichText(
-                  textAlign: textAlign,
-                  text: TextSpan(children: List<TextSpan>.from(delta)))
-          )
-      );
-    }
-
-    /// If there are text nodes in delta, wrap them in a Wrap widget and add to the result
+    deltaToResult();
 
     return result;
   }
@@ -282,13 +259,6 @@ class WidgetsHTMLDecoder {
             .merge(customStyles.italicStyle);
 
         break;
-
-      // /// Handle <bold> and <i> element
-      // case (HTMLTags.bold || HTMLTags.strong) && (HTMLTags.italic || HTMLTags.em):
-      //   attributes = attributes
-      //       .copyWith(fontStyle: FontStyle.italic, fontWeight: FontWeight.bold)
-      //       .merge(customStyles.boldItalicStyle);
-      //   break;
 
       /// Handle <u> element
       case HTMLTags.underline:
@@ -761,13 +731,13 @@ class WidgetsHTMLDecoder {
 
         /// Process text nodes and add them to delta variable
         delta.add(
-            TextSpan(
-                text: node.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
-                style: attributes.$2.copyWith(
-                    font: font,
-                    fontFallback: fontFallback
-                ).merge(customStyles.paragraphStyle)
-            )
+          TextSpan(
+            text: node.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
+            style: attributes.$2.copyWith(
+                font: font,
+                fontFallback: fontFallback
+            ).merge(customStyles.paragraphStyle)
+          )
         );
         continue;
       }
@@ -802,12 +772,31 @@ class WidgetsHTMLDecoder {
       final attributes = _parserFormattingElementAttributes(node);
       textAlign = attributes.$1;
 
-      delta.add(
-          TextSpan(
-            text: "${node.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
-            style: attributes.$2.merge(customStyles.paragraphStyle)
-          )
-      );
+      for(final child in node.nodes){
+        if(child is dom.Element){
+          if(child.localName == HTMLTags.br){
+            delta.add(const TextSpan(text: "\n"));
+            continue;
+          }
+
+          final childAttributes = _parserFormattingElementAttributes(child);
+          textAlign = childAttributes.$1;
+
+          delta.add(
+              TextSpan(
+                  text: child.text,
+                  style: childAttributes.$2.merge(attributes.$2)
+              )
+          );
+        } else {
+          delta.add(
+              TextSpan(
+                  text: child.text,
+                  style: attributes.$2.merge(TextStyle(font: font, fontFallback: fontFallback))
+              )
+          );
+        }
+      }
 
     }
 
