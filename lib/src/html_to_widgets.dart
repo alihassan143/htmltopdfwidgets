@@ -336,6 +336,15 @@ class WidgetsHTMLDecoder {
         break;
     }
 
+    final deltaAttributes = _getDeltaAttributesFromHtmlAttributes(
+      element.attributes,
+    );
+    textAlign = deltaAttributes.$1;
+    attributes = attributes.merge(deltaAttributes.$2);
+    if (deltaAttributes.$2.decoration != null) {
+      decoration.add(deltaAttributes.$2.decoration!);
+    }
+
     for (final child in element.children) {
       final nattributes = _parserFormattingElementAttributes(child);
       attributes = attributes.merge(nattributes.$2);
@@ -622,7 +631,6 @@ class WidgetsHTMLDecoder {
     int? index,
     required bool nestedList,
   }) async {
-    // final delta = await _parseDeltaElement(element);
     final child = Column(children: await _parseElement(element.nodes));
 
     /// Build a bullet list widget
@@ -651,8 +659,7 @@ class WidgetsHTMLDecoder {
 
   /// Function to parse a paragraph element and return a widget
   Future<Widget> _parseParagraphElement(dom.Element element) async {
-    final delta = await _parseDeltaElement(element);
-    return delta;
+    return await _parseDeltaElement(element);
   }
 
   /// Function to parse an image element and return an Image widget
@@ -729,6 +736,20 @@ class WidgetsHTMLDecoder {
     final List<Widget> result = [];
     TextAlign? textAlign;
 
+    void deltaToResult(){
+      if (delta.isEmpty) return;
+
+      result.add(
+        RichText(
+          text: TextSpan(children: List.of(delta)), textAlign: textAlign,
+        )
+      );
+
+      textAlign = null;
+      delta.clear();
+
+    }
+
     for (final node in element.nodes) {
       /// Recursively parse child elements
 
@@ -751,19 +772,8 @@ class WidgetsHTMLDecoder {
         continue;
       }
 
-      if (node.children.isNotEmpty && !HTMLTags.formattingElements.contains(node.localName)
-      ) {
-        if (delta.isNotEmpty) {
-          result.add(
-              RichText(
-                text: TextSpan(children: List<TextSpan>.from(delta)),
-                textAlign: textAlign,
-              )
-          );
-
-          textAlign = null;
-          delta.clear();
-        }
+      if (node.children.isNotEmpty && !HTMLTags.formattingElements.contains(node.localName)) {
+        deltaToResult();
 
         result.addAll(await _parseElement(node.children));
         continue;
@@ -771,17 +781,7 @@ class WidgetsHTMLDecoder {
 
       /// Handle special elements (e.g., headings, lists) within a paragraph
       if (HTMLTags.specialElements.contains(node.localName)) {
-        if (delta.isNotEmpty) {
-          result.add(
-              RichText(
-                text: TextSpan(children: List<TextSpan>.from(delta)),
-                textAlign: textAlign,
-              )
-          );
-
-          textAlign = null;
-          delta.clear();
-        }
+        deltaToResult();
 
         result.addAll(
           await _parseSpecialElements(
@@ -811,18 +811,7 @@ class WidgetsHTMLDecoder {
 
     }
 
-    if (delta.isNotEmpty) {
-      result.add(
-          RichText(
-            text: TextSpan(children: List<TextSpan>.from(delta)),
-            textAlign: textAlign,
-          )
-      );
-
-      // TODO(iwanicki):
-      textAlign = null;
-      delta.clear();
-    }
+    deltaToResult();
 
     /// Create a column with wrapped text and child nodes
     return Wrap(children: [
@@ -853,7 +842,8 @@ class WidgetsHTMLDecoder {
 
   /// Function to extract text styles from HTML attributes
   (TextAlign?, TextStyle) _getDeltaAttributesFromHtmlAttributes(
-      LinkedHashMap<Object, String> htmlAttributes) {
+      LinkedHashMap<Object, String> htmlAttributes
+  ) {
     TextStyle style = const TextStyle();
     TextAlign? textAlign;
 
