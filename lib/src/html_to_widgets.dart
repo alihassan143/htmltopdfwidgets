@@ -69,8 +69,13 @@ class WidgetsHTMLDecoder {
       if (delta.isEmpty) return;
 
       result.add(
-          RichText(
-            text: TextSpan(children: List.of(delta)), textAlign: textAlign,
+          // SizedBox expands the RichText widget to the full width of the
+          // parent. This way the text is able to be aligned properly.
+          SizedBox(
+            width: double.infinity,
+            child: RichText(
+              text: TextSpan(children: List.of(delta)), textAlign: textAlign,
+            )
           )
       );
 
@@ -102,7 +107,7 @@ class WidgetsHTMLDecoder {
 
       } else if (HTMLTags.formattingElements.contains(localName)) {
         /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-        final attributes = _parseFormattingElementAttributes(node);
+        final attributes = _parseFormattingElement(node);
         textAlign = attributes.$1;
         delta.add(
             TextSpan(
@@ -236,25 +241,23 @@ class WidgetsHTMLDecoder {
   }
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
-  (TextAlign?, TextStyle) _parseFormattingElementAttributes(
-      dom.Element element
-  ) {
-    final localName = element.localName;
-    TextAlign? textAlign;
-    TextStyle attributes = TextStyle(fontFallback: fontFallback, font: font);
+  (TextAlign?, TextStyle) _parseFormattingElement(dom.Element element) {
+    TextAlign? align;
+    TextStyle style = TextStyle(fontFallback: fontFallback, font: font);
     final List<TextDecoration> decoration = [];
-    switch (localName) {
+
+    switch (element.localName) {
 
       /// Handle <bold> element
       case HTMLTags.bold || HTMLTags.strong:
-        attributes = attributes
+        style = style
             .copyWith(fontWeight: FontWeight.bold)
             .merge(customStyles.boldStyle);
         break;
 
       /// Handle <em> <i> element
       case HTMLTags.italic || HTMLTags.em:
-        attributes = attributes
+        style = style
             .copyWith(fontStyle: FontStyle.italic)
             .merge(customStyles.italicStyle);
 
@@ -268,7 +271,6 @@ class WidgetsHTMLDecoder {
       /// Handle <del> element
       case HTMLTags.del:
         decoration.add(TextDecoration.lineThrough);
-
         break;
 
       /// Handle <span> and <mark> element
@@ -276,8 +278,8 @@ class WidgetsHTMLDecoder {
         final deltaAttributes = _getDeltaAttributesFromHtmlAttributes(
           element.attributes,
         );
-        textAlign = deltaAttributes.$1;
-        attributes = attributes.merge(deltaAttributes.$2);
+        align = deltaAttributes.$1;
+        style = style.merge(deltaAttributes.$2);
         if (deltaAttributes.$2.decoration != null) {
           decoration.add(deltaAttributes.$2.decoration!);
         }
@@ -287,10 +289,8 @@ class WidgetsHTMLDecoder {
       case HTMLTags.anchor:
         final href = element.attributes['href'];
         if (href != null) {
-          decoration.add(
-            TextDecoration.underline,
-          );
-          attributes = attributes
+          decoration.add(TextDecoration.underline);
+          style = style
               .copyWith(color: PdfColors.blue)
               .merge(customStyles.linkStyle);
         }
@@ -298,7 +298,7 @@ class WidgetsHTMLDecoder {
 
       /// Handle <code> element
       case HTMLTags.code:
-        attributes = attributes
+        style = style
             .copyWith(background: const BoxDecoration(color: PdfColors.red))
             .merge(customStyles.codeStyle);
         break;
@@ -306,29 +306,26 @@ class WidgetsHTMLDecoder {
         break;
     }
 
-    final deltaAttributes = _getDeltaAttributesFromHtmlAttributes(
-      element.attributes,
-    );
-    textAlign = deltaAttributes.$1;
-    attributes = attributes.merge(deltaAttributes.$2);
-    if (deltaAttributes.$2.decoration != null) {
-      decoration.add(deltaAttributes.$2.decoration!);
-    }
+    style = style.copyWith(decoration: TextDecoration.combine(decoration));
 
-    for (final child in element.children) {
-      final nattributes = _parseFormattingElementAttributes(child);
-      attributes = attributes.merge(nattributes.$2);
-      if (nattributes.$2.decoration != null) {
-        decoration.add(nattributes.$2.decoration!);
-      }
-      textAlign = nattributes.$1;
-    }
+    if(element.parent != null)
+      return (align, style);
+    
+    dom.Element parentElement = element.parent!;
+    var (parentAlign, parentStyle) = _getDeltaAttributesFromHtmlAttributes(
+      parentElement.attributes,
+    );
+
+    align ??= parentAlign;
+    style = parentStyle.merge(style);
+
+    (parentAlign, parentStyle) = _parseFormattingElement(parentElement);
+
+    align ??= parentAlign;
+    style = parentStyle.merge(style);
 
     ///will combine style get from the children
-    return (
-      textAlign,
-      attributes.copyWith(decoration: TextDecoration.combine(decoration))
-    );
+    return (align, style);
   }
 
   ///convert table tag into the table pdf widget
@@ -418,7 +415,7 @@ class WidgetsHTMLDecoder {
     /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
     if (localName == HTMLTags.br) {
     } else if (HTMLTags.formattingElements.contains(localName)) {
-      final attributes = _parseFormattingElementAttributes(element);
+      final attributes = _parseFormattingElement(element);
 
       result.add(Text(element.text, style: attributes.$2));
     } else if (HTMLTags.specialElements.contains(localName)) {
@@ -454,7 +451,7 @@ class WidgetsHTMLDecoder {
     final children = element.nodes.toList();
     for (final child in children) {
       if (child is dom.Element) {
-        final attributes = _parseFormattingElementAttributes(child);
+        final attributes = _parseFormattingElement(child);
         textAlign = attributes.$1;
         delta.add(TextSpan(text: child.text, style: attributes.$2));
       } else {
@@ -751,10 +748,11 @@ class WidgetsHTMLDecoder {
             width: double.infinity,
             child: RichText(
               textAlign: align,
-              text: TextSpan(children: List.of(delta)),
+              text: TextSpan(children: List.of(delta), style: style),
             ),
           )
       );
+      delta.clear();
     }
 
     for (final dom.Node node in element.nodes) {
@@ -780,7 +778,8 @@ class WidgetsHTMLDecoder {
       if(HTMLTags.formattingElements.contains(node.localName)) {
         deltaToResult();
 
-        final (newAlign, newStyle) = _parseFormattingElementAttributes(node);
+        final (newAlign, newStyle) = _parseFormattingElement(node);
+
         result.add(
             await _parseDeltaElement(
                 node,
@@ -960,6 +959,12 @@ class WidgetsHTMLDecoder {
     if (align != null) {
       textAlign = _alignText(align);
     }
+
+    // Flutter has a semi-bug - merging two styles with the `.merge()` method
+    // skips decoration if the decoration is set to null. For this reason
+    // the decoration has to be set manually.
+    if(style.decoration == null)
+      style = style.copyWith(decoration: TextDecoration.none);
 
     return (textAlign, style);
   }

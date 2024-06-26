@@ -1,4 +1,3 @@
-// Import the necessary dependencies from the 'htmltopdfwidgets.dart' file.
 import '../../htmltopdfwidgets.dart';
 
 
@@ -53,8 +52,9 @@ class _NumberListIndicator extends StatelessWidget {
         padding: style.listItemIndicatorPadding,
         child: Align(
           alignment: Alignment.centerRight,
-          child: Text('$index.',
-              style: style.listIndexStyle
+          child: Text(
+              '$index.',
+              style: style.listIndexStyle,
           )
         ),
       ),
