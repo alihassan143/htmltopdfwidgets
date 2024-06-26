@@ -46,6 +46,8 @@ class HtmlTagStyle {
   //bullet list style that will merge with default style
   final EdgeInsets listItemIndicatorPadding;
   //bullet list style that will merge with default style
+  final double listItemIndicatorWidth;
+  //bullet list style that will merge with default style
   final double listItemVerticalSeparatorSize;
 
   const HtmlTagStyle({
@@ -68,8 +70,9 @@ class HtmlTagStyle {
     this.quoteBarColor,
     this.bulletListIconColor,
     this.bulletListDotSize = 5.0,
-    this.bulletListIconSize = 22.0,
-    this.listItemIndicatorPadding = const EdgeInsets.symmetric(horizontal: 5.0),
+    this.bulletListIconSize = 14.0,
+    this.listItemIndicatorPadding = const EdgeInsets.only(right: 12.0),
+    this.listItemIndicatorWidth = 28.0,
     this.listItemVerticalSeparatorSize = 5.0,
   });
 }

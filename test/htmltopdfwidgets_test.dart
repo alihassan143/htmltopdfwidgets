@@ -22,7 +22,8 @@ import 'package:test/test.dart';
 late Document pdf;
 
 void main() {
-  const htmlText = '''  <h1>Heading Example</h1>
+  const htmlText = '''
+  <h1>Heading Example</h1>
   <p>This is a paragraph.</p>
   <img src="image.jpg" alt="Example Image" />
   <blockquote>This is a quote.</blockquote>
@@ -34,9 +35,10 @@ void main() {
     <ul>
     <li>1st subitem</li>
     <li>2nd subitem</li>
-    <li>3rd subitem</li>
+    <li>3rd subitem, and here goes some text to see if the subitems are all aligned properly to the left.</li>
     </ul>
     </li>
+    <li>Fourth item</li>
   </ul>
   
   <ol>
@@ -45,12 +47,26 @@ void main() {
     <li>Third item<br><b>With a bold newline</b></li>
   </ol>
   <br>
+  
+  <h4>Test single formattings</h4>
   <p><b>Hello there bold</b></p>
-  <br>
-  <p><b>Hello there bold<br>With a newline</b></p>
-  <br>
-  <br><p><b><i>Hello there bold and italic<br>With a newline</i></b></p>
-  <br>
+  <p><i>Hello there italic</i></p>
+  <p><u>Hello there underline</u></p>
+  
+  <h4>Test multiple formattings is one paragraph with newline</h4>
+  <p>Regular text<br>Regular text (after a newline)</p>
+  <p><b>Bold text<br>Bold text (after a newline)</b></p>
+  <p><b><i>Bold and italic text<br>Bold and italic text (after a newline)</i></b></p>
+  <p><b><i><u>Bold, italic and underline text<br>Bold, italic and underline text (after a newline)</u></i></b></p>
+
+  <h4>Test text alignment</h4>
+  
+  <p style="text-align:justify;">This is a very long, but lovely and tremendously pleasant and easy to read line in a paragraph that is justified.</p>
+  <p style="text-align:left;">This is a line in a paragraph that is aligned left.</p>
+  <p style="text-align:right;">This is a line in a paragraph that is aligned right.</p>
+  <p style="text-align:center;">This is a line in a paragraph that is aligned center.</p>
+
+  <h4>Test tables</h4>
   <table>
   <tr>
     <th>Company</th>
@@ -69,8 +85,8 @@ void main() {
   </tr>
 </table>''';
   setUpAll(() {
-    Document.debug = true;
-    RichText.debug = true;
+    // Document.debug = true;
+    // RichText.debug = true;
     pdf = Document();
   });
 

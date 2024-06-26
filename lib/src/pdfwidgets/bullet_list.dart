@@ -1,66 +1,78 @@
-// Import the necessary dependencies from the 'htmltopdfwidgets.dart' file.
 import '../../htmltopdfwidgets.dart';
 
-// This function creates a bullet list child widget with a bullet icon and content.
-// It takes a 'childValue' widget and 'customStyles' for styling.
-Widget buildBulletWidget(
-    Widget child,
-    {
-      required HtmlTagStyle customStyles,
-      required bool nestedList
-    }) {
-  // Create a container to hold the child elements.
-  return Container(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _BulletedListIcon(style: customStyles, nestedList: nestedList), // Include the bullet icon.
-        Flexible(child: child), // Include the main content child widget.
-      ],
-    ),
-  );
+class BulletListItemWidget extends StatelessWidget {
+  
+  // Bullet list item widget with a bullet icon and content.
+  
+  final Widget child;
+  final HtmlTagStyle customStyles;
+  final bool nestedList;
+  final bool withIndicator;
+
+  BulletListItemWidget({
+    required this.child,
+    required this.customStyles,
+    required this.nestedList,
+    this.withIndicator = true
+  });
+
+  @override
+  Widget build(Context context) {
+    return Container(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if(withIndicator)
+            _BulletedListIndicator(style: customStyles, nestedList: nestedList)
+          else
+            SizedBox(width: customStyles.listItemIndicatorWidth),
+          Flexible(child: child),
+        ],
+      ),
+    );
+  }
 }
 
-// This private class represents the bullet list icon.
-class _BulletedListIcon extends StatelessWidget {
+
+class _BulletedListIndicator extends StatelessWidget {
 
   final HtmlTagStyle style;
   final bool nestedList;
 
-  // Constructor to initialize the 'style' property.
-  _BulletedListIcon({required this.style, required this.nestedList});
+  _BulletedListIndicator({required this.style, required this.nestedList});
 
   @override
   Widget build(Context context) {
     return SizedBox(
-      width: style.bulletListIconSize,
+      width: style.listItemIndicatorWidth,
       height: style.bulletListIconSize,
       child: Padding(
         padding: style.listItemIndicatorPadding,
-        child: Center(
+        child: Align(
+          alignment: Alignment.centerRight,
           child: Container(
             width: style.bulletListDotSize,
             height: style.bulletListDotSize,
             decoration:
             nestedList?
             BoxDecoration(
-              shape: BoxShape.circle, // Bullet icon is circular.
+              shape: BoxShape.circle,
               border: Border.all(
-                color: style.bulletListIconColor ?? PdfColors.black, // Apply custom color.
-                width: 1.0, // Set border width.
+                color: style.bulletListIconColor ?? PdfColors.black,
+                width: 1.0,
               ),
             ):
 
             BoxDecoration(
-              shape: BoxShape.circle, // Bullet icon is circular.
+              shape: BoxShape.circle,
               color: style.bulletListIconColor ??
-                  PdfColors.black, // Apply custom color.
+                  PdfColors.black,
             ),
           ),
         ),
-      ),
+      )
     );
   }
 }

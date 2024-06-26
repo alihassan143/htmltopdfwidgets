@@ -1,47 +1,63 @@
 // Import the necessary dependencies from the 'htmltopdfwidgets.dart' file.
 import '../../htmltopdfwidgets.dart';
 
-// This function creates a default index (number) widget for a numbered list.
-// It takes an 'index' (the current number), a 'font', a list of 'fontFallback' fonts,
-// and 'customStyles' for styling.
-Widget defaultIndex(int index,
-    {Font? font,
-    required List<Font> fontFallback,
-    required HtmlTagStyle customStyles}) {
-  return Container(
-    width: 20,
-    padding: customStyles.listItemIndicatorPadding,
-    child: Text('$index.', // Display the index as text.
-        style: TextStyle(
-          font: font, // Apply the specified font.
-          fontFallback: fontFallback, // Use font fallbacks if needed.
-        )..merge(
-            customStyles.listIndexStyle)), // Apply custom styles for the index.
-  );
+
+class NumberListItemWidget extends StatelessWidget {
+  // Number list item widget with a number index and content.
+  final Widget child;
+  final int index;
+  final HtmlTagStyle customStyles;
+  final bool withIndicator;
+
+  NumberListItemWidget({
+    required this.child,
+    required this.index,
+    required this.customStyles,
+    this.withIndicator = true
+  });
+
+  @override
+  Widget build(Context context) {
+    return Container(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if(withIndicator)
+            _NumberListIndicator(
+              style: customStyles,
+              index: index
+            )
+          else
+            SizedBox(width: customStyles.listItemIndicatorWidth),
+          Flexible(child: child),
+        ],
+      ),
+    );
+  }
 }
 
-// This function creates a numbered list child widget with its current number and properties.
-// It takes a 'childValue' widget, 'index' (the current number), a 'font',
-// a list of 'fontFallback' fonts, and 'customStyles' for styling.
-Widget buildNumberWidget(
-    Widget child,
-    {
-      required int index,
-      Font? font,
-      required List<Font> fontFallback,
-      required HtmlTagStyle customStyles
-    }) {
-  return Container(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        defaultIndex(index,
-            fontFallback: fontFallback, font: font, customStyles: customStyles),
-        // Include the default index widget with specified properties.
-        Flexible(child: child), // Include the main content child widget.
-      ],
-    ),
-  );
+class _NumberListIndicator extends StatelessWidget {
+  final HtmlTagStyle style;
+  final int index;
+
+  _NumberListIndicator({required this.style, required this.index});
+
+  @override
+  Widget build(Context context) {
+    return SizedBox(
+      width: style.listItemIndicatorWidth,
+      height: style.bulletListIconSize,
+      child: Padding(
+        padding: style.listItemIndicatorPadding,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Text('$index.',
+              style: style.listIndexStyle
+          )
+        ),
+      ),
+    );
+  }
 }

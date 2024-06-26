@@ -514,8 +514,8 @@ class WidgetsHTMLDecoder {
     // If the list has no children, return a single bullet widget
     if (element.children.isEmpty)
       return [
-        buildBulletWidget(
-            Text(
+        BulletListItemWidget(
+            child: Text(
               element.text,
               style: customStyles.paragraphStyle,
             ),
@@ -526,8 +526,9 @@ class WidgetsHTMLDecoder {
 
     final result = <Widget>[];
 
-    // Add vertical space before the list
-    result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+    // Add vertical space before the list if it is not nested
+    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
+      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
     // Parse each list item and add it to the result
     for (int i=0; i<element.children.length; i++) {
@@ -538,7 +539,8 @@ class WidgetsHTMLDecoder {
           await _parseListItemElement(
               childElement,
               type: BuiltInAttributeKey.bulletedList,
-              nestedList: nestedList
+              nestedList: nestedList,
+              withIndicator: !isElementSublist(childElement)
           )
       );
 
@@ -565,20 +567,19 @@ class WidgetsHTMLDecoder {
     // If the list has no children, return a single number widget
     if (element.children.isEmpty)
       return [
-        buildNumberWidget(
-            Text(
+        NumberListItemWidget(
+            child: Text(
               element.text,
               style: customStyles.paragraphStyle,
             ),
-            fontFallback: fontFallback,
-            customStyles: customStyles,
-            index: 1
+            index: 1,
+            customStyles: customStyles
         )
       ];
 
     final result = <Widget>[];
 
-    // Add vertical space before the list
+    // Add vertical space before the list if it is not nested
     if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
       result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
 
@@ -591,7 +592,8 @@ class WidgetsHTMLDecoder {
           await _parseListItemElement(
             childElement,
             type: BuiltInAttributeKey.numberList, index: i + 1,
-            nestedList: nestedList
+            nestedList: nestedList,
+            withIndicator: !isElementSublist(childElement)
           )
       );
 
@@ -612,24 +614,34 @@ class WidgetsHTMLDecoder {
   Future<Iterable<Widget>> _parseListItemElement(
     dom.Element element, {
     required String type,
+    bool withIndicator = true,
     int? index,
     required bool nestedList,
   }) async {
-    final child = Column(children: await _parseElement(element.nodes));
+    final child = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: await _parseElement(element.nodes)
+    );
 
     /// Build a bullet list widget
     if (type == BuiltInAttributeKey.bulletedList) {
-      return [buildBulletWidget(child, customStyles: customStyles, nestedList: nestedList)];
+      return [
+        BulletListItemWidget(
+            child: child,
+            customStyles: customStyles,
+            nestedList: nestedList,
+            withIndicator: withIndicator
+        )
+      ];
 
       /// Build a numbered list widget
     } else if (type == BuiltInAttributeKey.numberList) {
       return [
-        buildNumberWidget(
-            child,
+        NumberListItemWidget(
+            child: child,
             index: index!,
             customStyles: customStyles,
-            font: font,
-            fontFallback: fontFallback
+            withIndicator: withIndicator
         )
       ];
 
@@ -726,8 +738,8 @@ class WidgetsHTMLDecoder {
         element.attributes
     );
 
-    newAlign ??= align ?? TextAlign.left;
-    newStyle.merge(style ?? customStyles.paragraphStyle);
+    align = newAlign ?? align ?? TextAlign.left;
+    style = newStyle.merge(style ?? customStyles.paragraphStyle);
 
     final List<TextSpan> delta = [];
     final List<Widget> result = [];
@@ -735,12 +747,14 @@ class WidgetsHTMLDecoder {
     void deltaToResult(){
       if (delta.isEmpty) return;
       result.add(
-          RichText(
-              text: TextSpan(
-                  children: List.of(delta),
-                  style: style
-              ),
-              textAlign: align
+          // SizedBox expands the RichText widget to the full width of the
+          // parent. This way the text is able to be aligned properly.
+          SizedBox(
+            width: double.infinity,
+            child: RichText(
+              textAlign: align,
+              text: TextSpan(children: List.of(delta)),
+            ),
           )
       );
     }
@@ -805,6 +819,67 @@ class WidgetsHTMLDecoder {
     /// Create a column with wrapped text and child nodes
     return Wrap(children: result);
   }
+
+  /// Function to parse a complex HTML element and return a widget
+  // Future<Widget> _parseDeltaElement(dom.Element element) async {
+  //   final delta = <TextSpan>[];
+  //   final children = element.nodes.toList();
+  //   final childNodes = <Widget>[];
+  //   TextAlign? textAlign;
+  //   for (final child in children) {
+  //     /// Recursively parse child elements
+  //     if (child is dom.Element) {
+  //       if (child.children.isNotEmpty &&
+  //           HTMLTags.formattingElements.contains(child.localName) == false) {
+  //         childNodes.addAll(await _parseElement(child.children));
+  //       } else {
+  //         /// Handle special elements (e.g., headings, lists) within a paragraph
+  //         if (HTMLTags.specialElements.contains(child.localName)) {
+  //           childNodes.addAll(
+  //             await _parseSpecialElements(
+  //               child,
+  //               type: BuiltInAttributeKey.bulletedList,
+  //             ),
+  //           );
+  //         } else {
+  //           if (child.localName == HTMLTags.br) {
+  //             delta.add(const TextSpan(
+  //               text: "\n",
+  //             ));
+  //           } else {
+  //             /// Parse text and attributes within the paragraph
+  //             final attributes = _parseFormattingElementAttributes(child);
+  //             textAlign = attributes.$1;
+  //
+  //             delta.add(TextSpan(
+  //                 text: "${child.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
+  //                 style: attributes.$2.merge(customStyles.paragraphStyle)));
+  //           }
+  //         }
+  //       }
+  //     } else {
+  //       final attributes =
+  //       _getDeltaAttributesFromHtmlAttributes(element.attributes);
+  //       textAlign = attributes.$1;
+  //
+  //       /// Process text nodes and add them to delta variable
+  //       delta.add(TextSpan(
+  //           text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
+  //           style: attributes.$2
+  //               .copyWith(font: font, fontFallback: fontFallback)
+  //               .merge(customStyles.paragraphStyle)));
+  //     }
+  //   }
+  //
+  //   /// Create a column with wrapped text and child nodes
+  //   return Wrap(children: [
+  //     SizedBox(
+  //       width: double.infinity,
+  //       child: RichText(textAlign: textAlign, text: TextSpan(children: delta)),
+  //     ),
+  //     ...childNodes
+  //   ]);
+  // }
 
   /// Utility function to convert a CSS string to a map of CSS properties
   static Map<String, String> _cssStringToMap(String? cssString) {
@@ -898,11 +973,9 @@ class WidgetsHTMLDecoder {
       case "center":
         return TextAlign.center;
       case "left":
-        return TextAlign.right;
-
+        return TextAlign.left;
       case "justify":
         return TextAlign.justify;
-
       default:
         return TextAlign.left;
     }
