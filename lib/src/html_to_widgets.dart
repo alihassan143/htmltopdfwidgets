@@ -810,12 +810,6 @@ class WidgetsHTMLDecoder {
       textAlign = _alignText(align);
     }
 
-    // Flutter has a semi-bug - merging two styles with the `.merge()` method
-    // skips decoration if the decoration is set to null. For this reason
-    // the decoration has to be set manually.
-    if(style.decoration == null)
-      style = style.copyWith(decoration: TextDecoration.none);
-
     return (textAlign, style);
   }
 
