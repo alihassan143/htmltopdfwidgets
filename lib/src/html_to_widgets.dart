@@ -6,9 +6,9 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' show parse;
 import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
-import 'package:htmltopdfwidgets/src/utils/app_assets.dart';
 import 'package:htmltopdfwidgets/src/utils/utils.dart';
 import 'package:http/http.dart';
+import 'package:pdf/widgets.dart';
 import 'package:printing/printing.dart';
 
 import '../htmltopdfwidgets.dart';
@@ -48,121 +48,10 @@ class WidgetsHTMLDecoder {
     }
 
     /// Call the private _parseElement function to process the HTML nodes
-    List<Widget> nodes = await _parseElement(body.nodes);
+    List<Widget> nodes = await _parseComplexElement(body);
+    // List<Widget> nodes = await _parseElement(body.nodes);
 
     return nodes;
-  }
-
-  //// Converts the given HTML string to a list of Widgets.
-  //// and returns the list of widgets
-
-  Future<List<Widget>> _parseElement(
-    Iterable<dom.Node> nodes,
-  ) async {
-    final List<TextSpan> delta = [];
-    final List<Widget> result = [];
-    TextAlign? textAlign;
-    bool checkbox = false;
-    bool alreadyChecked = false;
-
-    void deltaToResult(){
-      if (delta.isEmpty) return;
-
-      result.add(
-          // SizedBox expands the RichText widget to the full width of the
-          // parent. This way the text is able to be aligned properly.
-          SizedBox(
-            width: double.infinity,
-            child: RichText(
-              text: TextSpan(children: List.of(delta)), textAlign: textAlign,
-            )
-          )
-      );
-
-      textAlign = null;
-      delta.clear();
-
-    }
-
-    ///find dom node in and check if its element or not than convert it according to its specs
-    for (final node in nodes) {
-      if (node is dom.Text) {
-        delta.add(
-            TextSpan(
-                text: node.text,
-                style: TextStyle(font: font, fontFallback: fontFallback)
-            )
-        );
-        continue;
-      }
-
-      if (node is! dom.Element){
-        assert(false, 'Unknown node type: $node');
-        continue;
-      }
-
-      final localName = node.localName;
-      if (localName == HTMLTags.br) {
-        delta.add(const TextSpan(text: "\n"));
-
-      } else if (HTMLTags.formattingElements.contains(localName)) {
-        /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-        final attributes = _parseFormattingElement(node);
-        textAlign = attributes.$1;
-        delta.add(
-            TextSpan(
-                text: "${node.text.replaceAll(RegExp(r'\n+$'), '')}",
-                style: attributes.$2
-            )
-        );
-
-      } else if (HTMLTags.specialElements.contains(localName)) {
-        deltaToResult();
-
-        if (checkbox) {
-          checkbox = false;
-
-          result.add(
-              Row(
-                  children: [
-                    SvgImage(
-                        svg:
-                        alreadyChecked?
-                        AppAssets.checkedIcon:
-                        AppAssets.unCheckedIcon
-                    ),
-                    ...await _parseSpecialElements(
-                      node,
-                      type: BuiltInAttributeKey.bulletedList,
-                    ),
-                  ]
-              )
-          );
-          alreadyChecked = false;
-        } else {
-          if (localName == HTMLTags.checkbox) {
-            final checked = node.attributes["type"];
-            if (checked != null && checked == "checkbox") {
-              checkbox = true;
-              alreadyChecked = node.attributes.keys.contains("checked");
-            }
-          }
-
-          result.addAll(
-            await _parseSpecialElements(
-              node,
-              type: BuiltInAttributeKey.bulletedList,
-            ),
-          );
-        }
-
-        /// Handle special elements (e.g., headings, lists, images)
-      }
-    }
-
-    deltaToResult();
-
-    return result;
   }
 
   /// Function to parse special HTML elements (e.g., headings, lists, images)
@@ -266,7 +155,6 @@ class WidgetsHTMLDecoder {
         style = style
             .copyWith(fontStyle: FontStyle.italic)
             .merge(customStyles.italicStyle);
-
         break;
 
       /// Handle <u> element
@@ -307,24 +195,13 @@ class WidgetsHTMLDecoder {
 
     style = style.copyWith(decoration: TextDecoration.combine(decoration));
 
-    if(element.parent != null)
+    if(element.parent == null)
       return (align, style);
-    
-    dom.Element parentElement = element.parent!;
-    var (parentAlign, parentStyle) = _getDeltaAttributesFromHtmlAttributes(
-      parentElement.attributes,
-    );
 
-    align ??= parentAlign;
-    style = parentStyle.merge(style);
-
-    (parentAlign, parentStyle) = _parseFormattingElement(parentElement);
-
-    align ??= parentAlign;
-    style = parentStyle.merge(style);
+    var (parentAlign, parentStyle) = _parseFormattingElement(element.parent!);
 
     ///will combine style get from the children
-    return (align, style);
+    return (align ??= parentAlign, parentStyle.merge(style));
   }
 
   ///convert table tag into the table pdf widget
@@ -614,7 +491,7 @@ class WidgetsHTMLDecoder {
   }) async {
     final child = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: await _parseElement(element.nodes)
+      children: await _parseComplexElement(element)
     );
 
     /// Build a bullet list widget
@@ -647,9 +524,81 @@ class WidgetsHTMLDecoder {
     }
   }
 
+  List<Widget> _mergeDeltaSpans(List<(TextSpan, TextAlign?)> delta){
+    /// `TextSpan`s have to be grouped together if they have the same alignment.
+    /// This function merges such groups into a single `RichText` widgets.
+    /// This function is a helper function for `_parseParagraphElement(...)`.
+
+    if (delta.isEmpty) return [];
+
+    TextAlign? currentAlignment = delta[0].$2;
+    List<Widget> result = [];
+
+    /// Temporary list to hold subsequent spans with the same align values.
+    List<TextSpan> subDelta = [];
+
+    void subDeltaToResult(){
+      if (subDelta.isEmpty) return;
+      result.add(
+        // SizedBox expands the RichText widget to the full width of the
+        // parent. This way the text is able to be aligned properly.
+        SizedBox(
+          width: double.infinity,
+          child: RichText(
+            textAlign: currentAlignment,
+            text: TextSpan(children: List.of(subDelta)),
+          ),
+        )
+      );
+      subDelta.clear();
+    }
+
+    for((TextSpan, TextAlign?) item in delta){
+      TextSpan span = item.$1;
+      TextAlign? align = item.$2;
+
+      if(align != currentAlignment){
+        subDeltaToResult();
+        currentAlignment = align;
+      }
+
+      subDelta.add(span);
+    }
+    subDeltaToResult();
+
+    return result;
+  }
+
   /// Function to parse a paragraph element and return a widget
   Future<Widget> _parseParagraphElement(dom.Element element) async {
-    return Wrap(children: await _parseDeltaElement(element));
+    return Wrap(children: await _parseComplexElement(element));
+  }
+
+  Future<List<Widget>> _parseComplexElement(dom.Element element) async {
+    List<Widget> children = [];
+    List<(TextSpan, TextAlign?)> delta = [];
+
+    List<Object> items = await _parseDeltaElement(element);
+
+    for(var item in items){
+
+      if(item is Widget){
+        children.addAll(_mergeDeltaSpans(delta));
+        delta.clear();
+        children.add(item);
+        continue;
+      }
+
+      if(item is (TextSpan, TextAlign?)){
+        delta.add(item);
+        continue;
+      }
+
+    }
+
+    children.addAll(_mergeDeltaSpans(delta));
+
+    return children;
   }
 
   /// Function to parse an image element and return an Image widget
@@ -726,77 +675,39 @@ class WidgetsHTMLDecoder {
     }
   }
 
-  Future<List<Widget>> _parseDeltaElement(dom.Element element, {TextAlign? align, TextStyle? style}) async {
+  Future<List<Object>> _parseDeltaElement(dom.Element element) async {
 
-    print("_parseDeltaElement: ${element.localName}, ${element.nodes}");
+    var (align, style) = _parseFormattingElement(element);
 
-    var (newAlign, newStyle) = _parseFormattingElement(element);
-
-    // var (newAlign, newStyle) = _getDeltaAttributesFromHtmlAttributes(
-    //     element.attributes
-    // );
-
-    align = newAlign ?? align ?? TextAlign.left;
-    style = newStyle.merge(style ?? customStyles.paragraphStyle);
-
-    final List<TextSpan> delta = [];
-    final List<Widget> result = [];
-
-    void deltaToResult(){
-      if (delta.isEmpty) return;
-      result.add(
-          // SizedBox expands the RichText widget to the full width of the
-          // parent. This way the text is able to be aligned properly.
-          SizedBox(
-            width: double.infinity,
-            child: RichText(
-              textAlign: align,
-              text: TextSpan(children: List.of(delta), style: style),
-            ),
-          )
-      );
-      delta.clear();
-    }
+    // This list holds only of of two types:
+    // - (`TextSpan`, 'TextAlign?`) tuples
+    // - `Widget`s.
+    //
+    // The idea is to collect all neighbouring text spans and later display them
+    // in a single RichText. Of course widgets will be displayed as well.
+    final List<Object> result = [];
 
     for (final dom.Node node in element.nodes) {
 
       // Not of type `Element` - convert to text and add to delta.
       if(node is! dom.Element){
-        delta.add(
-          TextSpan(
+        TextSpan textSpan = TextSpan(
             text: node.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
             style: style
-          )
         );
+        result.add((textSpan, align));
         continue;
       }
 
       // Handle new line breaks within the paragraph
       if (node.localName == HTMLTags.br) {
-        delta.add(const TextSpan(text: "\n"));
-        continue;
-      }
-
-      // Handle simple formatting elements (e.g., <bold>, <italic>, <underline>)
-      if(HTMLTags.formattingElements.contains(node.localName)) {
-        deltaToResult();
-
-        final (newAlign, newStyle) = _parseFormattingElement(node);
-
-        result.addAll(
-            await _parseDeltaElement(
-                node,
-                align: newAlign ?? align,
-                style: newStyle.merge(style)
-            )
-        );
-
+        result.add((TextSpan(text: "\n", style: style), align));
         continue;
       }
 
       // Handle special elements (e.g., headings, lists) within a paragraph
       if(HTMLTags.specialElements.contains(node.localName)) {
-        deltaToResult();
+        // deltaToResult();
 
         result.addAll(
           await _parseSpecialElements(
@@ -806,81 +717,16 @@ class WidgetsHTMLDecoder {
         continue;
       }
 
-      // No match so far - parse text and attributes within the paragraph
-      deltaToResult();
+      // No match for irregular elements so far.
+      // Parse the children of the currently handled node and add the result.
       result.addAll(
-          await _parseDeltaElement(node, align: align, style: style)
+          await _parseDeltaElement(node)
       );
 
     }
 
-    deltaToResult();
-
-    print(result);
-    /// Create a column with wrapped text and child nodes
     return result;
   }
-
-  /// Function to parse a complex HTML element and return a widget
-  // Future<Widget> _parseDeltaElement(dom.Element element) async {
-  //   final delta = <TextSpan>[];
-  //   final children = element.nodes.toList();
-  //   final childNodes = <Widget>[];
-  //   TextAlign? textAlign;
-  //   for (final child in children) {
-  //     /// Recursively parse child elements
-  //     if (child is dom.Element) {
-  //       if (child.children.isNotEmpty &&
-  //           HTMLTags.formattingElements.contains(child.localName) == false) {
-  //         childNodes.addAll(await _parseElement(child.children));
-  //       } else {
-  //         /// Handle special elements (e.g., headings, lists) within a paragraph
-  //         if (HTMLTags.specialElements.contains(child.localName)) {
-  //           childNodes.addAll(
-  //             await _parseSpecialElements(
-  //               child,
-  //               type: BuiltInAttributeKey.bulletedList,
-  //             ),
-  //           );
-  //         } else {
-  //           if (child.localName == HTMLTags.br) {
-  //             delta.add(const TextSpan(
-  //               text: "\n",
-  //             ));
-  //           } else {
-  //             /// Parse text and attributes within the paragraph
-  //             final attributes = _parseFormattingElementAttributes(child);
-  //             textAlign = attributes.$1;
-  //
-  //             delta.add(TextSpan(
-  //                 text: "${child.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
-  //                 style: attributes.$2.merge(customStyles.paragraphStyle)));
-  //           }
-  //         }
-  //       }
-  //     } else {
-  //       final attributes =
-  //       _getDeltaAttributesFromHtmlAttributes(element.attributes);
-  //       textAlign = attributes.$1;
-  //
-  //       /// Process text nodes and add them to delta variable
-  //       delta.add(TextSpan(
-  //           text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
-  //           style: attributes.$2
-  //               .copyWith(font: font, fontFallback: fontFallback)
-  //               .merge(customStyles.paragraphStyle)));
-  //     }
-  //   }
-  //
-  //   /// Create a column with wrapped text and child nodes
-  //   return Wrap(children: [
-  //     SizedBox(
-  //       width: double.infinity,
-  //       child: RichText(textAlign: textAlign, text: TextSpan(children: delta)),
-  //     ),
-  //     ...childNodes
-  //   ]);
-  // }
 
   /// Utility function to convert a CSS string to a map of CSS properties
   static Map<String, String> _cssStringToMap(String? cssString) {

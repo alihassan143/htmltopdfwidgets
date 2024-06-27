@@ -97,14 +97,12 @@ void main() {
   </tr>
 </table>''';
   setUpAll(() {
-    // Document.debug = true;
-    // RichText.debug = true;
+    Document.debug = true;
+    RichText.debug = true;
     pdf = Document();
   });
 
   test('convertion_test', () async {
-
-    String htmlText = "<p><i><u>Italic and underline text<b><br>Bold, italic and underline text (after a newline)</b></u></i></p>";
 
     List<Widget> widgets = await HTMLToPdf().convert(htmlText);
     pdf.addPage(MultiPage(
