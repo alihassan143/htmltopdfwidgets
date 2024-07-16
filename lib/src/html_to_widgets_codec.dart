@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../htmltopdfwidgets.dart';
 import 'html_to_widgets.dart';
 
@@ -11,16 +13,19 @@ class HTMLToPdf extends HtmlCodec {
       {
       //font fall back
       List<Font> fontFallback = const [],
-      //default font the html string converted widgets
-      Font? defaultFont,
+      //font resolver (font name, bold, italic) => font
+      FutureOr<Font> Function(String, bool, bool)? fontResolver,
+      String defaultFontFamily = "Roboto",
+      double defaultFontSize = 12.0,
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle()}) async {
     //decode that handle all html tags logic
     final widgetDecoder = WidgetsHTMLDecoder(
-        //font fall back if privided
+        //font fall back if provided
         fontFallback: [...fontFallback],
-        //default font for the tags
-        font: defaultFont,
+        fontResolver: fontResolver,
+        defaultFontFamily: defaultFontFamily,
+        defaultFontSize: defaultFontSize,
         //custom html tags style
         customStyles: tagStyle);
     //convert function that convert string to dom nodes that that dom nodes will be converted
@@ -38,6 +43,6 @@ abstract class HtmlCodec {
   //handling HTML-to-pdf-widget conversion in a dart or flutter application
   Future<List<Widget>> convert(String html,
       {List<Font> fontFallback = const [],
-      Font? defaultFont,
+      FutureOr<Font> Function(String, bool, bool)? fontResolver,
       HtmlTagStyle tagStyle = const HtmlTagStyle()});
 }
