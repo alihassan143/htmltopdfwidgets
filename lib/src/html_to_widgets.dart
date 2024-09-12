@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:html/dom.dart' as dom;
@@ -15,7 +16,6 @@ import 'html_tags.dart';
 import 'pdfwidgets/bullet_list.dart';
 import 'pdfwidgets/number_list.dart';
 import 'pdfwidgets/quote_widget.dart';
-import 'dart:convert';
 
 ////html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
@@ -758,7 +758,9 @@ class WidgetsHTMLDecoder {
     final backgroundColorStr = cssMap["background-color"];
     final backgroundColor = backgroundColorStr == null
         ? null
-        : ColorExtension.tryFromRgbaString(backgroundColorStr);
+        : isHex(backgroundColorStr)
+            ? ColorExtension.hexToPdfColor(backgroundColorStr)
+            : ColorExtension.tryFromRgbaString(backgroundColorStr);
     if (backgroundColor != null) {
       style = style.copyWith(color: backgroundColor);
     }
