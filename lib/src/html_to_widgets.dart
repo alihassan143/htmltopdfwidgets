@@ -305,8 +305,12 @@ class WidgetsHTMLDecoder {
       );
     } else if (element is dom.Text) {
       /// Process text nodes and add them to delta
-      delta.add(Text(element.text,
-          style: TextStyle(font: font, fontFallback: fontFallback)));
+      delta.add(
+          Text(
+            element.text,
+            style: TextStyle(font: font, fontFallback: fontFallback)
+          )
+      );
     } else {
       assert(false, 'Unknown node type: $element');
     }
@@ -335,7 +339,10 @@ class WidgetsHTMLDecoder {
         delta.add(
           TextSpan(
             text: child.text,
-            style: TextStyle(font: font, fontFallback: fontFallback)
+            style: TextStyle(
+              font: font,
+              fontFallback: fontFallback,
+            )
           )
         );
       }
@@ -369,7 +376,8 @@ class WidgetsHTMLDecoder {
       }
     } else {
       result.add(
-          buildQuotewidget(Text(element.text), customStyles: customStyles));
+        buildQuotewidget(Text(element.text), customStyles: customStyles)
+      );
     }
     return result;
   }
