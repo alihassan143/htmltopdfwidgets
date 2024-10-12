@@ -749,7 +749,7 @@ class WidgetsHTMLDecoder {
   (TextAlign?, TextStyle) _getDeltaAttributesFromHtmlAttributes(
       LinkedHashMap<Object, String> htmlAttributes
   ) {
-    TextStyle style = TextStyle(font: font, fontFallback: fontFallback);
+    TextStyle style = customStyles.paragraphStyle??TextStyle(font: font, fontFallback: fontFallback);
     TextAlign? textAlign;
 
     ///extract styls from the inline css
