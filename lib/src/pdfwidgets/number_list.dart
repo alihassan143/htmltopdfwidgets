@@ -53,8 +53,8 @@ class _NumberListIndicator extends StatelessWidget {
         child: Align(
           alignment: Alignment.centerRight,
           child: Text(
-              '$index.',
-              style: style.listIndexStyle,
+            '$index.',
+            style: style.listIndexStyle,
           )
         ),
       ),

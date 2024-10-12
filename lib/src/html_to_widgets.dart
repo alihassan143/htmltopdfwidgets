@@ -206,37 +206,38 @@ class WidgetsHTMLDecoder {
 
   ///convert table tag into the table pdf widget
   Future<Iterable<Widget>> _parseTable(dom.Element element) async {
-    final List<TableRow> tablenodes = [];
+    final List<TableRow> tableNodes = [];
 
     ///iterate over html table tag body
     for (final data in element.children) {
-      final rwdata = await _parsetableRows(data);
+      final rwdata = await _parseTableRows(data);
 
-      tablenodes.addAll(rwdata);
+      tableNodes.addAll(rwdata);
     }
 
     return [
       Table(
           border: TableBorder.all(color: PdfColors.black),
-          children: tablenodes),
+          children: tableNodes
+      ),
     ];
   }
 
   ///converts html table tag body to table row widgets
-  Future<List<TableRow>> _parsetableRows(dom.Element element) async {
+  Future<List<TableRow>> _parseTableRows(dom.Element element) async {
     final List<TableRow> nodes = [];
 
     ///iterate over <tr> tag and convert its children to related pdf widget
     for (final data in element.children) {
-      final tabledata = await _parsetableData(data);
+      final tableData = await _parseTableData(data);
 
-      nodes.add(tabledata);
+      nodes.add(tableData);
     }
     return nodes;
   }
 
   ///parse html data and convert to table row
-  Future<TableRow> _parsetableData(
+  Future<TableRow> _parseTableData(
     dom.Element element,
   ) async {
     final List<Widget> nodes = [];
@@ -250,9 +251,9 @@ class WidgetsHTMLDecoder {
         nodes.add(node);
       } else {
         ///if nested <p><br> in <tag> found
-        final newnodes = await _parseTableSpecialNodes(data);
+        final newNodes = await _parseTableSpecialNodes(data);
 
-        nodes.addAll(newnodes);
+        nodes.addAll(newNodes);
       }
     }
 
@@ -268,9 +269,9 @@ class WidgetsHTMLDecoder {
 
     ///iterate over multiple childrens
     if (element.children.isNotEmpty) {
-      for (final childrens in element.children) {
+      for (final child in element.children) {
         ///parse them according to their widget
-        nodes.addAll(await _parseTableDataElementsData(childrens));
+        nodes.addAll(await _parseTableDataElementsData(child));
       }
     } else {
       nodes.addAll(await _parseTableDataElementsData(element));
@@ -327,13 +328,16 @@ class WidgetsHTMLDecoder {
     final children = element.nodes.toList();
     for (final child in children) {
       if (child is dom.Element) {
-        final attributes = _parseFormattingElement(child);
-        textAlign = attributes.$1;
-        delta.add(TextSpan(text: child.text, style: attributes.$2));
+        TextStyle style;
+        (textAlign, style) = _parseFormattingElement(child);
+        delta.add(TextSpan(text: child.text, style: style));
       } else {
-        delta.add(TextSpan(
+        delta.add(
+          TextSpan(
             text: child.text,
-            style: TextStyle(font: font, fontFallback: fontFallback)));
+            style: TextStyle(font: font, fontFallback: fontFallback)
+          )
+        );
       }
     }
 
@@ -344,10 +348,10 @@ class WidgetsHTMLDecoder {
             textAlign: textAlign,
             text: TextSpan(
                 children: delta,
-                style: TextStyle(
-                        fontSize: level.getHeadingSize,
-                        fontWeight: FontWeight.bold)
-                    .merge(level.getHeadingStyle(customStyles)))));
+                style: level.getHeadingStyle(customStyles)
+            )
+        )
+    );
   }
 
   /// Function to parse a block quote element and return a list of widgets

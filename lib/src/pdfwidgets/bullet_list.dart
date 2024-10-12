@@ -67,8 +67,7 @@ class _BulletedListIndicator extends StatelessWidget {
 
             BoxDecoration(
               shape: BoxShape.circle,
-              color: style.bulletListIconColor ??
-                  PdfColors.black,
+              color: style.bulletListIconColor ?? PdfColors.black,
             ),
           ),
         ),
