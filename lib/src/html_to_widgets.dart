@@ -271,7 +271,8 @@ class WidgetsHTMLDecoder {
     ///returns the tale row
     return TableRow(
         decoration: BoxDecoration(border: Border.all(color: PdfColors.black)),
-        children: nodes);
+        children: nodes
+    );
   }
 
   ///parse the nodes and handle theem accordingly
@@ -406,18 +407,13 @@ class WidgetsHTMLDecoder {
 
     final result = <Widget>[];
 
-    // Add vertical space before the list if it is not nested
-    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
-      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listTopPadding));
 
     // Parse each list item and add it to the result
     for (int i=0; i<element.children.length; i++) {
-      final childElement = element.children[i];
-
-      // Parse the list item element and add it to the result
       result.addAll(
           await _parseListItemElement(
-              childElement,
+            element.children[i],
               listTag: HTMLTags.unorderedList,
               nestedList: nestedList,
           )
@@ -429,9 +425,7 @@ class WidgetsHTMLDecoder {
 
     }
 
-    // Add vertical space after the list if it is not nested
-    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
-      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listBottomPadding));
 
     return result;
 
@@ -458,9 +452,7 @@ class WidgetsHTMLDecoder {
 
     final result = <Widget>[];
 
-    // Add vertical space before the list if it is not nested
-    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
-      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listTopPadding));
 
     // Parse each list item and add it to the result
     for (var i = 0; i < element.children.length; i++) {
@@ -482,9 +474,7 @@ class WidgetsHTMLDecoder {
 
     }
 
-    // Add vertical space after the list if it is not nested
-    if(!nestedList && customStyles.listItemVerticalSeparatorSize > 0)
-      result.add(SizedBox(height: customStyles.listItemVerticalSeparatorSize));
+    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listBottomPadding));
 
     return result;
   }

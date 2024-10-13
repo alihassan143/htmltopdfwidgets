@@ -38,6 +38,10 @@ class HtmlTagStyle {
   //quote bar style that will merge with default style
   final PdfColor? quoteBarColor;
   //bullet list style that will merge with default style
+  final double listTopPadding;
+  //bullet list style that will merge with default style
+  final double listBottomPadding;
+  //bullet list style that will merge with default style
   final PdfColor? bulletListIconColor;
   //bullet list style that will merge with default style
   final double bulletListDotSize;
@@ -49,7 +53,7 @@ class HtmlTagStyle {
   final double listItemIndicatorWidth;
   //bullet list style that will merge with default style
   final double listItemVerticalSeparatorSize;
-
+  //bullet list style that will merge with default style
   final double headingBottomSpacing;
 
   const HtmlTagStyle({
@@ -70,12 +74,14 @@ class HtmlTagStyle {
     this.listIndexStyle,
     this.linkStyle,
     this.quoteBarColor,
+    this.listTopPadding = 6.0,
+    this.listBottomPadding = 6.0,
     this.bulletListIconColor,
     this.bulletListDotSize = 5.0,
     this.bulletListIconSize = 14.0,
     this.listItemIndicatorPadding = const EdgeInsets.only(right: 12.0),
     this.listItemIndicatorWidth = 28.0,
-    this.listItemVerticalSeparatorSize = 5.0,
+    this.listItemVerticalSeparatorSize = 6.0,
     this.headingBottomSpacing = 10.0,
   });
 }
