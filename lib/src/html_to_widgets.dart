@@ -69,7 +69,7 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse special HTML elements (e.g., headings, lists, images)
-  Future<Iterable<Widget>> _parseSpecialElements(dom.Element element) async {
+  Future<List<Widget>> _parseSpecialElements(dom.Element element) async {
     final localName = element.localName;
     switch (localName) {
       /// Handle heading level 1
@@ -123,8 +123,6 @@ class WidgetsHTMLDecoder {
       /// Handle the image tag
       case HTMLTags.image:
         return [await _parseImageElement(element)];
-
-      /// Handle the line break tag
 
       /// if no special element is found it treated as simple paragraph
       default:  // E.g. HTMLTags.paragraph
@@ -212,7 +210,7 @@ class WidgetsHTMLDecoder {
   }
 
   ///convert table tag into the table pdf widget
-  Future<Iterable<Widget>> _parseTable(dom.Element element) async {
+  Future<List<Widget>> _parseTable(dom.Element element) async {
     final List<TableRow> tableRows = [];
 
     dom.Element tbody = element.children.first;
@@ -245,11 +243,17 @@ class WidgetsHTMLDecoder {
     dom.Element element,
   ) async {
 
+    List<Widget> children = [];
+    for (dom.Element child in element.children)
+      children.addAll(await _parseSpecialElements(child));
+
+    Widget result = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children
+    );
+
     if(!element.attributes.containsKey('style'))
-      return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: await _parseComplexElement(element)
-      );
+      return result;
 
     double paddingLeft = 0;
     double paddingRight = 0;
@@ -275,7 +279,6 @@ class WidgetsHTMLDecoder {
         paddingTop = double.tryParse(styleValue) ?? 0;
       else if(styleName == 'padding-bottom')
         paddingBottom = double.tryParse(styleValue) ?? 0;
-
     }
 
     return Padding(
@@ -285,10 +288,7 @@ class WidgetsHTMLDecoder {
         top: paddingTop,
         bottom: paddingBottom
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: await _parseComplexElement(element)
-      )
+      child: result
     );
 
   }
@@ -362,7 +362,7 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse an unordered list element and return a list of widgets
-  Future<Iterable<Widget>> _parseUnOrderListElement(dom.Element element) async {
+  Future<List<Widget>> _parseUnOrderListElement(dom.Element element) async {
 
     // Check if the list is nested within another list
     bool nestedList = hasInParent(element, [HTMLTags.listItem]);
@@ -409,7 +409,7 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse an ordered list element and return a list of widgets
-  Future<Iterable<Widget>> _parseOrderListElement(dom.Element element) async {
+  Future<List<Widget>> _parseOrderListElement(dom.Element element) async {
 
     // Check if the list is nested within another list
     bool nestedList = hasInParent(element, [HTMLTags.listItem]);
@@ -459,7 +459,7 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse a list element (unordered or ordered) and return a list of widgets
-  Future<Iterable<Widget>> _parseListItemElement(
+  Future<List<Widget>> _parseListItemElement(
     dom.Element element, {
     required String listTag,
     bool withIndicator = true,
