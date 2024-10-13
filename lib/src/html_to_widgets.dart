@@ -262,8 +262,7 @@ class WidgetsHTMLDecoder {
 
       List<String> styleElementParts = styleElement.split(':');
 
-      if(styleElementParts.length == 2)
-        continue;
+      if(styleElementParts.length != 2) continue;
 
       String styleName = styleElementParts[0].trim();
       String styleValue = styleElementParts[1].trim();
