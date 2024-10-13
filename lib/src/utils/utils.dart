@@ -26,10 +26,18 @@ bool hasInParent(dom.Element element, List<String> tags){
   return hasInParent(element.parent!, tags);
 }
 
-bool isNextElement(dom.Element element, List<String> tags){
-  if(element.parent == null) return false;
+bool isPreviousElement(dom.Element element, List<String> tags){
+  if(element.previousElementSibling == null) return false;
   for(String tag in tags)
-    if(element.parent!.localName == tag) return true;
+    if(element.previousElementSibling!.localName == tag) return true;
+
+  return false;
+}
+
+bool isNextElement(dom.Element element, List<String> tags){
+  if(element.nextElementSibling == null) return false;
+  for(String tag in tags)
+    if(element.nextElementSibling!.localName == tag) return true;
 
   return false;
 }

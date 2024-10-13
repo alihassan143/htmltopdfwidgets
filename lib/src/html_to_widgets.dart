@@ -317,7 +317,6 @@ class WidgetsHTMLDecoder {
     else
       assert(false, 'Unknown node type: $element');
 
-
     /// If there are text nodes in delta, wrap them in a Wrap widget and add to the result
     if (delta.isNotEmpty) {
       result.add(Wrap(children: delta));
@@ -325,7 +324,6 @@ class WidgetsHTMLDecoder {
     return result;
   }
 
-  /// Function to parse a heading element and return a RichText widget
   Widget _parseHeadingElement(
     dom.Element element, {
     required int level,
@@ -352,27 +350,26 @@ class WidgetsHTMLDecoder {
     }
 
     bool isNextHeader = isNextElement(
-        element,
-        [HTMLTags.h1, HTMLTags.h2, HTMLTags.h3, HTMLTags.h4, HTMLTags.h5, HTMLTags.h6]
+      element,
+      [HTMLTags.h1, HTMLTags.h2, HTMLTags.h3, HTMLTags.h4, HTMLTags.h5, HTMLTags.h6]
     );
 
     Widget widget = SizedBox(
-        width: double.infinity,
-        child: RichText(
-            textAlign: textAlign,
-            text: TextSpan(
-                children: delta,
-                style: level.getHeadingStyle(customStyles)
-            )
+      width: double.infinity,
+      child: RichText(
+        textAlign: textAlign,
+        text: TextSpan(
+          children: delta,
+          style: level.getHeadingStyle(customStyles)
         )
+      )
     );
 
-    if(isNextHeader)
-      return widget;
+    if(isNextHeader) return widget;
 
     return Padding(
-        padding: EdgeInsets.only(bottom: customStyles.headingBottomSpacing),
-        child: widget
+      padding: EdgeInsets.only(bottom: customStyles.headingBottomSpacing),
+      child: widget
     );
   }
 
