@@ -213,112 +213,83 @@ class WidgetsHTMLDecoder {
 
   ///convert table tag into the table pdf widget
   Future<Iterable<Widget>> _parseTable(dom.Element element) async {
-    final List<TableRow> tableNodes = [];
+    final List<TableRow> tableRows = [];
 
-    ///iterate over html table tag body
-    for (final data in element.children) {
-      final rwdata = await _parseTableRows(data);
-
-      tableNodes.addAll(rwdata);
-    }
+    for (final child in element.children)
+      tableRows.add(await _parseTableRow(child));
 
     return [
       Table(
           border: TableBorder.all(color: PdfColors.black),
-          children: tableNodes
+          children: tableRows
       ),
     ];
   }
 
-  ///converts html table tag body to table row widgets
-  Future<List<TableRow>> _parseTableRows(dom.Element element) async {
-    final List<TableRow> nodes = [];
+  Future<TableRow> _parseTableRow(dom.Element element) async {
+    final List<Widget> tableDataList = [];
 
-    ///iterate over <tr> tag and convert its children to related pdf widget
-    for (final data in element.children) {
-      final tableData = await _parseTableData(data);
+    for (final data in element.children)
+      tableDataList.add(await _parseTableData(data));
 
-      nodes.add(tableData);
-    }
-    return nodes;
-  }
-
-  ///parse html data and convert to table row
-  Future<TableRow> _parseTableData(
-    dom.Element element,
-  ) async {
-    final List<Widget> nodes = [];
-
-    ///iterate over <tr>children
-    for (final data in element.children) {
-      if (data.children.isEmpty) {
-        ///if single <th> or<td> tag found
-        final node = paragraphNode(text: data.text);
-
-        nodes.add(node);
-      } else {
-        ///if nested <p><br> in <tag> found
-        final newNodes = await _parseTableSpecialNodes(data);
-
-        nodes.addAll(newNodes);
-      }
-    }
-
-    ///returns the tale row
     return TableRow(
-        decoration: BoxDecoration(border: Border.all(color: PdfColors.black)),
-        children: nodes
+      decoration: BoxDecoration(border: Border.all(color: PdfColors.black)),
+      children: tableDataList
     );
   }
 
-  ///parse the nodes and handle theem accordingly
-  Future<Iterable<Widget>> _parseTableSpecialNodes(dom.Element element) async {
-    final List<Widget> nodes = [];
+  ///parse html data and convert to table row
+  Future<Widget> _parseTableData(
+    dom.Element element,
+  ) async {
 
-    ///iterate over multiple childrens
-    if (element.children.isNotEmpty) {
-      for (final child in element.children) {
-        ///parse them according to their widget
-        nodes.addAll(await _parseTableDataElementsData(child));
-      }
-    } else {
-      nodes.addAll(await _parseTableDataElementsData(element));
-    }
-    return nodes;
-  }
-
-  ///check if children contains the <p> <li> or any other tag
-
-  Future<List<Widget>> _parseTableDataElementsData(dom.Element element) async {
-    final List<Widget> delta = [];
-    final result = <Widget>[];
-
-    ///find dom node in and check if its element or not than convert it according to its specs
-
-    final localName = element.localName;
-
-    /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-    if (localName == HTMLTags.br) {
-    } else if (HTMLTags.formattingElements.contains(localName)) {
-      final (_, style) = _parseFormattingElement(element);
-      result.add(Text(element.text, style: style));
-    } else if (HTMLTags.specialElements.contains(localName))
-      result.addAll(await _parseSpecialElements(element));
-    else if (element is dom.Text)
-      delta.add(
-          Text(
-            element.text,
-            style: TextStyle(font: font, fontFallback: fontFallback)
-          )
+    if(element.attributes['style'] != null)
+      return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: await _parseComplexElement(element)
       );
-    else
-      assert(false, 'Unknown node type: $element');
 
-    /// If there are text nodes in delta, wrap them in a Wrap widget and add to the result
-    if (delta.isNotEmpty) {
-      result.add(Wrap(children: delta));
+    double paddingLeft = 0;
+    double paddingRight = 0;
+    double paddingTop = 0;
+    double paddingBottom = 0;
+
+    List<String> styleElements = element.attributes['style']!.split(';');
+
+    for(String styleElement in styleElements) {
+
+      List<String> styleElementParts = styleElement.split(':');
+
+      if(styleElementParts.length == 2)
+        continue;
+
+      String styleName = styleElementParts[0].trim();
+      String styleValue = styleElementParts[1].trim();
+
+      if(styleName == 'padding-left')
+        paddingLeft = double.tryParse(styleValue) ?? 0;
+      else if(styleName == 'padding-right')
+        paddingRight = double.tryParse(styleValue) ?? 0;
+      else if(styleName == 'padding-top')
+        paddingTop = double.tryParse(styleValue) ?? 0;
+      else if(styleName == 'padding-bottom')
+        paddingBottom = double.tryParse(styleValue) ?? 0;
+
     }
-    return result;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: paddingLeft,
+        right: paddingRight,
+        top: paddingTop,
+        bottom: paddingBottom
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: await _parseComplexElement(element)
+      )
+    );
+
   }
 
   Widget _parseHeadingElement(
