@@ -249,10 +249,10 @@ class WidgetsHTMLDecoder {
     if(!element.attributes.containsKey('style'))
       return result;
 
-    double paddingLeft = 0;
-    double paddingRight = 0;
-    double paddingTop = 0;
-    double paddingBottom = 0;
+    double? paddingLeft;
+    double? paddingRight;
+    double? paddingTop;
+    double? paddingBottom;
 
     List<String> styleElements = element.attributes['style']!.split(';');
 
@@ -267,17 +267,17 @@ class WidgetsHTMLDecoder {
 
       // Replace 'px' with '' is inacurate - should consider other units like 'pt', 'em', 'rem', '%', etc.
       if(styleName == 'padding-left')
-        paddingLeft = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
+        paddingLeft = double.tryParse(styleValue.replaceAll('px', ''));
       else if(styleName == 'padding-right')
-        paddingRight = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
+        paddingRight = double.tryParse(styleValue.replaceAll('px', ''));
       else if(styleName == 'padding-top')
-        paddingTop = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
+        paddingTop = double.tryParse(styleValue.replaceAll('px', ''));
       else if(styleName == 'padding-bottom')
-        paddingBottom = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
+        paddingBottom = double.tryParse(styleValue.replaceAll('px', ''));
     }
 
     return Padding(
-      padding: EdgeInsets.only(
+      padding: customStyles.tablePadding.copyWith(
         left: paddingLeft,
         right: paddingRight,
         top: paddingTop,
