@@ -209,11 +209,6 @@ class WidgetsHTMLDecoder {
   Future<Widget> _parseTable(dom.Element element) async {
     final List<TableRow> tableRows = [];
 
-    return Table(
-          border: TableBorder.all(color: PdfColors.black),
-          children: []
-      );
-
     dom.Element tbody = element.children.first;
 
     for (final child in tbody.children)
