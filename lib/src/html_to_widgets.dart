@@ -215,7 +215,9 @@ class WidgetsHTMLDecoder {
   Future<Iterable<Widget>> _parseTable(dom.Element element) async {
     final List<TableRow> tableRows = [];
 
-    for (final child in element.children)
+    dom.Element tbody = element.children.first;
+
+    for (final child in tbody.children)
       tableRows.add(await _parseTableRow(child));
 
     return [
