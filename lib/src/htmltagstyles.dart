@@ -54,6 +54,8 @@ class HtmlTagStyle {
   //bullet list style that will merge with default style
   final double listItemVerticalSeparatorSize;
   //bullet list style that will merge with default style
+  final double headingTopSpacing;
+  //bullet list style that will merge with default style
   final double headingBottomSpacing;
 
   const HtmlTagStyle({
@@ -80,8 +82,9 @@ class HtmlTagStyle {
     this.bulletListDotSize = 5.0,
     this.bulletListIconSize = 14.0,
     this.listItemIndicatorPadding = const EdgeInsets.only(right: 12.0),
-    this.listItemIndicatorWidth = 28.0,
+    this.listItemIndicatorWidth = 24.0,
     this.listItemVerticalSeparatorSize = 6.0,
-    this.headingBottomSpacing = 10.0,
+    this.headingTopSpacing = 12.0,
+    this.headingBottomSpacing = 18.0,
   });
 }

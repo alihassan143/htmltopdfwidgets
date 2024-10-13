@@ -116,10 +116,6 @@ class WidgetsHTMLDecoder {
           nestedList: hasInParent(element, [HTMLTags.listItem]),
         );
 
-      /// it handles the simple paragraph element
-      case HTMLTags.paragraph:
-        return [await _parseParagraphElement(element)];
-
       /// Handle block quote tag
       case HTMLTags.blockQuote:
         return [await _parseBlockQuoteElement(element)];
@@ -131,7 +127,7 @@ class WidgetsHTMLDecoder {
       /// Handle the line break tag
 
       /// if no special element is found it treated as simple paragraph
-      default:
+      default:  // E.g. HTMLTags.paragraph
         return [await _parseParagraphElement(element)];
     }
   }
@@ -350,6 +346,11 @@ class WidgetsHTMLDecoder {
       }
     }
 
+    bool isPreviousHeader = isPreviousElement(
+      element,
+      [HTMLTags.h1, HTMLTags.h2, HTMLTags.h3, HTMLTags.h4, HTMLTags.h5, HTMLTags.h6]
+    );
+
     bool isNextHeader = isNextElement(
       element,
       [HTMLTags.h1, HTMLTags.h2, HTMLTags.h3, HTMLTags.h4, HTMLTags.h5, HTMLTags.h6]
@@ -366,10 +367,12 @@ class WidgetsHTMLDecoder {
       )
     );
 
-    if(isNextHeader) return widget;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: customStyles.headingBottomSpacing),
+      padding: EdgeInsets.only(
+        top: isPreviousHeader?0:customStyles.headingTopSpacing,
+        bottom: isNextHeader?0:customStyles.headingBottomSpacing
+      ),
       child: widget
     );
   }
@@ -407,7 +410,8 @@ class WidgetsHTMLDecoder {
 
     final result = <Widget>[];
 
-    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listTopPadding));
+    if(customStyles.listTopPadding > 0 && hasPreviousElement(element) || nestedList)
+      result.add(SizedBox(height: customStyles.listTopPadding));
 
     // Parse each list item and add it to the result
     for (int i=0; i<element.children.length; i++) {
@@ -425,7 +429,8 @@ class WidgetsHTMLDecoder {
 
     }
 
-    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listBottomPadding));
+    if(customStyles.listTopPadding > 0 && hasNextElement(element))
+      result.add(SizedBox(height: customStyles.listBottomPadding));
 
     return result;
 
@@ -452,7 +457,8 @@ class WidgetsHTMLDecoder {
 
     final result = <Widget>[];
 
-    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listTopPadding));
+    if(customStyles.listTopPadding > 0 && hasPreviousElement(element) || nestedList)
+      result.add(SizedBox(height: customStyles.listTopPadding));
 
     // Parse each list item and add it to the result
     for (var i = 0; i < element.children.length; i++) {
@@ -474,7 +480,8 @@ class WidgetsHTMLDecoder {
 
     }
 
-    if(customStyles.listTopPadding > 0) result.add(SizedBox(height: customStyles.listBottomPadding));
+    if(customStyles.listTopPadding > 0  && hasNextElement(element))
+      result.add(SizedBox(height: customStyles.listBottomPadding));
 
     return result;
   }
