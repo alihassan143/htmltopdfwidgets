@@ -18,47 +18,58 @@ import 'pdfwidgets/bullet_list.dart';
 import 'pdfwidgets/number_list.dart';
 import 'pdfwidgets/quote_widget.dart';
 
-////html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
-  /// default font of the pdf if it not provided custo
-  /// Constructor for the HTML decoder
+
   final Font? font;
 
-  /// Font for the PDF, if not provided, use default
   final HtmlTagStyle customStyles;
 
-  /// Custom styles for HTML tags
   final List<Font> fontFallback;
 
-  /// Fallback fonts
   WidgetsHTMLDecoder({
     this.font,
     required this.fontFallback,
     this.customStyles = const HtmlTagStyle(),
   });
 
-  //// The class takes an HTML string as input and returns a list of Widgets. The Widgets
-  //// are created based on the tags and attributes in the HTML string.
   Future<List<Widget>> convert(String html) async {
-    /// Parse the HTML document using the html package
+
     final document = parse(html.trim());
     final body = document.body;
-    if (body == null) {
-      return [];
+    if (body == null) return [];
+
+    return await _parseComplexElement(body);
+  }
+
+  Future<List<Widget>> _parseComplexElement(dom.Element element) async {
+    List<Widget> children = [];
+    List<(TextSpan, TextAlign?)> delta = [];
+
+    List<Object> items = await _parseDeltaElement(element);
+
+    for(var item in items){
+
+      if(item is Widget){
+        children.addAll(_mergeDeltaSpans(delta));
+        delta.clear();
+        children.add(item);
+        continue;
+      }
+
+      if(item is (TextSpan, TextAlign?)){
+        delta.add(item);
+        continue;
+      }
+
     }
 
-    /// Call the private _parseElement function to process the HTML nodes
-    List<Widget> nodes = await _parseComplexElement(body);
-    // List<Widget> nodes = await _parseElement(body.nodes);
+    children.addAll(_mergeDeltaSpans(delta));
 
-    return nodes;
+    return children;
   }
 
   /// Function to parse special HTML elements (e.g., headings, lists, images)
-  Future<Iterable<Widget>> _parseSpecialElements(
-    dom.Element element, {
-    required String type,
-  }) async {
+  Future<Iterable<Widget>> _parseSpecialElements(dom.Element element) async {
     final localName = element.localName;
     switch (localName) {
       /// Handle heading level 1
@@ -101,7 +112,7 @@ class WidgetsHTMLDecoder {
       case HTMLTags.listItem:
         return await _parseListItemElement(
           element,
-          type: type,
+          listTag: nearestParent(element, [HTMLTags.unorderedList, HTMLTags.orderedList])?.localName ?? HTMLTags.unorderedList,
           nestedList: hasInParent(element, [HTMLTags.listItem]),
         );
 
@@ -111,7 +122,7 @@ class WidgetsHTMLDecoder {
 
       /// Handle block quote tag
       case HTMLTags.blockQuote:
-        return await _parseBlockQuoteElement(element);
+        return [await _parseBlockQuoteElement(element)];
 
       /// Handle the image tag
       case HTMLTags.image:
@@ -292,28 +303,20 @@ class WidgetsHTMLDecoder {
     /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
     if (localName == HTMLTags.br) {
     } else if (HTMLTags.formattingElements.contains(localName)) {
-      final attributes = _parseFormattingElement(element);
-
-      result.add(Text(element.text, style: attributes.$2));
-    } else if (HTMLTags.specialElements.contains(localName)) {
-      /// Handle special elements (e.g., headings, lists, images)
-      result.addAll(
-        await _parseSpecialElements(
-          element,
-          type: BuiltInAttributeKey.bulletedList,
-        ),
-      );
-    } else if (element is dom.Text) {
-      /// Process text nodes and add them to delta
+      final (_, style) = _parseFormattingElement(element);
+      result.add(Text(element.text, style: style));
+    } else if (HTMLTags.specialElements.contains(localName))
+      result.addAll(await _parseSpecialElements(element));
+    else if (element is dom.Text)
       delta.add(
           Text(
             element.text,
             style: TextStyle(font: font, fontFallback: fontFallback)
           )
       );
-    } else {
+    else
       assert(false, 'Unknown node type: $element');
-    }
+
 
     /// If there are text nodes in delta, wrap them in a Wrap widget and add to the result
     if (delta.isNotEmpty) {
@@ -348,8 +351,12 @@ class WidgetsHTMLDecoder {
       }
     }
 
-    /// Return a RichText widget with the parsed text and styles
-    return SizedBox(
+    bool isNextHeader = isNextElement(
+        element,
+        [HTMLTags.h1, HTMLTags.h2, HTMLTags.h3, HTMLTags.h4, HTMLTags.h5, HTMLTags.h6]
+    );
+
+    Widget widget = SizedBox(
         width: double.infinity,
         child: RichText(
             textAlign: textAlign,
@@ -359,35 +366,26 @@ class WidgetsHTMLDecoder {
             )
         )
     );
+
+    if(isNextHeader)
+      return widget;
+
+    return Padding(
+        padding: EdgeInsets.only(bottom: customStyles.headingBottomSpacing),
+        child: widget
+    );
   }
 
   /// Function to parse a block quote element and return a list of widgets
-  Future<List<Widget>> _parseBlockQuoteElement(dom.Element element) async {
-    final result = <Widget>[];
-    if (element.children.isNotEmpty) {
-      for (final child in element.children) {
-        result.addAll(
-            await _parseListItemElement(
-              child,
-              type: BuiltInAttributeKey.quote,
-              nestedList: hasInParent(child, [HTMLTags.listItem])
-            )
-        );
-      }
-    } else {
-      result.add(
-        buildQuotewidget(Text(element.text), customStyles: customStyles)
-      );
-    }
-    return result;
-  }
+  Future<Widget> _parseBlockQuoteElement(dom.Element element) async {
 
-  bool hasInParent(dom.Element element, List<String> tags){
-    if(element.parent == null) return false;
-    for(String tag in tags)
-      if(element.parent!.localName == tag) return true;
+    final child = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: await _parseComplexElement(element)
+    );
 
-    return hasInParent(element.parent!, tags);
+    return buildQuoteWidget(child, customStyles: customStyles);
+
   }
 
   /// Function to parse an unordered list element and return a list of widgets
@@ -423,7 +421,7 @@ class WidgetsHTMLDecoder {
       result.addAll(
           await _parseListItemElement(
               childElement,
-              type: BuiltInAttributeKey.bulletedList,
+              listTag: HTMLTags.unorderedList,
               nestedList: nestedList,
           )
       );
@@ -475,7 +473,8 @@ class WidgetsHTMLDecoder {
       result.addAll(
           await _parseListItemElement(
             childElement,
-            type: BuiltInAttributeKey.numberList, index: i + 1,
+            listTag: HTMLTags.orderedList,
+            index: i + 1,
             nestedList: nestedList,
           )
       );
@@ -496,7 +495,7 @@ class WidgetsHTMLDecoder {
   /// Function to parse a list element (unordered or ordered) and return a list of widgets
   Future<Iterable<Widget>> _parseListItemElement(
     dom.Element element, {
-    required String type,
+    required String listTag,
     bool withIndicator = true,
     int? index,
     required bool nestedList,
@@ -507,7 +506,7 @@ class WidgetsHTMLDecoder {
     );
 
     /// Build a bullet list widget
-    if (type == BuiltInAttributeKey.bulletedList) {
+    if (listTag == HTMLTags.unorderedList) {
       return [
         BulletListItemWidget(
             child: child,
@@ -518,7 +517,7 @@ class WidgetsHTMLDecoder {
       ];
 
       /// Build a numbered list widget
-    } else if (type == BuiltInAttributeKey.numberList) {
+    } else if (listTag == HTMLTags.orderedList) {
       return [
         NumberListItemWidget(
             child: child,
@@ -528,9 +527,6 @@ class WidgetsHTMLDecoder {
         )
       ];
 
-      /// Build a quote  widget
-    } else if (type == BuiltInAttributeKey.quote) {
-      return [buildQuotewidget(child, customStyles: customStyles)];
     } else {
       return [child];
     }
@@ -584,33 +580,6 @@ class WidgetsHTMLDecoder {
   /// Function to parse a paragraph element and return a widget
   Future<Widget> _parseParagraphElement(dom.Element element) async {
     return Wrap(children: await _parseComplexElement(element));
-  }
-
-  Future<List<Widget>> _parseComplexElement(dom.Element element) async {
-    List<Widget> children = [];
-    List<(TextSpan, TextAlign?)> delta = [];
-
-    List<Object> items = await _parseDeltaElement(element);
-
-    for(var item in items){
-
-      if(item is Widget){
-        children.addAll(_mergeDeltaSpans(delta));
-        delta.clear();
-        children.add(item);
-        continue;
-      }
-
-      if(item is (TextSpan, TextAlign?)){
-        delta.add(item);
-        continue;
-      }
-
-    }
-
-    children.addAll(_mergeDeltaSpans(delta));
-
-    return children;
   }
 
   /// Function to parse an image element and return an Image widget
@@ -719,21 +688,15 @@ class WidgetsHTMLDecoder {
 
       // Handle special elements (e.g., headings, lists) within a paragraph
       if(HTMLTags.specialElements.contains(node.localName)) {
-        // deltaToResult();
-
         result.addAll(
-          await _parseSpecialElements(
-            node, type: BuiltInAttributeKey.bulletedList,
-          )
+          await _parseSpecialElements(node)
         );
         continue;
       }
 
       // No match for irregular elements so far.
       // Parse the children of the currently handled node and add the result.
-      result.addAll(
-          await _parseDeltaElement(node)
-      );
+      result.addAll(await _parseDeltaElement(node));
 
     }
 
@@ -758,9 +721,7 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to extract text styles from HTML attributes
-  (TextAlign?, TextStyle) _getDeltaAttributesFromHtmlAttributes(
-      LinkedHashMap<Object, String> htmlAttributes
-  ) {
+  (TextAlign?, TextStyle) _getDeltaAttributesFromHtmlAttributes(LinkedHashMap<Object, String> htmlAttributes) {
     TextStyle style = customStyles.paragraphStyle??TextStyle(font: font, fontFallback: fontFallback);
     TextAlign? textAlign;
 
@@ -811,7 +772,6 @@ class WidgetsHTMLDecoder {
     }
 
     ///apply italic tag
-
     if (cssMap["font-style"] == "italic") {
       style = style
           .copyWith(fontStyle: FontStyle.italic)
@@ -841,8 +801,7 @@ class WidgetsHTMLDecoder {
   }
 
   ///this function apply thee text decorations from html inline style css
-  static TextStyle _assignTextDecorations(
-      TextStyle style, String decorationStr) {
+  static TextStyle _assignTextDecorations(TextStyle style, String decorationStr) {
     final decorations = decorationStr.split(" ");
     final textdecorations = <TextDecoration>[];
     for (final d in decorations) {

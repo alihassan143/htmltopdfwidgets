@@ -50,6 +50,8 @@ class HtmlTagStyle {
   //bullet list style that will merge with default style
   final double listItemVerticalSeparatorSize;
 
+  final double headingBottomSpacing;
+
   const HtmlTagStyle({
     this.boldStyle,
     this.italicStyle,
@@ -74,5 +76,6 @@ class HtmlTagStyle {
     this.listItemIndicatorPadding = const EdgeInsets.only(right: 12.0),
     this.listItemIndicatorWidth = 28.0,
     this.listItemVerticalSeparatorSize = 5.0,
+    this.headingBottomSpacing = 10.0,
   });
 }
