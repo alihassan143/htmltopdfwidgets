@@ -243,7 +243,7 @@ class WidgetsHTMLDecoder {
     dom.Element element,
   ) async {
 
-    if(element.attributes['style'] != null)
+    if(element.attributes['style'] == null)
       return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: await _parseComplexElement(element)
