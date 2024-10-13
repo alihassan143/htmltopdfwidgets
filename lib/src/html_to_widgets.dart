@@ -265,14 +265,15 @@ class WidgetsHTMLDecoder {
       String styleName = styleElementParts[0].trim();
       String styleValue = styleElementParts[1].trim();
 
+      // Replace 'px' with '' is inacurate - should consider other units like 'pt', 'em', 'rem', '%', etc.
       if(styleName == 'padding-left')
-        paddingLeft = double.tryParse(styleValue) ?? 0;
+        paddingLeft = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
       else if(styleName == 'padding-right')
-        paddingRight = double.tryParse(styleValue) ?? 0;
+        paddingRight = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
       else if(styleName == 'padding-top')
-        paddingTop = double.tryParse(styleValue) ?? 0;
+        paddingTop = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
       else if(styleName == 'padding-bottom')
-        paddingBottom = double.tryParse(styleValue) ?? 0;
+        paddingBottom = double.tryParse(styleValue.replaceAll('px', '')) ?? 0;
     }
 
     return Padding(
