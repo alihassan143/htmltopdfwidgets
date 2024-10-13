@@ -106,7 +106,7 @@ class WidgetsHTMLDecoder {
 
       /// Handle table
       case HTMLTags.table:
-        return await _parseTable(element);
+        return [await _parseTable(element)];
 
       ///if simple list is found it will handle accordingly
       case HTMLTags.listItem:
@@ -128,10 +128,6 @@ class WidgetsHTMLDecoder {
       default:  // E.g. HTMLTags.paragraph
         return [await _parseParagraphElement(element)];
     }
-  }
-
-  Text paragraphNode({required String text}) {
-    return Text(text);
   }
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
@@ -210,27 +206,23 @@ class WidgetsHTMLDecoder {
   }
 
   ///convert table tag into the table pdf widget
-  Future<List<Widget>> _parseTable(dom.Element element) async {
+  Future<Widget> _parseTable(dom.Element element) async {
     final List<TableRow> tableRows = [];
 
-    return [
-      Table(
+    return Table(
           border: TableBorder.all(color: PdfColors.black),
           children: []
-      ),
-    ];
+      );
 
     dom.Element tbody = element.children.first;
 
     for (final child in tbody.children)
       tableRows.add(await _parseTableRow(child));
 
-    return [
-      Table(
+    return Table(
           border: TableBorder.all(color: PdfColors.black),
           children: tableRows
-      ),
-    ];
+      );
   }
 
   Future<TableRow> _parseTableRow(dom.Element element) async {
