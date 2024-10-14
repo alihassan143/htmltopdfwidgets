@@ -9,7 +9,6 @@ import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
 import 'package:htmltopdfwidgets/src/pdfwidgets/quote_widget.dart';
 import 'package:htmltopdfwidgets/src/utils/utils.dart';
 import 'package:http/http.dart';
-import 'package:pdf/widgets.dart';
 import 'package:printing/printing.dart';
 
 import '../htmltopdfwidgets.dart';
@@ -46,8 +45,7 @@ class WidgetsHTMLDecoder {
     final font = await fontResolver?.call(defaultFontFamily, false, false);
     final fontBold = await fontResolver?.call(defaultFontFamily, true, false);
     final fontItalic = await fontResolver?.call(defaultFontFamily, false, true);
-    final fontBoldItalic =
-    await fontResolver?.call(defaultFontFamily, true, true);
+    final fontBoldItalic = await fontResolver?.call(defaultFontFamily, true, true);
     final baseTextStyle = TextStyle(
         fontSize: defaultFontSize,
         font: font,
@@ -61,11 +59,11 @@ class WidgetsHTMLDecoder {
     return await _parseComplexElement(body, baseTextStyle);
   }
 
-  Future<List<Widget>> _parseComplexElement(dom.Element element) async {
+  Future<List<Widget>> _parseComplexElement(dom.Element element, TextStyle baseTextStyle) async {
     List<Widget> children = [];
     List<(TextSpan, TextAlign?)> delta = [];
 
-    List<Object> items = await _parseDeltaElement(element);
+    List<Object> items = await _parseDeltaElement(element, baseTextStyle);
 
     for(var item in items){
 
@@ -150,20 +148,20 @@ class WidgetsHTMLDecoder {
 
       /// if no special element is found it treated as simple paragraph
       default:  // E.g. HTMLTags.paragraph
-        return [await _parseParagraphElement(element, , baseTextStyle)];
+        return [await _parseParagraphElement(element, baseTextStyle)];
     }
   }
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
-  Future<(TextAlign?, TextStyle)> _parseFormattingElement(dom.Element element) {
+  Future<(TextAlign?, TextStyle)> _parseFormattingElement(dom.Element element, TextStyle baseTextStyle) async {
 
     // Check if the element is a simple formatting tag like <span>, <bold>,
     // or <italic> as well as formatting tags or attributes in all of its parent
     // elements and return the corresponding text alignment and style.
 
     final List<TextDecoration> decoration = [];
-    var (align, style) = _getDeltaAttributesFromHtmlAttributes(
-      element.attributes,
+    var (align, style) = await _getDeltaAttributesFromHtmlAttributes(
+      element.attributes, baseTextStyle
     );
 
     switch (element.localName) {
@@ -220,10 +218,9 @@ class WidgetsHTMLDecoder {
 
     style = style.copyWith(decoration: TextDecoration.combine(decoration));
 
-    if(element.parent == null)
-      return (align, style);
+    if(element.parent == null) return (align, style);
 
-    var (parentAlign, parentStyle) = _parseFormattingElement(element.parent!, baseTextStyle);
+    var (parentAlign, parentStyle) = await _parseFormattingElement(element.parent!, baseTextStyle);
 
     ///will combine style get from the children
     return (align ??= parentAlign, parentStyle.merge(style));
@@ -268,8 +265,7 @@ class WidgetsHTMLDecoder {
         children: children
     );
 
-    if(!element.attributes.containsKey('style'))
-      return result;
+    if(!element.attributes.containsKey('style')) return result;
 
     double? paddingLeft;
     double? paddingRight;
@@ -317,16 +313,13 @@ class WidgetsHTMLDecoder {
     for (final child in children) {
       if (child is dom.Element) {
         TextStyle style;
-        (textAlign, style) = _parseFormattingElement(child, baseTextStyle);
+        (textAlign, style) = await _parseFormattingElement(child, baseTextStyle);
         delta.add(TextSpan(text: child.text, style: style));
       } else {
         delta.add(
           TextSpan(
             text: child.text,
-            style: TextStyle(
-              font: font,
-              fontFallback: fontFallback,
-            )
+            style: baseTextStyle
           )
         );
       }
@@ -404,8 +397,9 @@ class WidgetsHTMLDecoder {
       result.addAll(
           await _parseListItemElement(
             element.children[i],
-              listTag: HTMLTags.unorderedList,
-              nestedList: nestedList,
+            baseTextStyle,
+            listTag: HTMLTags.unorderedList,
+            nestedList: nestedList,
           )
       );
 
@@ -437,7 +431,8 @@ class WidgetsHTMLDecoder {
               style: customStyles.paragraphStyle,
             ),
             index: 1,
-            customStyles: customStyles
+            customStyles: customStyles,
+            baseTextStyle: baseTextStyle,
         )
       ];
 
@@ -499,7 +494,7 @@ class WidgetsHTMLDecoder {
       ];
 
       /// Build a numbered list widget
-    } else if (type == BuiltInAttributeKey.numberList) {
+    } else if (listTag == HTMLTags.orderedList) {
       return [
         NumberListItemWidget(
             child: child,
@@ -561,8 +556,8 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to parse a paragraph element and return a widget
-  Future<Widget> _parseParagraphElement(dom.Element element) async {
-    return Wrap(children: await _parseComplexElement(element));
+  Future<Widget> _parseParagraphElement(dom.Element element, TextStyle baseTextStyle) async {
+    return Wrap(children: await _parseComplexElement(element, baseTextStyle));
   }
 
   /// Function to parse an image element and return an Image widget
@@ -639,9 +634,9 @@ class WidgetsHTMLDecoder {
     }
   }
 
-  Future<List<Object>> _parseDeltaElement(dom.Element element) async {
+  Future<List<Object>> _parseDeltaElement(dom.Element element, TextStyle baseTextStyle) async {
 
-    var (align, style) = _parseFormattingElement(element);
+    var (align, style) = await _parseFormattingElement(element, baseTextStyle);
 
     // This list holds only of of two types:
     // - (`TextSpan`, 'TextAlign?`) tuples
@@ -672,14 +667,14 @@ class WidgetsHTMLDecoder {
       // Handle special elements (e.g., headings, lists) within a paragraph
       if(HTMLTags.specialElements.contains(node.localName)) {
         result.addAll(
-          await _parseSpecialElements(node)
+          await _parseSpecialElements(node, baseTextStyle)
         );
         continue;
       }
 
       // No match for irregular elements so far.
       // Parse the children of the currently handled node and add the result.
-      result.addAll(await _parseDeltaElement(node));
+      result.addAll(await _parseDeltaElement(node, baseTextStyle));
 
     }
 
@@ -704,8 +699,8 @@ class WidgetsHTMLDecoder {
   }
 
   /// Function to extract text styles from HTML attributes
-  Future<(TextAlign?, TextStyle)> _getDeltaAttributesFromHtmlAttributes(LinkedHashMap<Object, String> htmlAttributes) async {
-    TextStyle style = customStyles.paragraphStyle??const TextStyle(font: font, fontFallback: fontFallback);
+  Future<(TextAlign?, TextStyle)> _getDeltaAttributesFromHtmlAttributes(LinkedHashMap<Object, String> htmlAttributes, TextStyle baseTextStyle) async {
+    TextStyle style = customStyles.paragraphStyle??baseTextStyle;
     TextAlign? textAlign;
 
     ///extract styls from the inline css

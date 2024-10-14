@@ -2,17 +2,19 @@ import '../../htmltopdfwidgets.dart';
 
 
 class NumberListItemWidget extends StatelessWidget {
-  // Number list item widget with a number index and content.
+
   final Widget child;
   final int index;
   final HtmlTagStyle customStyles;
   final bool withIndicator;
+  final TextStyle baseTextStyle;
 
   NumberListItemWidget({
     required this.child,
     required this.index,
     required this.customStyles,
-    this.withIndicator = true
+    this.withIndicator = true,
+    required this.baseTextStyle
   });
 
   @override
@@ -26,7 +28,8 @@ class NumberListItemWidget extends StatelessWidget {
           if(withIndicator)
             _NumberListIndicator(
               style: customStyles,
-              index: index
+              index: index,
+              baseTextStyle: baseTextStyle
             )
           else
             SizedBox(width: customStyles.listItemIndicatorWidth),
@@ -40,8 +43,9 @@ class NumberListItemWidget extends StatelessWidget {
 class _NumberListIndicator extends StatelessWidget {
   final HtmlTagStyle style;
   final int index;
+  final TextStyle baseTextStyle;
 
-  _NumberListIndicator({required this.style, required this.index});
+  _NumberListIndicator({required this.style, required this.index, required this.baseTextStyle});
 
   @override
   Widget build(Context context) {
@@ -54,7 +58,7 @@ class _NumberListIndicator extends StatelessWidget {
           alignment: Alignment.centerRight,
           child: Text(
             '$index.',
-            style: style.listIndexStyle,
+            style: style.listIndexStyle??baseTextStyle,
           )
         ),
       ),
