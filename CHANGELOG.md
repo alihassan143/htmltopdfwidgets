@@ -1,3 +1,6 @@
+## 1.0.4
+* Fix wrong styles of background color ([#31](https://github.com/alihassan143/htmltopdfwidgets/issues/31))
+* Add support for custom fonts ([#34](https://github.com/alihassan143/htmltopdfwidgets/pull/34)) by @hig-dev
 ## 1.0.3
 * Intial support for checkboxes
 *([#25](https://github.com/alihassan143/htmltopdfwidgets/issues/25))

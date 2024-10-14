@@ -40,6 +40,28 @@ extension ColorExtension on PdfColor {
   String toRgbaString() {
     return 'rgba($red, $green, $blue, $alpha)';
   }
+
+  static PdfColor hexToPdfColor(String hexColor) {
+    // Remove the leading '#' if it exists
+    hexColor = hexColor.replaceAll('#', '');
+
+    // Ensure the hex string is in the correct format (6 characters long)
+    if (hexColor.length == 3) {
+      hexColor = hexColor.split('').map((char) => '$char$char').join();
+    }
+
+    if (hexColor.length != 6) {
+      throw ArgumentError('Invalid hex color format');
+    }
+
+    // Convert hex string to integer values for RGB
+    final int red = int.parse(hexColor.substring(0, 2), radix: 16);
+    final int green = int.parse(hexColor.substring(2, 4), radix: 16);
+    final int blue = int.parse(hexColor.substring(4, 6), radix: 16);
+
+    // Return a PdfColor object using the RGB values (normalized to 0-1)
+    return PdfColor.fromInt((red << 16) | (green << 8) | blue);
+  }
 }
 
 // Function to calculate the hex representation of an RGBA color.
@@ -58,4 +80,18 @@ int hexOfRGBA(int r, int g, int b, {double opacity = 1}) {
   // Calculate and return the hex representation of the color.
   return int.parse(
       '0x${a.toRadixString(16)}${r.toRadixString(16)}${g.toRadixString(16)}${b.toRadixString(16)}');
+}
+
+bool isRgba(String color) {
+  // Regular expression to check if the color is in 'rgba' format
+  final rgbaRegex = RegExp(r"^rgba?\((\s*\d+\s*,){2,3}\s*\d+(\.\d+)?\s*\)$",
+      caseSensitive: false);
+  return rgbaRegex.hasMatch(color);
+}
+
+bool isHex(String color) {
+  // Regular expression to check if the color is in hex format (#RRGGBB or #RGB)
+  final hexRegex =
+  RegExp(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", caseSensitive: false);
+  return hexRegex.hasMatch(color);
 }
