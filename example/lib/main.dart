@@ -49,7 +49,7 @@ const htmlText = '''<h1>AppFlowyEditor</h1>
   <label for="option3">Option 3</label>
   ''';
 
-createDocument() async {
+void createDocument() async {
   const filePath = 'example.pdf';
   final file = File(filePath);
   final newpdf = Document();

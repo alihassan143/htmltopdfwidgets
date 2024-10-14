@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' show parse;
-import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
 import 'package:htmltopdfwidgets/src/utils/utils.dart';
 import 'package:http/http.dart';
@@ -233,9 +232,7 @@ class WidgetsHTMLDecoder {
   }
 
   ///parse html data and convert to table row
-  Future<Widget> _parseTableData(
-    dom.Element element,
-  ) async {
+  Future<Widget> _parseTableData(dom.Element element) async {
 
     List<Widget> children = [];
     for (dom.Element child in element.children)
@@ -288,10 +285,7 @@ class WidgetsHTMLDecoder {
 
   }
 
-  Widget _parseHeadingElement(
-    dom.Element element, {
-    required int level,
-  }) {
+  Widget _parseHeadingElement(dom.Element element, {required int level}) {
     TextAlign? textAlign;
     final delta = <TextSpan>[];
     final children = element.nodes.toList();
@@ -774,4 +768,5 @@ class WidgetsHTMLDecoder {
     }
     return style.copyWith(decoration: TextDecoration.combine(textdecorations));
   }
+
 }

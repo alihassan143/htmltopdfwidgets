@@ -3,7 +3,7 @@ import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
 
 //apply custom styles to html stylee
 class HtmlTagStyle {
-  //bold  style that will merge with default style
+  //bold style that will merge with default style
   final TextStyle? boldStyle;
   //italic style that will merge with default style
   final TextStyle? italicStyle;
