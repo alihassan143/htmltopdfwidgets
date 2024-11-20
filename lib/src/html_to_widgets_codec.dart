@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:markdown/markdown.dart';
+
 import '../htmltopdfwidgets.dart';
 import 'html_to_widgets.dart';
 
@@ -31,6 +33,29 @@ class HTMLToPdf extends HtmlCodec {
     //convert function that convert string to dom nodes that that dom nodes will be converted
     return await widgetDecoder.convert(html);
   }
+
+  @override
+  Future<List<Widget>> convertMarkdown(String markDown,
+      {List<Font> fontFallback = const [],
+      //font resolver (font name, bold, italic) => font
+      FutureOr<Font> Function(String, bool, bool)? fontResolver,
+      String defaultFontFamily = "Roboto",
+      double defaultFontSize = 12.0,
+      //custom html tag styles
+      HtmlTagStyle tagStyle = const HtmlTagStyle()}) async {
+    // TODO: implement convertMarkdown
+    final widgetDecoder = WidgetsHTMLDecoder(
+        //font fall back if provided
+        fontFallback: [...fontFallback],
+        fontResolver: fontResolver,
+        defaultFontFamily: defaultFontFamily,
+        defaultFontSize: defaultFontSize,
+        //custom html tags style
+        customStyles: tagStyle);
+    final html = markdownToHtml(markDown);
+    //convert function that convert string to dom nodes that that dom nodes will be converted
+    return await widgetDecoder.convert(html);
+  }
 }
 
 // Define an abstract class named HtmlCodec.
@@ -42,6 +67,10 @@ abstract class HtmlCodec {
   // that must be implemented by its subclasses. The code is structured for
   //handling HTML-to-pdf-widget conversion in a dart or flutter application
   Future<List<Widget>> convert(String html,
+      {List<Font> fontFallback = const [],
+      FutureOr<Font> Function(String, bool, bool)? fontResolver,
+      HtmlTagStyle tagStyle = const HtmlTagStyle()});
+  Future<List<Widget>> convertMarkdown(String markDown,
       {List<Font> fontFallback = const [],
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       HtmlTagStyle tagStyle = const HtmlTagStyle()});
