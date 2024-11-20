@@ -62,7 +62,7 @@ final htmlContent = '''
       }));
   await file.writeAsBytes(await newpdf.save());
 ```
-2. Converting Markdown to PDF:
+3. Converting Markdown to PDF:
 
 ```dart
 final markDown = '''
