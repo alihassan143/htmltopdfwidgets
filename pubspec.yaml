@@ -1,5 +1,5 @@
 name: htmltopdfwidgets
-description: Htmlt to pdf widgets library convert html text to pdf widgets
+description: A Dart package that converts HTML and Markdown rich text content into high-quality PDF widgets. Simplify the creation of PDF documents by seamlessly transforming your structured text content into printable, professional PDFs. Perfect for generating reports, invoices, and more!
 version: 1.0.5
 homepage: https://github.com/alihassan143/htmltopdfwidgets
 
