@@ -85,9 +85,8 @@ createDocument() async {
   final markdownfile = File(markDownfilePath);
   final newpdf = Document();
   final markdownNewpdf = Document();
-  final List<Widget> widgets = await HTMLToPdf().convert(
-    htmlText,
-  );
+  final List<Widget> widgets =
+      await HTMLToPdf().convert(htmlText, wrapInParagraph: true);
   final List<Widget> markdownwidgets = await HTMLToPdf().convertMarkdown(
     markDown,
   );

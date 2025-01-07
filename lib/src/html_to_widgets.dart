@@ -27,6 +27,7 @@ class WidgetsHTMLDecoder {
 
   /// Font for the PDF, if not provided, use default
   final HtmlTagStyle customStyles;
+  final bool wrapInParagraph;
 
   /// Custom styles for HTML tags
   final List<Font> fontFallback;
@@ -37,14 +38,20 @@ class WidgetsHTMLDecoder {
     required this.fontFallback,
     this.customStyles = const HtmlTagStyle(),
     this.defaultFontFamily = "Roboto",
+    this.wrapInParagraph = false,
     this.defaultFontSize = 12.0,
   });
 
   //// The class takes an HTML string as input and returns a list of Widgets. The Widgets
   //// are created based on the tags and attributes in the HTML string.
   Future<List<Widget>> convert(String html) async {
+    String text = html.trim();
+    if (wrapInParagraph) {
+      text = '<p>$text</p>';
+    }
+
     /// Parse the HTML document using the html package
-    final document = parse(html.trim());
+    final document = parse(text);
     final body = document.body;
     if (body == null) {
       return [];

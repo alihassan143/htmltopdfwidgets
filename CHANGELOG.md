@@ -1,3 +1,5 @@
+## 1.0.6
+* added wrap in paragraph element feature for html text
 ## 1.0.5
 * Markdown to pdf support added
 ## 1.0.4

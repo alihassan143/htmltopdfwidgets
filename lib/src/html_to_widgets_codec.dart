@@ -15,6 +15,7 @@ class HTMLToPdf extends HtmlCodec {
       {
       //font fall back
       List<Font> fontFallback = const [],
+      bool wrapInParagraph = false,
       //font resolver (font name, bold, italic) => font
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       String defaultFontFamily = "Roboto",
@@ -27,6 +28,7 @@ class HTMLToPdf extends HtmlCodec {
         fontFallback: [...fontFallback],
         fontResolver: fontResolver,
         defaultFontFamily: defaultFontFamily,
+        wrapInParagraph: wrapInParagraph,
         defaultFontSize: defaultFontSize,
         //custom html tags style
         customStyles: tagStyle);
@@ -41,6 +43,7 @@ class HTMLToPdf extends HtmlCodec {
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       String defaultFontFamily = "Roboto",
       double defaultFontSize = 12.0,
+      bool wrapInParagraph = false,
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle()}) async {
     // TODO: implement convertMarkdown
@@ -48,6 +51,7 @@ class HTMLToPdf extends HtmlCodec {
         //font fall back if provided
         fontFallback: [...fontFallback],
         fontResolver: fontResolver,
+        wrapInParagraph: wrapInParagraph,
         defaultFontFamily: defaultFontFamily,
         defaultFontSize: defaultFontSize,
         //custom html tags style
@@ -68,10 +72,12 @@ abstract class HtmlCodec {
   //handling HTML-to-pdf-widget conversion in a dart or flutter application
   Future<List<Widget>> convert(String html,
       {List<Font> fontFallback = const [],
+      bool wrapInParagraph = false,
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       HtmlTagStyle tagStyle = const HtmlTagStyle()});
   Future<List<Widget>> convertMarkdown(String markDown,
       {List<Font> fontFallback = const [],
+      bool wrapInParagraph = false,
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       HtmlTagStyle tagStyle = const HtmlTagStyle()});
 }
