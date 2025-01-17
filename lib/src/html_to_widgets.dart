@@ -159,14 +159,18 @@ class WidgetsHTMLDecoder {
           result.add((SizedBox(
               width: double.infinity,
               child: RichText(
-                  textAlign: textAlign, text: TextSpan(children: newlist)))));
+                  textAlign: textAlign,
+                  text: TextSpan(
+                      children: newlist
+                        ..add(TextSpan(
+                            text: domNode.text, style: baseTextStyle)))))));
 
           textAlign = null;
 
           delta.clear();
+        } else {
+          result.add(Text(domNode.text, style: baseTextStyle));
         }
-
-        result.add(Text(domNode.text, style: baseTextStyle));
 
         /// Process text nodes and add them to delta
       } else {
@@ -642,7 +646,7 @@ class WidgetsHTMLDecoder {
       if (child is dom.Element) {
         if (child.children.isNotEmpty &&
             HTMLTags.formattingElements.contains(child.localName) == false) {
-          childNodes.addAll(await _parseElement(child.children, baseTextStyle));
+          childNodes.addAll(await _parseElement(child.nodes, baseTextStyle));
         } else {
           /// Handle special elements (e.g., headings, lists) within a paragraph
           if (HTMLTags.specialElements.contains(child.localName)) {

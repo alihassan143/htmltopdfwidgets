@@ -1,3 +1,5 @@
+## 1.0.7
+* fix nested child skipping issue fixed
 ## 1.0.6
 * added wrap in paragraph element feature for html text
 ## 1.0.5
