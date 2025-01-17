@@ -1,3 +1,5 @@
+## 1.0.8
+* fix: Links get formatted but are not clickable in the PDF ([#35](https://github.com/alihassan143/htmltopdfwidgets/issues/35))
 ## 1.0.7
 * fix nested child skipping issue fixed
 ## 1.0.6

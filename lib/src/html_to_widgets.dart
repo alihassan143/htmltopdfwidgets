@@ -104,9 +104,13 @@ class WidgetsHTMLDecoder {
               await _parserFormattingElementAttributes(domNode, baseTextStyle);
 
           textAlign = attributes.$1;
+
           delta.add(TextSpan(
               text: "${domNode.text.replaceAll(RegExp(r'\n+$'), '')} ",
-              style: attributes.$2));
+              style: attributes.$2,
+              annotation: attributes.$3 == null
+                  ? null
+                  : AnnotationUrl(attributes.$3!)));
         } else if (HTMLTags.specialElements.contains(localName)) {
           if (delta.isNotEmpty) {
             final newlist = List<TextSpan>.from(delta);
@@ -265,10 +269,11 @@ class WidgetsHTMLDecoder {
   }
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
-  Future<(TextAlign?, TextStyle)> _parserFormattingElementAttributes(
+  Future<(TextAlign?, TextStyle, String?)> _parserFormattingElementAttributes(
       dom.Element element, TextStyle baseTextStyle) async {
     final localName = element.localName;
     TextAlign? textAlign;
+    String? link;
     TextStyle attributes = baseTextStyle;
     final List<TextDecoration> decoration = [];
     switch (localName) {
@@ -320,6 +325,7 @@ class WidgetsHTMLDecoder {
           attributes = attributes
               .copyWith(color: PdfColors.blue)
               .merge(customStyles.linkStyle);
+          link = href;
         }
         break;
 
@@ -341,12 +347,16 @@ class WidgetsHTMLDecoder {
         decoration.add(nattributes.$2.decoration!);
       }
       textAlign = nattributes.$1;
+      if (nattributes.$3 != null) {
+        link = nattributes.$3;
+      }
     }
 
     ///will combine style get from the children
     return (
       textAlign,
-      attributes.copyWith(decoration: TextDecoration.combine(decoration))
+      attributes.copyWith(decoration: TextDecoration.combine(decoration)),
+      link
     );
   }
 
@@ -445,7 +455,13 @@ class WidgetsHTMLDecoder {
     } else if (HTMLTags.formattingElements.contains(localName)) {
       final attributes =
           await _parserFormattingElementAttributes(element, baseTextStyle);
-
+      result.add(RichText(
+          text: TextSpan(
+              text: element.text,
+              style: attributes.$2,
+              annotation: attributes.$3 == null
+                  ? null
+                  : AnnotationUrl(attributes.$3!))));
       result.add(Text(element.text, style: attributes.$2));
     } else if (HTMLTags.specialElements.contains(localName)) {
       /// Handle special elements (e.g., headings, lists, images)
@@ -484,7 +500,12 @@ class WidgetsHTMLDecoder {
         final attributes =
             await _parserFormattingElementAttributes(child, baseTextStyle);
         textAlign = attributes.$1;
-        delta.add(TextSpan(text: child.text, style: attributes.$2));
+
+        delta.add(TextSpan(
+            text: child.text,
+            style: attributes.$2,
+            annotation:
+                attributes.$3 == null ? null : AnnotationUrl(attributes.$3!)));
       } else {
         delta.add(TextSpan(text: child.text, style: baseTextStyle));
       }
@@ -670,7 +691,10 @@ class WidgetsHTMLDecoder {
 
               delta.add(TextSpan(
                   text: "${child.text.replaceAll(RegExp(r'\n+$'), ' ')} ",
-                  style: attributes.$2.merge(customStyles.paragraphStyle)));
+                  style: attributes.$2.merge(customStyles.paragraphStyle),
+                  annotation: attributes.$3 == null
+                      ? null
+                      : AnnotationUrl(attributes.$3!)));
             }
           }
         }
