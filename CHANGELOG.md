@@ -1,3 +1,6 @@
+## 1.0.9
+* added support for horizontal divider
+* code block and pre tag support
 ## 1.0.8
 * fix: Links get formatted but are not clickable in the PDF ([#35](https://github.com/alihassan143/htmltopdfwidgets/issues/35))
 ## 1.0.7

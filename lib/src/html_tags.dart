@@ -11,9 +11,11 @@ class HTMLTags {
   static const paragraph = 'p';
   static const image = 'img';
   static const anchor = 'a';
+  static const horizontalDivider = 'hr';
   static const italic = 'i';
   static const em = 'em';
   static const bold = 'b';
+  static const pre = 'pre';
   static const underline = 'u';
   static const strikethrough = 's';
   static const del = 'del';

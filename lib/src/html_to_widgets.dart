@@ -82,8 +82,9 @@ class WidgetsHTMLDecoder {
 
   Future<List<Widget>> _parseElement(
     Iterable<dom.Node> domNodes,
-    TextStyle baseTextStyle,
-  ) async {
+    TextStyle baseTextStyle, {
+    bool preTag = false,
+  }) async {
     final result = <Widget>[];
     final delta = <TextSpan>[];
     TextAlign? textAlign;
@@ -98,10 +99,22 @@ class WidgetsHTMLDecoder {
           delta.add(const TextSpan(
             text: "\n",
           ));
+        } else if (localName == HTMLTags.pre) {
+          final childrens =
+              await _parseElement(domNode.nodes, baseTextStyle, preTag: true);
+          delta.add(TextSpan(children: [
+            WidgetSpan(
+                child: Container(
+                    width: double.infinity,
+                    decoration: customStyles.codeDecoration ??
+                        BoxDecoration(color: customStyles.codeblockColor),
+                    child: Column(children: childrens)))
+          ]));
         } else if (HTMLTags.formattingElements.contains(localName)) {
           /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-          final attributes =
-              await _parserFormattingElementAttributes(domNode, baseTextStyle);
+          final attributes = await _parserFormattingElementAttributes(
+              domNode, baseTextStyle,
+              preTag: preTag);
 
           textAlign = attributes.$1;
 
@@ -156,6 +169,12 @@ class WidgetsHTMLDecoder {
           }
 
           /// Handle special elements (e.g., headings, lists, images)
+        } else if (localName == HTMLTags.horizontalDivider) {
+          result.add(Divider(
+              color: customStyles.dividerColor,
+              thickness: customStyles.dividerthickness,
+              height: customStyles.dividerHight,
+              borderStyle: customStyles.dividerBorderStyle));
         }
       } else if (domNode is dom.Text) {
         if (delta.isNotEmpty && domNode.text.trim().isNotEmpty) {
@@ -270,7 +289,8 @@ class WidgetsHTMLDecoder {
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
   Future<(TextAlign?, TextStyle, String?)> _parserFormattingElementAttributes(
-      dom.Element element, TextStyle baseTextStyle) async {
+      dom.Element element, TextStyle baseTextStyle,
+      {bool preTag = false}) async {
     final localName = element.localName;
     TextAlign? textAlign;
     String? link;
@@ -331,17 +351,23 @@ class WidgetsHTMLDecoder {
 
       /// Handle <code> element
       case HTMLTags.code:
-        attributes = attributes
-            .copyWith(background: const BoxDecoration(color: PdfColors.red))
-            .merge(customStyles.codeStyle);
+        if (!preTag) {
+          attributes = attributes
+              .copyWith(
+                  background: BoxDecoration(
+                      color: customStyles.codeBlockBackgroundColor))
+              .merge(customStyles.codeStyle);
+        }
+
         break;
       default:
         break;
     }
 
     for (final child in element.children) {
-      final nattributes =
-          await _parserFormattingElementAttributes(child, baseTextStyle);
+      final nattributes = await _parserFormattingElementAttributes(
+          child, baseTextStyle,
+          preTag: preTag);
       attributes = attributes.merge(nattributes.$2);
       if (nattributes.$2.decoration != null) {
         decoration.add(nattributes.$2.decoration!);
@@ -402,7 +428,7 @@ class WidgetsHTMLDecoder {
 
     ///iterate over <tr>children
     for (final data in element.children) {
-      if (data.children.isEmpty) {
+      if (data.nodes.isEmpty) {
         ///if single <th> or<td> tag found
         final node = paragraphNode(text: data.text);
 
@@ -423,18 +449,15 @@ class WidgetsHTMLDecoder {
 
   ///parse the nodes and handle theem accordingly
   Future<Iterable<Widget>> _parseTableSpecialNodes(
-      dom.Element element, TextStyle baseTextStyle) async {
+      dom.Element node, TextStyle baseTextStyle) async {
     final List<Widget> nodes = [];
 
     ///iterate over multiple childrens
-    if (element.children.isNotEmpty) {
-      for (final childrens in element.children) {
-        ///parse them according to their widget
-        nodes.addAll(
-            await _parseTableDataElementsData(childrens, baseTextStyle));
-      }
+    if (node.nodes.isNotEmpty) {
+      ///parse them according to their widget
+      nodes.addAll(await _parseElement(node.nodes, baseTextStyle));
     } else {
-      nodes.addAll(await _parseTableDataElementsData(element, baseTextStyle));
+      nodes.addAll(await _parseTableDataElementsData(node, baseTextStyle));
     }
     return nodes;
   }
@@ -452,6 +475,7 @@ class WidgetsHTMLDecoder {
 
     /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
     if (localName == HTMLTags.br) {
+      result.add(Text('\n'));
     } else if (HTMLTags.formattingElements.contains(localName)) {
       final attributes =
           await _parserFormattingElementAttributes(element, baseTextStyle);
@@ -519,9 +543,9 @@ class WidgetsHTMLDecoder {
             text: TextSpan(
                 children: delta,
                 style: baseTextStyle
-                    .merge(TextStyle(
+                    .copyWith(
                         fontSize: level.getHeadingSize,
-                        fontWeight: FontWeight.bold))
+                        fontWeight: FontWeight.bold)
                     .merge(level.getHeadingStyle(customStyles)))));
   }
 
@@ -669,6 +693,19 @@ class WidgetsHTMLDecoder {
             HTMLTags.formattingElements.contains(child.localName) == false) {
           childNodes.addAll(await _parseElement(child.nodes, baseTextStyle));
         } else {
+          if (child.localName == HTMLTags.pre) {
+            final childrens =
+                await _parseElement(child.nodes, baseTextStyle, preTag: true);
+            delta.add(TextSpan(children: [
+              WidgetSpan(
+                  child: Container(
+                      width: double.infinity,
+                      decoration: customStyles.codeDecoration ??
+                          BoxDecoration(color: customStyles.codeblockColor),
+                      child: Column(children: childrens)))
+            ]));
+          } else
+
           /// Handle special elements (e.g., headings, lists) within a paragraph
           if (HTMLTags.specialElements.contains(child.localName)) {
             childNodes.addAll(
@@ -678,6 +715,12 @@ class WidgetsHTMLDecoder {
                 type: BuiltInAttributeKey.bulletedList,
               ),
             );
+          } else if (child.localName == HTMLTags.horizontalDivider) {
+            childNodes.add(Divider(
+                color: customStyles.dividerColor,
+                thickness: customStyles.dividerthickness,
+                height: customStyles.dividerHight,
+                borderStyle: customStyles.dividerBorderStyle));
           } else {
             if (child.localName == HTMLTags.br) {
               delta.add(const TextSpan(

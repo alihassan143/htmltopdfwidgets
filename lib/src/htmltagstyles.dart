@@ -36,24 +36,58 @@ class HtmlTagStyle {
   //quote bar style that will merge with default style
   final PdfColor? quoteBarColor;
   //bullet list style style that will merge with default style
+  /// The color of the bullet list icon in a PDF document.
   final PdfColor? bulletListIconColor;
-  const HtmlTagStyle({
-    this.boldStyle,
-    this.italicStyle,
-    this.h1Style,
-    this.h2Style,
-    this.h3Style,
-    this.imageAlignment = Alignment.center,
-    this.h4Style,
-    this.h5Style,
-    this.h6Style,
-    this.strikeThrough,
-    this.paragraphStyle,
-    this.codeStyle,
-    this.headingStyle,
-    this.listIndexStyle,
-    this.linkStyle,
-    this.quoteBarColor,
-    this.bulletListIconColor,
-  });
+
+  /// The color of the divider in a PDF document.
+  final PdfColor dividerColor;
+
+  /// The border style of the divider in a PDF document.
+  final BorderStyle? dividerBorderStyle;
+
+  /// The thickness of the divider in a PDF document.
+  /// The thickness of the divider line.
+  ///
+  /// This value determines how thick the divider line will be.
+  final double dividerthickness;
+
+  /// The background color of the code block.
+  ///
+  /// This color is used as the background for code blocks in the PDF.
+  final PdfColor codeBlockBackgroundColor;
+
+  /// The color of the code block text.
+  ///
+  /// This color is used for the text within code blocks in the PDF.
+  final PdfColor codeblockColor;
+  // The decoration style that will merge with default style
+  final BoxDecoration? codeDecoration;
+
+  /// The height of the divider in a PDF document.
+  final double dividerHight;
+  const HtmlTagStyle(
+      {this.boldStyle,
+      this.italicStyle,
+      this.h1Style,
+      this.h2Style,
+      this.h3Style,
+      this.imageAlignment = Alignment.center,
+      this.h4Style,
+      this.h5Style,
+      this.h6Style,
+      this.strikeThrough,
+      this.paragraphStyle,
+      this.codeStyle,
+      this.headingStyle,
+      this.listIndexStyle,
+      this.linkStyle,
+      this.quoteBarColor,
+      this.bulletListIconColor,
+      this.dividerBorderStyle,
+      this.dividerHight = 0.5,
+      this.codeBlockBackgroundColor = PdfColors.red,
+      this.codeblockColor = PdfColors.grey,
+      this.codeDecoration,
+      this.dividerthickness = 1.0,
+      this.dividerColor = PdfColors.grey});
 }
