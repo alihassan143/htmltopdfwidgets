@@ -661,7 +661,7 @@ class WidgetsHTMLDecoder {
               alignment: customStyles.imageAlignment);
         }
         final localImage = File(src);
-        if (localImage.existsSync()) {
+        if (await localImage.exists()) {
           return Image(MemoryImage(await localImage.readAsBytes()));
         }
       }
