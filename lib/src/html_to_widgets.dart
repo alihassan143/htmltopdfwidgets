@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:html/dom.dart' as dom;
@@ -654,10 +655,15 @@ class WidgetsHTMLDecoder {
           }
           return Text("");
         }
-
-        final netImage = await _saveImage(src);
-        return Image(MemoryImage(netImage),
-            alignment: customStyles.imageAlignment);
+        if (src.startsWith("http") || src.startsWith("https")) {
+          final netImage = await _saveImage(src);
+          return Image(MemoryImage(netImage),
+              alignment: customStyles.imageAlignment);
+        }
+        final localImage = File(src);
+        if (await localImage.exists()) {
+          return Image(MemoryImage(await localImage.readAsBytes()));
+        }
       }
       return Text("");
     } catch (e) {
