@@ -1,3 +1,6 @@
+## 1.1.0
+*([#46](https://github.com/alihassan143/htmltopdfwidgets/pull/46)) Add support for local image files
+
 ## 1.0.9
 * added support for horizontal divider
 * code block and pre tag support
