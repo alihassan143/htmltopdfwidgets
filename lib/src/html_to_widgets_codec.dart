@@ -44,6 +44,16 @@ class HTMLToPdf extends HtmlCodec {
       String defaultFontFamily = "Roboto",
       double defaultFontSize = 12.0,
       bool wrapInParagraph = false,
+      Iterable<BlockSyntax> blockSyntaxes = const [],
+      Iterable<InlineSyntax> inlineSyntaxes = const [],
+      ExtensionSet? extensionSet,
+      Resolver? linkResolver,
+      Resolver? imageLinkResolver,
+      bool inlineOnly = false,
+      bool encodeHtml = true,
+      bool enableTagfilter = false,
+      bool withDefaultBlockSyntaxes = true,
+      bool withDefaultInlineSyntaxes = true,
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle()}) async {
     // TODO: implement convertMarkdown
@@ -56,7 +66,20 @@ class HTMLToPdf extends HtmlCodec {
         defaultFontSize: defaultFontSize,
         //custom html tags style
         customStyles: tagStyle);
-    final html = markdownToHtml(markDown);
+    final html = markdownToHtml(
+      markDown,
+      extensionSet: extensionSet ?? ExtensionSet.gitHubFlavored,
+      linkResolver: linkResolver,
+      imageLinkResolver: imageLinkResolver,
+      inlineOnly: inlineOnly,
+      encodeHtml: encodeHtml,
+      enableTagfilter: enableTagfilter,
+      withDefaultBlockSyntaxes: withDefaultBlockSyntaxes,
+      withDefaultInlineSyntaxes: withDefaultInlineSyntaxes,
+      blockSyntaxes: blockSyntaxes,
+      inlineSyntaxes: inlineSyntaxes,
+    );
+
     //convert function that convert string to dom nodes that that dom nodes will be converted
     return await widgetDecoder.convert(html);
   }
@@ -77,7 +100,21 @@ abstract class HtmlCodec {
       HtmlTagStyle tagStyle = const HtmlTagStyle()});
   Future<List<Widget>> convertMarkdown(String markDown,
       {List<Font> fontFallback = const [],
-      bool wrapInParagraph = false,
+      //font resolver (font name, bold, italic) => font
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
+      String defaultFontFamily = "Roboto",
+      double defaultFontSize = 12.0,
+      bool wrapInParagraph = false,
+      Iterable<BlockSyntax> blockSyntaxes = const [],
+      Iterable<InlineSyntax> inlineSyntaxes = const [],
+      ExtensionSet? extensionSet,
+      Resolver? linkResolver,
+      Resolver? imageLinkResolver,
+      bool inlineOnly = false,
+      bool encodeHtml = true,
+      bool enableTagfilter = false,
+      bool withDefaultBlockSyntaxes = true,
+      bool withDefaultInlineSyntaxes = true,
+      //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle()});
 }
