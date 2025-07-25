@@ -1,3 +1,5 @@
+## 1.1.1
+* Fix markdown table issue and added more markdown properties modifiers
 ## 1.1.0
 *([#46](https://github.com/alihassan143/htmltopdfwidgets/pull/46)) Add support for local image files
 
