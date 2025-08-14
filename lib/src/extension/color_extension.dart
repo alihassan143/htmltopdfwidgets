@@ -1,96 +1,75 @@
 import 'package:pdf/pdf.dart';
 
-// Define an extension for PdfColor to add additional functionality.
 extension ColorExtension on PdfColor {
-  /// Try to parse the `rgba(red, green, blue, alpha)` from the string.
+  /// Parse either HEX (#RRGGBB or #RGB) or RGBA (rgba(r,g,b,a)) into PdfColor.
+  static PdfColor? parse(String colorString) {
+    colorString = colorString.trim();
+
+    if (isHex(colorString)) {
+      return hexToPdfColor(colorString);
+    } else if (isRgba(colorString)) {
+      return tryFromRgbaString(colorString);
+    }
+    return null; // Not a recognized format
+  }
+
+  /// Parse rgba(r,g,b,a) to PdfColor
   static PdfColor? tryFromRgbaString(String colorString) {
-    final reg = RegExp(r'rgba\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)');
+    final reg =
+        RegExp(r'rgba\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d*\.?\d+)\s*\)');
     final match = reg.firstMatch(colorString);
+    if (match == null) return null;
 
-    if (match == null) {
-      return null; // Return null if the provided string does not match the expected format.
-    }
+    final red = int.tryParse(match.group(1) ?? '');
+    final green = int.tryParse(match.group(2) ?? '');
+    final blue = int.tryParse(match.group(3) ?? '');
+    final alpha = double.tryParse(match.group(4) ?? '');
 
-    if (match.groupCount < 4) {
-      return null; // Return null if there are not enough color components.
-    }
-
-    final redStr = match.group(1);
-    final greenStr = match.group(2);
-    final blueStr = match.group(3);
-    final alphaStr = match.group(4);
-
-    // Attempt to parse color components as integers.
-    final red = redStr != null ? int.tryParse(redStr) : null;
-    final green = greenStr != null ? int.tryParse(greenStr) : null;
-    final blue = blueStr != null ? int.tryParse(blueStr) : null;
-    final alpha = alphaStr != null ? int.tryParse(alphaStr) : null;
-
-    // If any component parsing fails, return null.
     if (red == null || green == null || blue == null || alpha == null) {
       return null;
     }
 
-    // Create a PdfColor from the parsed RGBA values.
-    return PdfColor.fromInt(
-        hexOfRGBA(red, green, blue, opacity: alpha.toDouble()));
+    return PdfColor.fromInt(hexOfRGBA(red, green, blue, opacity: alpha));
   }
 
-  // Convert PdfColor to an RGBA string format.
-  String toRgbaString() {
-    return 'rgba($red, $green, $blue, $alpha)';
-  }
-
+  /// Convert HEX (#RRGGBB or #RGB) to PdfColor
   static PdfColor hexToPdfColor(String hexColor) {
-    // Remove the leading '#' if it exists
     hexColor = hexColor.replaceAll('#', '');
-
-    // Ensure the hex string is in the correct format (6 characters long)
     if (hexColor.length == 3) {
-      hexColor = hexColor.split('').map((char) => '$char$char').join();
+      hexColor = hexColor.split('').map((c) => '$c$c').join();
     }
-
     if (hexColor.length != 6) {
       throw ArgumentError('Invalid hex color format');
     }
 
-    // Convert hex string to integer values for RGB
-    final int red = int.parse(hexColor.substring(0, 2), radix: 16);
-    final int green = int.parse(hexColor.substring(2, 4), radix: 16);
-    final int blue = int.parse(hexColor.substring(4, 6), radix: 16);
+    final red = int.parse(hexColor.substring(0, 2), radix: 16);
+    final green = int.parse(hexColor.substring(2, 4), radix: 16);
+    final blue = int.parse(hexColor.substring(4, 6), radix: 16);
 
-    // Return a PdfColor object using the RGB values (normalized to 0-1)
     return PdfColor.fromInt((red << 16) | (green << 8) | blue);
   }
 }
 
-// Function to calculate the hex representation of an RGBA color.
+/// Convert RGBA values to a single int for PdfColor
 int hexOfRGBA(int r, int g, int b, {double opacity = 1}) {
-  // Ensure that color values and opacity are within valid ranges.
-  r = (r < 0) ? -r : r;
-  g = (g < 0) ? -g : g;
-  b = (b < 0) ? -b : b;
-  opacity = (opacity < 0) ? -opacity : opacity;
-  opacity = (opacity > 1) ? 255 : opacity * 255;
-  r = (r > 255) ? 255 : r;
-  g = (g > 255) ? 255 : g;
-  b = (b > 255) ? 255 : b;
-  int a = opacity.toInt();
+  r = r.clamp(0, 255);
+  g = g.clamp(0, 255);
+  b = b.clamp(0, 255);
+  final a = (opacity.clamp(0, 1) * 255).toInt();
 
-  // Calculate and return the hex representation of the color.
-  return int.parse(
-      '0x${a.toRadixString(16)}${r.toRadixString(16)}${g.toRadixString(16)}${b.toRadixString(16)}');
+  return (a << 24) | (r << 16) | (g << 8) | b;
 }
 
+/// Check if a string is rgba format
 bool isRgba(String color) {
-  // Regular expression to check if the color is in 'rgba' format
-  final rgbaRegex = RegExp(r"^rgba?\((\s*\d+\s*,){2,3}\s*\d+(\.\d+)?\s*\)$",
+  final rgbaRegex = RegExp(
+      r"^rgba?\((\s*\d+\s*,){2}\s*\d+\s*,\s*\d*\.?\d+\s*\)$",
       caseSensitive: false);
   return rgbaRegex.hasMatch(color);
 }
 
+/// Check if a string is hex format (#RRGGBB or #RGB)
 bool isHex(String color) {
-  // Regular expression to check if the color is in hex format (#RRGGBB or #RGB)
   final hexRegex =
       RegExp(r"^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$", caseSensitive: false);
   return hexRegex.hasMatch(color);
