@@ -1,5 +1,5 @@
-## 1.1.2
-* *([#52](https://github.com/alihassan143/htmltopdfwidgets/pull/52)) fix css color parsingproperties modifiers
+## 1.1.3
+* *([#52](https://github.com/alihassan143/htmltopdfwidgets/pull/52)) fix css color parsing
 ## 1.1.1
 * Fix markdown table issue and added more markdown properties modifiers
 ## 1.1.0
