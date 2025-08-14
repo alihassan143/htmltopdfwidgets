@@ -1,20 +1,18 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' show parse;
 import 'package:htmltopdfwidgets/src/attributes.dart';
 import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
 import 'package:htmltopdfwidgets/src/utils/app_assets.dart';
-import 'package:http/http.dart';
 
 import '../htmltopdfwidgets.dart';
 import 'extension/color_extension.dart';
 import 'html_tags.dart';
 import 'pdfwidgets/bullet_list.dart';
+import 'pdfwidgets/image_element_io.dart'
+    if (dart.library.html) 'pdfwidgets/image_element_web.dart';
 import 'pdfwidgets/number_list.dart';
 import 'pdfwidgets/quote_widget.dart';
 
@@ -274,7 +272,7 @@ class WidgetsHTMLDecoder {
 
       /// Handle the image tag
       case HTMLTags.image:
-        return [await _parseImageElement(element)];
+        return [await parseImageElement(element, customStyles: customStyles)];
 
       /// Handle the line break tag
 
@@ -297,6 +295,7 @@ class WidgetsHTMLDecoder {
     String? link;
     TextStyle attributes = baseTextStyle;
     final List<TextDecoration> decoration = [];
+
     switch (localName) {
       /// Handle <bold> element
       case HTMLTags.bold || HTMLTags.strong:
@@ -638,53 +637,6 @@ class WidgetsHTMLDecoder {
     return delta;
   }
 
-  /// Function to parse an image element and download image as bytes  and return an Image widget
-  Future<Widget> _parseImageElement(dom.Element element) async {
-    final src = element.attributes["src"];
-    try {
-      if (src != null) {
-        if (src.startsWith("data:image/")) {
-          // To handle a case if someone added a space after base64 string
-          final List<String> components = src.split(",");
-
-          if (components.length > 1) {
-            var base64Encoded = components.last;
-            Uint8List listData = base64Decode(base64Encoded);
-            return Image(MemoryImage(listData),
-                alignment: customStyles.imageAlignment);
-          }
-          return Text("");
-        }
-        if (src.startsWith("http") || src.startsWith("https")) {
-          final netImage = await _saveImage(src);
-          return Image(MemoryImage(netImage),
-              alignment: customStyles.imageAlignment);
-        }
-        final localImage = File(src);
-        if (await localImage.exists()) {
-          return Image(MemoryImage(await localImage.readAsBytes()));
-        }
-      }
-      return Text("");
-    } catch (e) {
-      return Text("");
-    }
-  }
-
-  /// Function to download and save an image from a URL
-  Future<Uint8List> _saveImage(String url) async {
-    try {
-      /// Download image
-      final Response response = await get(Uri.parse(url));
-
-      /// Get temporary directory
-
-      return response.bodyBytes;
-    } catch (e) {
-      throw Exception(e);
-    }
-  }
-
   /// Function to parse a complex HTML element and return a widget
   Future<Widget> _parseDeltaElement(
       dom.Element element, TextStyle baseTextStyle) async {
@@ -842,17 +794,15 @@ class WidgetsHTMLDecoder {
     final backgroundColorStr = cssMap["background-color"];
     final backgroundColor = backgroundColorStr == null
         ? null
-        : isHex(backgroundColorStr)
-            ? ColorExtension.hexToPdfColor(backgroundColorStr)
-            : ColorExtension.tryFromRgbaString(backgroundColorStr);
+        : ColorExtension.parse(backgroundColorStr);
     if (backgroundColor != null) {
-      style = style.copyWith(color: backgroundColor);
+      style = style.copyWith(background: BoxDecoration(color: backgroundColor));
     }
 
     ///apply background color on text
     final colorstr = cssMap["color"];
-    final color =
-        colorstr == null ? null : ColorExtension.tryFromRgbaString(colorstr);
+
+    final color = colorstr == null ? null : ColorExtension.parse(colorstr);
     if (color != null) {
       style = style.copyWith(color: color);
     }
