@@ -20,6 +20,7 @@ class HTMLToPdf extends HtmlCodec {
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       String defaultFontFamily = "Roboto",
       double defaultFontSize = 12.0,
+      double defaultFontHeight = 1.2,
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle()}) async {
     //decode that handle all html tags logic
@@ -30,6 +31,7 @@ class HTMLToPdf extends HtmlCodec {
         defaultFontFamily: defaultFontFamily,
         wrapInParagraph: wrapInParagraph,
         defaultFontSize: defaultFontSize,
+        defaultFontHeight: defaultFontHeight,
         //custom html tags style
         customStyles: tagStyle);
     //convert function that convert string to dom nodes that that dom nodes will be converted
@@ -43,6 +45,7 @@ class HTMLToPdf extends HtmlCodec {
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       String defaultFontFamily = "Roboto",
       double defaultFontSize = 12.0,
+      double defaultFontHeight = 1.2,
       bool wrapInParagraph = false,
       Iterable<BlockSyntax> blockSyntaxes = const [],
       Iterable<InlineSyntax> inlineSyntaxes = const [],
@@ -64,6 +67,7 @@ class HTMLToPdf extends HtmlCodec {
         wrapInParagraph: wrapInParagraph,
         defaultFontFamily: defaultFontFamily,
         defaultFontSize: defaultFontSize,
+        defaultFontHeight: defaultFontHeight,
         //custom html tags style
         customStyles: tagStyle);
     final html = markdownToHtml(
