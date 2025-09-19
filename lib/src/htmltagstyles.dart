@@ -39,6 +39,9 @@ class HtmlTagStyle {
   /// The color of the bullet list icon in a PDF document.
   final PdfColor? bulletListIconColor;
 
+  /// This provides consistent spacing and alignment for bullet points
+  final double? bulletIconContainerDimension;
+
   /// The color of the divider in a PDF document.
   final PdfColor dividerColor;
 
@@ -83,6 +86,7 @@ class HtmlTagStyle {
       this.linkStyle,
       this.quoteBarColor,
       this.bulletListIconColor,
+      this.bulletIconContainerDimension = 22,
       this.dividerBorderStyle,
       this.dividerHight = 0.5,
       this.codeBlockBackgroundColor = PdfColors.red,
