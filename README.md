@@ -17,6 +17,11 @@ I've been maintaining quite many repos these days and burning out slowly. If you
 - Seamless integration with your Flutter project
 - Lightweight and easy to use
 
+### New in this PR
+- Apply `HtmlTagStyle` to headings h1–h6 with fallback to `headingStyle`.
+- Support inline CSS `font-size` (px/pt/number) and `color` for inline elements.
+- Support `margin-bottom`/`padding-bottom` for headings and paragraphs.
+
 ## Installation
 
 Add the following dependency to your `pubspec.yaml` file:
@@ -62,6 +67,21 @@ final htmlContent = '''
       }));
   await file.writeAsBytes(await newpdf.save());
 ```
+
+### Styling with HtmlTagStyle
+```dart
+final widgets = await HTMLToPdf().convert(
+  '<h1>Title</h1><p style="margin-bottom:12px"><span style="font-size:18px;color:#3366ff">Hello</span> world</p>',
+  tagStyle: const HtmlTagStyle(
+    headingStyle: TextStyle(color: PdfColors.orange), // fallback for all h1–h6
+    h1Style: TextStyle(color: PdfColors.red, fontSize: 40),
+    paragraphStyle: TextStyle(color: PdfColors.black),
+  ),
+);
+```
+Notes:
+- Inline `font-size`/`color` are applied to the specific span.
+- Headings support `padding-bottom`/`margin-bottom` via a bottom `Padding` wrapper. Paragraphs similarly support bottom spacing.
 3. Converting Markdown to PDF:
 
 ```dart

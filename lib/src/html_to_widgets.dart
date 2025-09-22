@@ -116,7 +116,7 @@ class WidgetsHTMLDecoder {
           /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
           final attributes = await _parserFormattingElementAttributes(
               domNode, baseTextStyle,
-              preTag: preTag);
+              preTag: preTag, inheritBase: true);
 
           textAlign = attributes.$1;
 
@@ -292,11 +292,11 @@ class WidgetsHTMLDecoder {
   //// Parses the attributes of a formatting element and returns a TextStyle.
   Future<(TextAlign?, TextStyle, String?)> _parserFormattingElementAttributes(
       dom.Element element, TextStyle baseTextStyle,
-      {bool preTag = false}) async {
+      {bool preTag = false, bool inheritBase = true}) async {
     final localName = element.localName;
     TextAlign? textAlign;
     String? link;
-    TextStyle attributes = baseTextStyle;
+    TextStyle attributes = inheritBase ? baseTextStyle : const TextStyle();
     final List<TextDecoration> decoration = [];
 
     switch (localName) {
@@ -370,7 +370,7 @@ class WidgetsHTMLDecoder {
     for (final child in element.children) {
       final nattributes = await _parserFormattingElementAttributes(
           child, baseTextStyle,
-          preTag: preTag);
+          preTag: preTag, inheritBase: inheritBase);
       attributes = attributes.merge(nattributes.$2);
       if (nattributes.$2.decoration != null) {
         decoration.add(nattributes.$2.decoration!);
@@ -524,8 +524,9 @@ class WidgetsHTMLDecoder {
     final children = element.nodes.toList();
     for (final child in children) {
       if (child is dom.Element) {
-        final attributes =
-            await _parserFormattingElementAttributes(child, baseTextStyle);
+        final attributes = await _parserFormattingElementAttributes(
+            child, baseTextStyle,
+            inheritBase: false);
         textAlign = attributes.$1;
 
         delta.add(TextSpan(
@@ -534,22 +535,28 @@ class WidgetsHTMLDecoder {
             annotation:
                 attributes.$3 == null ? null : AnnotationUrl(attributes.$3!)));
       } else {
-        delta.add(TextSpan(text: child.text, style: baseTextStyle));
+        delta.add(TextSpan(text: child.text));
       }
     }
+
+    // Parse possible block-level spacing (margin-bottom/padding-bottom)
+    final cssMap = _cssStringToMap(element.attributes['style']);
+    final bottomPadding = _parseBottomSpacing(cssMap);
 
     /// Return a RichText widget with the parsed text and styles
     return SizedBox(
         width: double.infinity,
-        child: RichText(
-            textAlign: textAlign,
-            text: TextSpan(
-                children: delta,
-                style: baseTextStyle
-                    .copyWith(
-                        fontSize: level.getHeadingSize,
-                        fontWeight: FontWeight.bold)
-                    .merge(level.getHeadingStyle(customStyles)))));
+        child: Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding ?? 0),
+            child: RichText(
+                textAlign: textAlign,
+                text: TextSpan(
+                    children: delta,
+                    style: baseTextStyle
+                        .copyWith(
+                            fontSize: level.getHeadingSize,
+                            fontWeight: FontWeight.bold)
+                        .merge(level.getHeadingStyle(customStyles))))));
   }
 
   /// Function to parse a block quote element and return a list of widgets
@@ -637,6 +644,12 @@ class WidgetsHTMLDecoder {
   Future<Widget> _parseParagraphElement(
       dom.Element element, TextStyle baseTextStyle) async {
     final delta = await _parseDeltaElement(element, baseTextStyle);
+    // Apply block-level bottom spacing if provided
+    final cssMap = _cssStringToMap(element.attributes['style']);
+    final bottomPadding = _parseBottomSpacing(cssMap);
+    if (bottomPadding != null && bottomPadding > 0) {
+      return Padding(padding: EdgeInsets.only(bottom: bottomPadding), child: delta);
+    }
     return delta;
   }
 
@@ -690,7 +703,8 @@ class WidgetsHTMLDecoder {
             } else {
               /// Parse text and attributes within the paragraph
               final attributes = await _parserFormattingElementAttributes(
-                  child, baseTextStyle);
+                  child, baseTextStyle,
+                  inheritBase: true);
               textAlign = attributes.$1;
 
               delta.add(TextSpan(
@@ -740,6 +754,25 @@ class WidgetsHTMLDecoder {
       result[tuples[0].trim()] = tuples[1].trim();
     }
     return result;
+  }
+
+  /// Parse bottom spacing from CSS map. Prefers padding-bottom, then margin-bottom.
+  static double? _parseBottomSpacing(Map<String, String> cssMap) {
+    double? parseLength(String? value) {
+      if (value == null) return null;
+      final s = value.trim().toLowerCase();
+      if (s.endsWith('px')) {
+        return double.tryParse(s.replaceAll('px', '').trim());
+      }
+      if (s.endsWith('pt')) {
+        return double.tryParse(s.replaceAll('pt', '').trim());
+      }
+      return double.tryParse(s);
+    }
+
+    final padding = parseLength(cssMap['padding-bottom']);
+    final margin = parseLength(cssMap['margin-bottom']);
+    return padding ?? margin;
   }
 
   /// Function to extract text styles from HTML attributes
@@ -808,6 +841,23 @@ class WidgetsHTMLDecoder {
     final color = colorstr == null ? null : ColorExtension.parse(colorstr);
     if (color != null) {
       style = style.copyWith(color: color);
+    }
+
+    /// apply font-size
+    final fontSizeStr = cssMap["font-size"];
+    if (fontSizeStr != null) {
+      double? parsedSize;
+      final s = fontSizeStr.trim().toLowerCase();
+      if (s.endsWith('px')) {
+        parsedSize = double.tryParse(s.replaceAll('px', '').trim());
+      } else if (s.endsWith('pt')) {
+        parsedSize = double.tryParse(s.replaceAll('pt', '').trim());
+      } else {
+        parsedSize = double.tryParse(s);
+      }
+      if (parsedSize != null) {
+        style = style.copyWith(fontSize: parsedSize);
+      }
     }
 
     ///apply italic tag

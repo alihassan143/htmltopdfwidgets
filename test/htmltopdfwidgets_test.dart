@@ -17,6 +17,7 @@
 import 'dart:io';
 
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
+import 'package:htmltopdfwidgets/src/extension/color_extension.dart';
 import 'package:test/test.dart';
 
 late Document pdf;
@@ -63,6 +64,240 @@ void main() {
         build: (context) {
           return widgets;
         }));
+  });
+
+  test('heading_custom_style_applied', () async {
+    const html = '<h1>Hello</h1><h2>World</h2>';
+    final tagStyle = HtmlTagStyle(
+      h1Style: const TextStyle(color: PdfColors.red),
+      h2Style: const TextStyle(color: PdfColors.green),
+    );
+    final widgets = await HTMLToPdf().convert(html, tagStyle: tagStyle);
+    expect(widgets.whereType<SizedBox>().length, greaterThanOrEqualTo(2));
+  });
+
+  test('heading_default_style_fallback', () async {
+    const html = '<h3>Text</h3>';
+    final widgets = await HTMLToPdf().convert(html);
+    expect(widgets.isNotEmpty, true);
+  });
+
+  test('h1 color from HtmlTagStyle is applied to root TextSpan', () async {
+    const html = '<h1>Title</h1>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h1Style: TextStyle(color: PdfColors.red)),
+    );
+    final sizedBox = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sizedBox.child as Padding;
+    final rich = padded.child as RichText;
+    final span = rich.text as TextSpan;
+    expect(span.style?.color, equals(PdfColors.red));
+  });
+
+  test('h1 default font-size is applied (32)', () async {
+    const html = '<h1>Size</h1>';
+    final widgets = await HTMLToPdf().convert(html);
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(32));
+  });
+
+  test('h1 font-size from HtmlTagStyle overrides default', () async {
+    const html = '<h1>Size</h1>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h1Style: TextStyle(fontSize: 40)),
+    );
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(40));
+  });
+
+  test('h2 default font-size is applied (28)', () async {
+    const html = '<h2>Size</h2>';
+    final widgets = await HTMLToPdf().convert(html);
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(28));
+  });
+
+  test('h2 font-size from HtmlTagStyle overrides default', () async {
+    const html = '<h2>Size</h2>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h2Style: TextStyle(fontSize: 36)),
+    );
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(36));
+  });
+
+  test('h3 default font-size is applied (20)', () async {
+    const html = '<h3>Size</h3>';
+    final widgets = await HTMLToPdf().convert(html);
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(20));
+  });
+
+  test('h3 font-size from HtmlTagStyle overrides default', () async {
+    const html = '<h3>Size</h3>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h3Style: TextStyle(fontSize: 30)),
+    );
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(30));
+  });
+
+  test('h4 default font-size is applied (17)', () async {
+    const html = '<h4>Size</h4>';
+    final widgets = await HTMLToPdf().convert(html);
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(17));
+  });
+
+  test('h4 font-size from HtmlTagStyle overrides default', () async {
+    const html = '<h4>Size</h4>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h4Style: TextStyle(fontSize: 26)),
+    );
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(26));
+  });
+
+  test('h5 default font-size is applied (14)', () async {
+    const html = '<h5>Size</h5>';
+    final widgets = await HTMLToPdf().convert(html);
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(14));
+  });
+
+  test('h5 font-size from HtmlTagStyle overrides default', () async {
+    const html = '<h5>Size</h5>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h5Style: TextStyle(fontSize: 22)),
+    );
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(22));
+  });
+
+  test('h6 default font-size is applied (10)', () async {
+    const html = '<h6>Size</h6>';
+    final widgets = await HTMLToPdf().convert(html);
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(10));
+  });
+
+  test('h6 font-size from HtmlTagStyle overrides default', () async {
+    const html = '<h6>Size</h6>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h6Style: TextStyle(fontSize: 18)),
+    );
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    final span = (padded.child as RichText).text as TextSpan;
+    expect(span.style?.fontSize, equals(18));
+  });
+
+  test('inline span color overrides heading color for that span', () async {
+    const html = '<h1><span style="color:#00FF00">X</span>Y</h1>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(h1Style: TextStyle(color: PdfColors.red)),
+    );
+    final sizedBox = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sizedBox.child as Padding;
+    final rich = padded.child as RichText;
+    final span = rich.text as TextSpan;
+    // Root heading color remains red
+    expect(span.style?.color, equals(PdfColors.red));
+    // First child created from <span> should carry green color
+    final children = span.children!;
+    final firstChild = children.first as TextSpan;
+    expect(firstChild.style?.color,
+        equals(ColorExtension.hexToPdfColor('#00FF00')));
+  });
+
+  test('inline span font-size is applied from CSS', () async {
+    const html = '<p><span style="font-size:18px">Big</span> Small</p>';
+    final widgets = await HTMLToPdf().convert(html);
+    final wrap = widgets.firstWhere((w) => w is Wrap) as Wrap;
+    final sized = wrap.children.first as SizedBox;
+    final rich = sized.child as RichText;
+    final root = rich.text as TextSpan;
+    final first = root.children!.first as TextSpan;
+    expect(first.style?.fontSize, equals(18));
+  });
+
+  test('paragraph margin-bottom applies as padding below paragraph', () async {
+    const html = '<p style="margin-bottom:12px">Hello</p>';
+    final widgets = await HTMLToPdf().convert(html);
+    // Paragraph with margin-bottom returns top-level Padding wrapping Wrap
+    final padded = widgets.firstWhere((w) => w is Padding) as Padding;
+    expect((padded.padding as EdgeInsets).bottom, equals(12));
+  });
+
+  test('h2 padding-bottom applies below heading', () async {
+    const html = '<h2 style="padding-bottom:8px">Head</h2>';
+    final widgets = await HTMLToPdf().convert(html);
+    final sized = widgets.firstWhere((w) => w is SizedBox) as SizedBox;
+    final padded = sized.child as Padding;
+    expect((padded.padding as EdgeInsets).bottom, equals(8));
+  });
+
+  test('global headingStyle is used when specific h styles are null', () async {
+    const html = '<h1>A</h1><h3>B</h3>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle:
+          const HtmlTagStyle(headingStyle: TextStyle(color: PdfColors.orange)),
+    );
+    final sized1 = widgets[0] as SizedBox;
+    final span1 =
+        ((sized1.child as Padding).child as RichText).text as TextSpan;
+    expect(span1.style?.color, equals(PdfColors.orange));
+
+    final sized2 = widgets[1] as SizedBox;
+    final span2 =
+        ((sized2.child as Padding).child as RichText).text as TextSpan;
+    expect(span2.style?.color, equals(PdfColors.orange));
+  });
+
+  test('paragraphStyle is merged for paragraph text', () async {
+    const html = '<p>Hello</p>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(
+          paragraphStyle: TextStyle(color: PdfColors.purple)),
+    );
+    final wrap = widgets.firstWhere((w) => w is Wrap) as Wrap;
+    final sized = wrap.children.first as SizedBox;
+    final span = (sized.child as RichText).text as TextSpan;
+    expect(span.children!.first is TextSpan, true);
+    final first = span.children!.first as TextSpan;
+    expect(first.style?.color, equals(PdfColors.purple));
   });
 
   const String markDown = """
