@@ -589,6 +589,16 @@ class WidgetsHTMLDecoder {
       result.add(
           buildBulletwidget(Text(element.text), customStyles: customStyles));
     }
+    // Apply bottom spacing from ul style if provided
+    final cssMap = _cssStringToMap(element.attributes['style']);
+    final bottomPadding = _parseBottomSpacing(cssMap);
+    if (bottomPadding != null && bottomPadding > 0) {
+      return [
+        Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding),
+            child: Column(children: result))
+      ];
+    }
     return result;
   }
 
@@ -606,6 +616,16 @@ class WidgetsHTMLDecoder {
     } else {
       result.add(buildNumberwdget(Text(element.text),
           baseTextStyle: baseTextStyle, customStyles: customStyles, index: 1));
+    }
+    // Apply bottom spacing from ol style if provided
+    final cssMap = _cssStringToMap(element.attributes['style']);
+    final bottomPadding = _parseBottomSpacing(cssMap);
+    if (bottomPadding != null && bottomPadding > 0) {
+      return [
+        Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding),
+            child: Column(children: result))
+      ];
     }
     return result;
   }

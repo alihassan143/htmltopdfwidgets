@@ -267,6 +267,20 @@ void main() {
     expect((padded.padding as EdgeInsets).bottom, equals(8));
   });
 
+  test('ul margin-bottom applies padding below unordered list', () async {
+    const html = '<ul style="margin-bottom:10px"><li>A</li><li>B</li></ul>';
+    final widgets = await HTMLToPdf().convert(html);
+    final padded = widgets.firstWhere((w) => w is Padding) as Padding;
+    expect((padded.padding as EdgeInsets).bottom, equals(10));
+  });
+
+  test('ol padding-bottom applies padding below ordered list', () async {
+    const html = '<ol style="padding-bottom:6px"><li>A</li><li>B</li></ol>';
+    final widgets = await HTMLToPdf().convert(html);
+    final padded = widgets.firstWhere((w) => w is Padding) as Padding;
+    expect((padded.padding as EdgeInsets).bottom, equals(6));
+  });
+
   test('global headingStyle is used when specific h styles are null', () async {
     const html = '<h1>A</h1><h3>B</h3>';
     final widgets = await HTMLToPdf().convert(

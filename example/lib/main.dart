@@ -25,10 +25,12 @@ const htmlText = '''
   <li>[x] Test-covered</li>
   <li>[ ] more to come!</li>
 </ul>
-<ol>
+<p>This is a quote!</p>
+<ol style="margin-bottom: 20px;">
   <li>First item</li>
   <li>Second item</li>
 </ol>
+<p>This is a quote!</p>
 <li>List element</li>
 <blockquote>
   <p>This is a quote!</p>
