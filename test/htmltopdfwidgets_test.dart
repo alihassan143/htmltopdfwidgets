@@ -281,6 +281,20 @@ void main() {
     expect((padded.padding as EdgeInsets).bottom, equals(6));
   });
 
+  test('unordered bullet size can be customized via HtmlTagStyle', () async {
+    const html = '<ul><li>A</li></ul>';
+    final widgets = await HTMLToPdf().convert(
+      html,
+      tagStyle: const HtmlTagStyle(bulletListIconSize: 9),
+    );
+    // Find the Container wrapping the Row for the bullet line, then check icon's style
+    final container = widgets.firstWhere((w) => w is Container) as Container;
+    final row = container.child as Row;
+    final icon = row.children.first; // _BulletedListIcon
+    final style = (icon as dynamic).style as HtmlTagStyle;
+    expect(style.bulletListIconSize, equals(9));
+  });
+
   test('global headingStyle is used when specific h styles are null', () async {
     const html = '<h1>A</h1><h3>B</h3>';
     final widgets = await HTMLToPdf().convert(

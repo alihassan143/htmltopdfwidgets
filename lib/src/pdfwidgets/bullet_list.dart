@@ -35,13 +35,15 @@ class _BulletedListIcon extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(right: 5.0),
         child: Center(
-          child: Container(
-            width: 5,
-            height: 5,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle, // Bullet icon is circular.
-              color: style.bulletListIconColor ??
-                  PdfColors.black, // Apply custom color.
+          child: SizedBox(
+            width: style.bulletListIconSize,
+            height: style.bulletListIconSize,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle, // Bullet icon is circular.
+                color: style.bulletListIconColor ??
+                    PdfColors.black, // Apply custom color.
+              ),
             ),
           ),
         ),
