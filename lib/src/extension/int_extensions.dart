@@ -28,19 +28,19 @@ extension IntConverter on int {
   ) {
     switch (this) {
       case 1:
-        return customStyles.h1Style;
+        return customStyles.h1Style ?? customStyles.headingStyle;
       case 2:
-        return customStyles.h2Style;
+        return customStyles.h2Style ?? customStyles.headingStyle;
       case 3:
-        return customStyles.h3Style;
+        return customStyles.h3Style ?? customStyles.headingStyle;
       case 4:
-        return customStyles.h4Style;
+        return customStyles.h4Style ?? customStyles.headingStyle;
       case 5:
-        return customStyles.h5Style;
+        return customStyles.h5Style ?? customStyles.headingStyle;
       case 6:
-        return customStyles.h6Style;
+        return customStyles.h6Style ?? customStyles.headingStyle;
       default:
-        return customStyles.h1Style;
+        return customStyles.h1Style ?? customStyles.headingStyle;
     }
   }
 }

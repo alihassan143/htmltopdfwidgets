@@ -6,8 +6,9 @@ void main() {
   createDocument();
 }
 
-const htmlText = '''<h1>AppFlowyEditor</h1>
-<h2>👋 <strong>Welcome to</strong> <strong><em><a href="appflowy.io">AppFlowy Editor</a></em></strong></h2>
+const htmlText = '''
+<h1 style="font-size: 20px; font-weight: bold; color: red;">AppFlowyEditor</h1>
+<h2 style="font-size: 16px; font-weight: bold; font-style: italic;">👋 <strong>Welcome to</strong> <strong><em><a href="appflowy.io">AppFlowy Editor</a></em></strong></h2>
   <p>AppFlowy Editor is a <strong>highly customizable</strong> <em>rich-text editor</em></p>
 <hr />
 <p><u>Here</u> is an example <del>your</del> you can give a try</p>
@@ -24,10 +25,12 @@ const htmlText = '''<h1>AppFlowyEditor</h1>
   <li>[x] Test-covered</li>
   <li>[ ] more to come!</li>
 </ul>
-<ol>
+<p>This is a quote!</p>
+<ol style="margin-bottom: 20px;">
   <li>First item</li>
   <li>Second item</li>
 </ol>
+<p>This is a quote!</p>
 <li>List element</li>
 <blockquote>
   <p>This is a quote!</p>
@@ -41,7 +44,7 @@ const htmlText = '''<h1>AppFlowyEditor</h1>
 <p>You can also use <strong><em>AppFlowy Editor</em></strong> as a component to build your own app.</p>
 <h3>Awesome features</h3>
 
-<p>If you have questions or feedback, please submit an issue on Github or join the community along with 1000+ builders!</p>
+<p style="font-size: 10px; ">If you have questions or feedback, please submit an issue on Github or join the community along with 1000+ builders!</p>
   <h3>Checked Boxes</h3>
  <input type="checkbox" id="option2" checked> 
   <label for="option2">Option 2</label>
