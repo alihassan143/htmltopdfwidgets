@@ -778,21 +778,23 @@ class WidgetsHTMLDecoder {
 
   /// Parse bottom spacing from CSS map. Prefers padding-bottom, then margin-bottom.
   static double? _parseBottomSpacing(Map<String, String> cssMap) {
-    double? parseLength(String? value) {
-      if (value == null) return null;
-      final s = value.trim().toLowerCase();
-      if (s.endsWith('px')) {
-        return double.tryParse(s.replaceAll('px', '').trim());
-      }
-      if (s.endsWith('pt')) {
-        return double.tryParse(s.replaceAll('pt', '').trim());
-      }
-      return double.tryParse(s);
-    }
-
-    final padding = parseLength(cssMap['padding-bottom']);
-    final margin = parseLength(cssMap['margin-bottom']);
+    final padding = _parseCssLength(cssMap['padding-bottom']);
+    final margin = _parseCssLength(cssMap['margin-bottom']);
     return padding ?? margin;
+  }
+
+  /// Parse a CSS length string (e.g., "18", "18px", "18pt") to points (double)
+  /// Currently treats px and pt as numeric values in the same unit space used by pdf widgets.
+  static double? _parseCssLength(String? value) {
+    if (value == null) return null;
+    final s = value.trim().toLowerCase();
+    if (s.endsWith('px')) {
+      return double.tryParse(s.replaceAll('px', '').trim());
+    }
+    if (s.endsWith('pt')) {
+      return double.tryParse(s.replaceAll('pt', '').trim());
+    }
+    return double.tryParse(s);
   }
 
   /// Function to extract text styles from HTML attributes
@@ -866,15 +868,7 @@ class WidgetsHTMLDecoder {
     /// apply font-size
     final fontSizeStr = cssMap["font-size"];
     if (fontSizeStr != null) {
-      double? parsedSize;
-      final s = fontSizeStr.trim().toLowerCase();
-      if (s.endsWith('px')) {
-        parsedSize = double.tryParse(s.replaceAll('px', '').trim());
-      } else if (s.endsWith('pt')) {
-        parsedSize = double.tryParse(s.replaceAll('pt', '').trim());
-      } else {
-        parsedSize = double.tryParse(s);
-      }
+      final parsedSize = _parseCssLength(fontSizeStr);
       if (parsedSize != null) {
         style = style.copyWith(fontSize: parsedSize);
       }
