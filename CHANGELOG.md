@@ -1,4 +1,4 @@
-## 2.0.0
+## 2.0.0-beta.1
 
 *   **New Architecture**: Introduced a "Browser Rendering Engine" architecture for more robust HTML to PDF conversion.
     *   **Style Engine**: Comprehensive CSS parsing and cascading support (`lib/src/browser/css_style.dart`).
