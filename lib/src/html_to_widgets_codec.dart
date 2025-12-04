@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:markdown/markdown.dart';
 
 import '../htmltopdfwidgets.dart';
-import 'html_to_widgets.dart';
+import 'browser/css_style.dart';
+import 'browser/html_parser.dart';
+import 'browser/pdf_builder.dart';
+import 'legacy/html_to_widgets.dart';
 
 // Define a class named HTMLToPdf that extends HtmlCodec. and it contains the converter that convert html string to pdf widgets
 class HTMLToPdf extends HtmlCodec {
@@ -21,7 +24,27 @@ class HTMLToPdf extends HtmlCodec {
       String defaultFontFamily = "Roboto",
       double defaultFontSize = 12.0,
       //custom html tag styles
-      HtmlTagStyle tagStyle = const HtmlTagStyle()}) async {
+      HtmlTagStyle tagStyle = const HtmlTagStyle(),
+      bool useNewEngine = false}) async {
+    
+    if (useNewEngine) {
+      final parser = HtmlParser(
+        htmlString: html,
+        tagStyle: tagStyle,
+        baseStyle: CSSStyle(
+          fontSize: defaultFontSize,
+          fontFamily: defaultFontFamily,
+          color: PdfColors.black,
+          fontWeight: FontWeight.normal,
+          fontStyle: FontStyle.normal,
+          textDecoration: TextDecoration.none,
+        ),
+      );
+      final renderTree = parser.parse();
+      final builder = PdfBuilder(root: renderTree);
+      return await builder.build();
+    }
+
     //decode that handle all html tags logic
     final widgetDecoder = WidgetsHTMLDecoder(
         //font fall back if provided
@@ -55,17 +78,9 @@ class HTMLToPdf extends HtmlCodec {
       bool withDefaultBlockSyntaxes = true,
       bool withDefaultInlineSyntaxes = true,
       //custom html tag styles
-      HtmlTagStyle tagStyle = const HtmlTagStyle()}) async {
-    // TODO: implement convertMarkdown
-    final widgetDecoder = WidgetsHTMLDecoder(
-        //font fall back if provided
-        fontFallback: [...fontFallback],
-        fontResolver: fontResolver,
-        wrapInParagraph: wrapInParagraph,
-        defaultFontFamily: defaultFontFamily,
-        defaultFontSize: defaultFontSize,
-        //custom html tags style
-        customStyles: tagStyle);
+      HtmlTagStyle tagStyle = const HtmlTagStyle(),
+      bool useNewEngine = false}) async {
+    
     final html = markdownToHtml(
       markDown,
       extensionSet: extensionSet ?? ExtensionSet.gitHubFlavored,
@@ -79,6 +94,34 @@ class HTMLToPdf extends HtmlCodec {
       blockSyntaxes: blockSyntaxes,
       inlineSyntaxes: inlineSyntaxes,
     );
+
+    if (useNewEngine) {
+      final parser = HtmlParser(
+        htmlString: html,
+        tagStyle: tagStyle,
+        baseStyle: CSSStyle(
+          fontSize: defaultFontSize,
+          fontFamily: defaultFontFamily,
+          color: PdfColors.black,
+          fontWeight: FontWeight.normal,
+          fontStyle: FontStyle.normal,
+          textDecoration: TextDecoration.none,
+        ),
+      );
+      final renderTree = parser.parse();
+      final builder = PdfBuilder(root: renderTree);
+      return await builder.build();
+    }
+
+    final widgetDecoder = WidgetsHTMLDecoder(
+        //font fall back if provided
+        fontFallback: [...fontFallback],
+        fontResolver: fontResolver,
+        wrapInParagraph: wrapInParagraph,
+        defaultFontFamily: defaultFontFamily,
+        defaultFontSize: defaultFontSize,
+        //custom html tags style
+        customStyles: tagStyle);
 
     //convert function that convert string to dom nodes that that dom nodes will be converted
     return await widgetDecoder.convert(html);
@@ -97,7 +140,8 @@ abstract class HtmlCodec {
       {List<Font> fontFallback = const [],
       bool wrapInParagraph = false,
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
-      HtmlTagStyle tagStyle = const HtmlTagStyle()});
+      HtmlTagStyle tagStyle = const HtmlTagStyle(),
+      bool useNewEngine = false});
   Future<List<Widget>> convertMarkdown(String markDown,
       {List<Font> fontFallback = const [],
       //font resolver (font name, bold, italic) => font

@@ -28,17 +28,12 @@ dependencies:
 
 ## Usage
 
-To use HTMLtoPDFWidgets in your Flutter project, follow these simple steps:
-
-1. Import the package:
+### 1. Legacy Engine (Default)
+The legacy engine is maintained for backward compatibility.
 
 ```dart
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
-```
 
-2. Convert HTML to PDF:
-
-```dart
 final htmlContent = '''
   <h1>Heading Example</h1>
   <p>This is a paragraph.</p>
@@ -61,8 +56,34 @@ final htmlContent = '''
         return widgets;
       }));
   await file.writeAsBytes(await newpdf.save());
+  await file.writeAsBytes(await newpdf.save());
 ```
-3. Converting Markdown to PDF:
+
+### 2. Browser Rendering Engine (New)
+The new engine offers better CSS support, robust layout handling, and a cleaner architecture.
+
+```dart
+import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
+
+final htmlContent = '''
+  <div style="padding: 20px; background-color: #f0f0f0;">
+    <h1 style="color: blue;">Hello Browser Engine</h1>
+    <p>Supports <b>bold</b>, <i>italic</i>, and <span style="color: red;">inline styles</span>.</p>
+  </div>
+''';
+
+// Enable the new engine with the useNewEngine flag
+final widgets = await HTMLToPdf().convert(
+  htmlContent,
+  useNewEngine: true,
+);
+
+final newpdf = Document();
+newpdf.addPage(MultiPage(build: (context) => widgets));
+await File('browser_engine_example.pdf').writeAsBytes(await newpdf.save());
+```
+
+### 3. Converting Markdown to PDF:
 
 ```dart
 final markDown = '''

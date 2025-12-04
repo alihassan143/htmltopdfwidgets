@@ -1,26 +1,10 @@
-/*
- * Copyright (C) 2017, David PHAM-VAN <dev.nfet.net@gmail.com>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import 'dart:io';
 
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
 import 'package:test/test.dart';
 
 late Document pdf;
-late Document marDownPdf;
+late Document testPdf;
 
 void main() {
   const htmlText = '''  <h1>Heading Example</h1>
@@ -49,11 +33,12 @@ void main() {
     <td>Mexico</td>
   </tr>
 </table>''';
+
   setUpAll(() {
     Document.debug = true;
     RichText.debug = true;
     pdf = Document();
-    marDownPdf = Document();
+    testPdf = Document();
   });
 
   test('convertion_test', () async {
@@ -63,6 +48,90 @@ void main() {
         build: (context) {
           return widgets;
         }));
+  });
+
+  // Test comprehensive HTML features
+  test('comprehensive_features_test', () async {
+    const comprehensiveHtml = '''
+      <h1 style="margin-bottom:20px">Heading 1 with spacing</h1>
+      <h2 style="padding-bottom:15px">Heading 2 with padding</h2>
+      <h3>Heading 3</h3>
+      <h4>Heading 4</h4>
+      <h5>Heading 5</h5>
+      <h6>Heading 6</h6>
+      
+      <p style="margin-bottom:10px">Paragraph with spacing and <span style="font-size:16px;color:#FF0000">red colored text</span>.</p>
+      <p>Another paragraph with <span style="font-size:20pt">larger font size in pt</span>.</p>
+      <p>Text with <span style="font-size:18">numeric font size</span>.</p>
+      
+      <ul style="margin-bottom:20px">
+        <li>First level item 1</li>
+        <li>First level item 2
+          <ul>
+            <li>Second level item 1</li>
+            <li>Second level item 2
+              <ul>
+                <li>Third level item</li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+        <li>First level item 3</li>
+      </ul>
+      
+      <ol style="padding-bottom:15px">
+        <li>Ordered item 1</li>
+        <li>Ordered item 2
+          <ol>
+            <li>Nested ordered 1</li>
+            <li>Nested ordered 2</li>
+          </ol>
+        </li>
+        <li>Ordered item 3</li>
+      </ol>
+      
+      <h2>Mixed Nested Lists</h2>
+      <ul>
+        <li>Bullet item
+          <ol>
+            <li>Nested numbered item 1</li>
+            <li>Nested numbered item 2</li>
+          </ol>
+        </li>
+      </ul>
+    ''';
+
+    List<Widget> widgets = await HTMLToPdf().convert(comprehensiveHtml);
+    testPdf.addPage(MultiPage(
+        maxPages: 200,
+        build: (context) {
+          return widgets;
+        }));
+  });
+
+  // Test custom heading styles with fallback
+  test('custom_heading_styles_test', () async {
+    const headingHtml = '''
+      <h1>Custom H1</h1>
+      <h2>Custom H2</h2>
+      <h3>Custom H3</h3>
+      <h4>Custom H4</h4>
+      <h5>Custom H5</h5>
+      <h6>Custom H6</h6>
+    ''';
+
+    final customTagStyle = HtmlTagStyle(
+      h1Style: TextStyle(color: PdfColors.blue),
+      h2Style: TextStyle(color: PdfColors.green),
+      headingStyle: TextStyle(color: PdfColors.red), // Fallback for h3-h6
+    );
+
+    List<Widget> widgets = await HTMLToPdf().convert(
+      headingHtml,
+      tagStyle: customTagStyle,
+    );
+
+    expect(widgets.isNotEmpty, true);
   });
 
   const String markDown = """
@@ -98,7 +167,7 @@ for the formatted Markdown view in the demo.
 
   test('markdown_convertion_test', () async {
     List<Widget> widgets = await HTMLToPdf().convertMarkdown(markDown);
-    marDownPdf.addPage(MultiPage(
+    pdf.addPage(MultiPage(
         maxPages: 200,
         build: (context) {
           return widgets;
@@ -108,7 +177,7 @@ for the formatted Markdown view in the demo.
   tearDownAll(() async {
     final file = File('example.pdf');
     await file.writeAsBytes(await pdf.save());
-    final markDownfile = File('markdown_example.pdf');
-    await markDownfile.writeAsBytes(await marDownPdf.save());
+    final testFile = File('comprehensive_test.pdf');
+    await testFile.writeAsBytes(await testPdf.save());
   });
 }

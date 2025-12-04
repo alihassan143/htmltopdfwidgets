@@ -65,29 +65,56 @@ class HtmlTagStyle {
 
   /// The height of the divider in a PDF document.
   final double dividerHight;
-  const HtmlTagStyle(
-      {this.boldStyle,
-      this.italicStyle,
-      this.h1Style,
-      this.h2Style,
-      this.h3Style,
-      this.imageAlignment = Alignment.center,
-      this.h4Style,
-      this.h5Style,
-      this.h6Style,
-      this.strikeThrough,
-      this.paragraphStyle,
-      this.codeStyle,
-      this.headingStyle,
-      this.listIndexStyle,
-      this.linkStyle,
-      this.quoteBarColor,
-      this.bulletListIconColor,
-      this.dividerBorderStyle,
-      this.dividerHight = 0.5,
-      this.codeBlockBackgroundColor = PdfColors.red,
-      this.codeblockColor = PdfColors.grey,
-      this.codeDecoration,
-      this.dividerthickness = 1.0,
-      this.dividerColor = PdfColors.grey});
+
+  /// Enable browser-standard default styles (margins, padding, etc.)
+  final bool useDefaultStyles;
+
+  /// Custom default paragraph margin (overrides browser defaults if set)
+  final EdgeInsets? paragraphMargin;
+
+  /// Custom default heading margins by level (overrides browser defaults if set)
+  final Map<int, EdgeInsets>? headingMargins;
+
+  /// Custom default list margin (overrides browser defaults if set)
+  final EdgeInsets? listMargin;
+
+  /// Custom table cell padding (overrides browser defaults if set)
+  final EdgeInsets? tableCellPadding;
+
+  /// Custom table header cell padding (overrides browser defaults if set)
+  final EdgeInsets? tableHeaderPadding;
+
+  const HtmlTagStyle({
+    this.boldStyle,
+    this.italicStyle,
+    this.h1Style,
+    this.h2Style,
+    this.h3Style,
+    this.imageAlignment = Alignment.center,
+    this.h4Style,
+    this.h5Style,
+    this.h6Style,
+    this.strikeThrough,
+    this.paragraphStyle,
+    this.codeStyle,
+    this.headingStyle,
+    this.listIndexStyle,
+    this.linkStyle,
+    this.quoteBarColor,
+    this.bulletListIconColor,
+    this.dividerBorderStyle,
+    this.dividerHight = 0.5,
+    this.codeBlockBackgroundColor = PdfColors.red,
+    this.codeblockColor = PdfColors.grey,
+    this.codeDecoration,
+    this.dividerthickness = 1.0,
+    this.dividerColor = PdfColors.grey,
+    this.useDefaultStyles = true,
+    this.paragraphMargin,
+    this.headingMargins,
+    this.listMargin,
+    this.tableCellPadding,
+    this.tableHeaderPadding,
+  });
 }
+

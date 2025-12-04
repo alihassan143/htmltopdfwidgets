@@ -22,25 +22,35 @@ extension IntConverter on int {
     }
   }
 
-//it apply custom user style from provided constructor
+//it apply custom user style from provided constructor with fallback
   TextStyle? getHeadingStyle(
     HtmlTagStyle customStyles,
   ) {
+    TextStyle? specificStyle;
     switch (this) {
       case 1:
-        return customStyles.h1Style;
+        specificStyle = customStyles.h1Style;
+        break;
       case 2:
-        return customStyles.h2Style;
+        specificStyle = customStyles.h2Style;
+        break;
       case 3:
-        return customStyles.h3Style;
+        specificStyle = customStyles.h3Style;
+        break;
       case 4:
-        return customStyles.h4Style;
+        specificStyle = customStyles.h4Style;
+        break;
       case 5:
-        return customStyles.h5Style;
+        specificStyle = customStyles.h5Style;
+        break;
       case 6:
-        return customStyles.h6Style;
+        specificStyle = customStyles.h6Style;
+        break;
       default:
-        return customStyles.h1Style;
+        specificStyle = customStyles.h1Style;
+        break;
     }
+    // Fallback to headingStyle if specific style is not provided
+    return specificStyle ?? customStyles.headingStyle;
   }
 }

@@ -4,17 +4,19 @@ import 'dart:collection';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' show parse;
 import 'package:htmltopdfwidgets/src/attributes.dart';
+import 'package:htmltopdfwidgets/src/legacy/css_styles.dart';
 import 'package:htmltopdfwidgets/src/extension/int_extensions.dart';
+import 'package:htmltopdfwidgets/src/legacy/html_default_styles.dart';
 import 'package:htmltopdfwidgets/src/utils/app_assets.dart';
 
-import '../htmltopdfwidgets.dart';
-import 'extension/color_extension.dart';
-import 'html_tags.dart';
-import 'pdfwidgets/bullet_list.dart';
-import 'pdfwidgets/image_element_io.dart'
-    if (dart.library.html) 'pdfwidgets/image_element_web.dart';
-import 'pdfwidgets/number_list.dart';
-import 'pdfwidgets/quote_widget.dart';
+import '../../htmltopdfwidgets.dart';
+import '../extension/color_extension.dart';
+import '../html_tags.dart';
+import '../pdfwidgets/bullet_list.dart';
+import '../pdfwidgets/image_element_io.dart'
+    if (dart.library.html) '../pdfwidgets/image_element_web.dart';
+import '../pdfwidgets/number_list.dart';
+import '../pdfwidgets/quote_widget.dart';
 
 ////html deocoder that deocde html and convert it into pdf widgets
 class WidgetsHTMLDecoder {
@@ -252,7 +254,7 @@ class WidgetsHTMLDecoder {
       case HTMLTags.orderedList:
         return await _parseOrderListElement(element, baseTextStyle);
       case HTMLTags.table:
-        return await _parseTable(element, baseTextStyle);
+        return [await _parseTable(element, baseTextStyle)];
 
       ///if simple list is found it will handle accoridingly
       case HTMLTags.list:
@@ -287,13 +289,14 @@ class WidgetsHTMLDecoder {
   }
 
   //// Parses the attributes of a formatting element and returns a TextStyle.
+  /// [inheritBase] determines whether to inherit base text style or start fresh
   Future<(TextAlign?, TextStyle, String?)> _parserFormattingElementAttributes(
       dom.Element element, TextStyle baseTextStyle,
-      {bool preTag = false}) async {
+      {bool preTag = false, bool inheritBase = true}) async {
     final localName = element.localName;
     TextAlign? textAlign;
     String? link;
-    TextStyle attributes = baseTextStyle;
+    TextStyle attributes = inheritBase ? baseTextStyle : const TextStyle();
     final List<TextDecoration> decoration = [];
 
     switch (localName) {
@@ -367,7 +370,7 @@ class WidgetsHTMLDecoder {
     for (final child in element.children) {
       final nattributes = await _parserFormattingElementAttributes(
           child, baseTextStyle,
-          preTag: preTag);
+          preTag: preTag, inheritBase: inheritBase);
       attributes = attributes.merge(nattributes.$2);
       if (nattributes.$2.decoration != null) {
         decoration.add(nattributes.$2.decoration!);
@@ -387,127 +390,212 @@ class WidgetsHTMLDecoder {
   }
 
   ///convert table tag into the table pdf widget
-  Future<Iterable<Widget>> _parseTable(
+  Future<Widget> _parseTable(
       dom.Element element, TextStyle baseTextStyle) async {
-    final List<TableRow> tablenodes = [];
+    final cssStyles = await _parseAllCssProperties(element.attributes);
 
-    ///iterate over html table tag body
-    for (final data in element.children) {
-      final rwdata = await _parsetableRows(data, baseTextStyle);
+    final headerRows = <TableRow>[];
+    final bodyRows = <TableRow>[];
+    final footerRows = <TableRow>[];
 
-      tablenodes.addAll(rwdata);
-    }
-
-    return [
-      Table(
-          border: TableBorder.all(color: PdfColors.black),
-          children: tablenodes),
-    ];
-  }
-
-  ///converts html table tag body to table row widgets
-  Future<List<TableRow>> _parsetableRows(
-      dom.Element element, TextStyle baseTextStyle) async {
-    final List<TableRow> nodes = [];
-
-    ///iterate over <tr> tag and convert its children to related pdf widget
-    for (final data in element.children) {
-      final tabledata = await _parsetableData(data, baseTextStyle);
-
-      nodes.add(tabledata);
-    }
-    return nodes;
-  }
-
-  ///parse html data and convert to table row
-  Future<TableRow> _parsetableData(
-    dom.Element element,
-    TextStyle baseTextStyle,
-  ) async {
-    final List<Widget> nodes = [];
-
-    ///iterate over <tr>children
-    for (final data in element.children) {
-      if (data.nodes.isEmpty) {
-        ///if single <th> or<td> tag found
-        final node = paragraphNode(text: data.text);
-
-        nodes.add(node);
-      } else {
-        ///if nested <p><br> in <tag> found
-        final newnodes = await _parseTableSpecialNodes(data, baseTextStyle);
-
-        nodes.addAll(newnodes);
+    ///iterate over html table tag sections
+    for (final child in element.children) {
+      switch (child.localName) {
+        case 'thead':
+          for (final tr in child.children) {
+            if (tr.localName == 'tr') {
+              headerRows.add(await _parseTableRow(tr, baseTextStyle, isHeader: true));
+            }
+          }
+          break;
+        case 'tbody':
+          for (final tr in child.children) {
+            if (tr.localName == 'tr') {
+              bodyRows.add(await _parseTableRow(tr, baseTextStyle));
+            }
+          }
+          break;
+        case 'tfoot':
+          for (final tr in child.children) {
+            if (tr.localName == 'tr') {
+              footerRows.add(await _parseTableRow(tr, baseTextStyle));
+            }
+          }
+          break;
+        case 'tr':
+          // Direct tr without tbody
+          bodyRows.add(await _parseTableRow(child, baseTextStyle));
+          break;
       }
     }
 
-    ///returns the tale row
-    return TableRow(
-        decoration: BoxDecoration(border: Border.all(color: PdfColors.black)),
-        children: nodes);
-  }
+    final allRows = [...headerRows, ...bodyRows, ...footerRows];
 
-  ///parse the nodes and handle theem accordingly
-  Future<Iterable<Widget>> _parseTableSpecialNodes(
-      dom.Element node, TextStyle baseTextStyle) async {
-    final List<Widget> nodes = [];
-
-    ///iterate over multiple childrens
-    if (node.nodes.isNotEmpty) {
-      ///parse them according to their widget
-      nodes.addAll(await _parseElement(node.nodes, baseTextStyle));
-    } else {
-      nodes.addAll(await _parseTableDataElementsData(node, baseTextStyle));
-    }
-    return nodes;
-  }
-
-  ///check if children contains the <p> <li> or any other tag
-
-  Future<List<Widget>> _parseTableDataElementsData(
-      dom.Element element, TextStyle baseTextStyle) async {
-    final List<Widget> delta = [];
-    final result = <Widget>[];
-
-    ///find dom node in and check if its element or not than convert it according to its specs
-
-    final localName = element.localName;
-
-    /// Check if the element is a simple formatting element like <span>, <bold>, or <italic>
-    if (localName == HTMLTags.br) {
-      result.add(Text('\n'));
-    } else if (HTMLTags.formattingElements.contains(localName)) {
-      final attributes =
-          await _parserFormattingElementAttributes(element, baseTextStyle);
-      result.add(RichText(
-          text: TextSpan(
-              text: element.text,
-              style: attributes.$2,
-              annotation: attributes.$3 == null
-                  ? null
-                  : AnnotationUrl(attributes.$3!))));
-      result.add(Text(element.text, style: attributes.$2));
-    } else if (HTMLTags.specialElements.contains(localName)) {
-      /// Handle special elements (e.g., headings, lists, images)
-      result.addAll(
-        await _parseSpecialElements(
-          element,
-          baseTextStyle,
-          type: BuiltInAttributeKey.bulletedList,
-        ),
+    // Determine border style
+    TableBorder? tableBorder;
+    
+    if (cssStyles.border != null || 
+        cssStyles.borderTop != null ||
+        cssStyles.borderRight != null ||
+        cssStyles.borderBottom != null ||
+        cssStyles.borderLeft != null) {
+      // Use CSS border if specified
+      final border = cssStyles.border ?? 
+          BorderInfo(width: 1.0, color: PdfColors.black);
+      
+      if (cssStyles.borderCollapse == 'collapse') {
+        tableBorder = TableBorder.all(
+          color: border.color,
+          width: border.width,
+          style: border.style,
+        );
+      }
+    } else if (cssStyles.borderCollapse != 'none') {
+      // Default border if no CSS border specified
+      tableBorder = TableBorder.all(
+        color: PdfColors.black,
+        width: 1.0,
       );
-    } else if (element is dom.Text) {
-      /// Process text nodes and add them to delta
-      delta.add(Text(element.text, style: baseTextStyle));
-    } else {
-      assert(false, 'Unknown node type: $element');
     }
 
-    /// If there are text nodes in delta, wrap them in a Wrap widget and add to the result
-    if (delta.isNotEmpty) {
-      result.add(Wrap(children: delta));
+    Widget table = Table(
+      border: tableBorder,
+      defaultColumnWidth: const IntrinsicColumnWidth(),
+      children: allRows,
+    );
+
+    // Apply margin/padding if specified
+    if (cssStyles.margin != null || cssStyles.padding != null) {
+      table = Container(
+        margin: cssStyles.margin,
+        padding: cssStyles.padding,
+        child: table,
+      );
     }
-    return result;
+
+    return table;
+  }
+
+  /// Parse table row element
+  Future<TableRow> _parseTableRow(
+    dom.Element element,
+    TextStyle baseTextStyle, {
+    bool isHeader = false,
+  }) async {
+    final cssStyles = await _parseAllCssProperties(element.attributes);
+    final cells = <Widget>[];
+
+    for (final cell in element.children) {
+      if (cell.localName == 'td' || cell.localName == 'th') {
+        final isHeaderCell = cell.localName == 'th' || isHeader;
+        cells.add(await _parseTableCell(cell, baseTextStyle, isHeader: isHeaderCell));
+      }
+    }
+
+    return TableRow(
+      decoration: cssStyles.backgroundColor != null
+          ? BoxDecoration(color: cssStyles.backgroundColor)
+          : null,
+      children: cells,
+    );
+  }
+
+  /// Parse table cell element (td or th)
+  Future<Widget> _parseTableCell(
+    dom.Element element,
+    TextStyle baseTextStyle, {
+    bool isHeader = false,
+  }) async {
+    final cssStyles = await _parseAllCssProperties(element.attributes);
+
+    // Parse cell content
+    final content = await _parseTableCellContent(element, baseTextStyle, isHeader: isHeader);
+
+    // Determine cell padding
+    EdgeInsets cellPadding;
+    if (cssStyles.padding != null) {
+      cellPadding = cssStyles.padding!;
+    } else if (customStyles.tableCellPadding != null && !isHeader) {
+      cellPadding = customStyles.tableCellPadding!;
+    } else if (customStyles.tableHeaderPadding != null && isHeader) {
+      cellPadding = customStyles.tableHeaderPadding!;
+    } else if (customStyles.useDefaultStyles) {
+      cellPadding = isHeader 
+          ? HtmlDefaultStyles.thCellPadding 
+          : HtmlDefaultStyles.tableCellPadding;
+    } else {
+      cellPadding = const EdgeInsets.all(2.0);
+    }
+
+    // Determine text alignment
+    final textAlign = cssStyles.textAlign ??
+        (isHeader ? TextAlign.center : TextAlign.left);
+
+    // Apply cell style with border
+    Widget cell = Container(
+      padding: cellPadding,
+      decoration: cssStyles.backgroundColor != null
+          ? BoxDecoration(
+              color: cssStyles.backgroundColor,
+              border: cssStyles.border != null
+                  ? Border.all(
+                      color: cssStyles.border!.color,
+                      width: cssStyles.border!.width,
+                      style: cssStyles.border!.style,
+                    )
+                  : null,
+            )
+          : null,
+      child: Align(
+        alignment: _alignmentFromTextAlign(textAlign),
+        child: content,
+      ),
+    );
+
+    return cell;
+  }
+
+  /// Parse table cell content
+  Future<Widget> _parseTableCellContent(
+    dom.Element element,
+    TextStyle baseTextStyle, {
+    bool isHeader = false,
+  }) async {
+    // Apply bold style for headers
+    final cellBaseStyle = isHeader
+        ? baseTextStyle.copyWith(fontWeight: FontWeight.bold)
+        : baseTextStyle;
+
+    if (element.children.isEmpty) {
+      return Text(element.text, style: cellBaseStyle);
+    }
+
+    final widgets = await _parseElement(element.nodes, cellBaseStyle);
+    
+    if (widgets.length == 1) {
+      return widgets.first;
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+
+  /// Convert TextAlign to Alignment
+  Alignment _alignmentFromTextAlign(TextAlign textAlign) {
+    switch (textAlign) {
+      case TextAlign.left:
+        return Alignment.centerLeft;
+      case TextAlign.center:
+        return Alignment.center;
+      case TextAlign.right:
+        return Alignment.centerRight;
+      case TextAlign.justify:
+        return Alignment.centerLeft;
+      default:
+        return Alignment.centerLeft;
+    }
   }
 
   /// Function to parse a heading element and return a RichText widget
@@ -519,10 +607,23 @@ class WidgetsHTMLDecoder {
     TextAlign? textAlign;
     final delta = <TextSpan>[];
     final children = element.nodes.toList();
+    
+    // Extract spacing from inline style
+    final spacing = _extractSpacing(element.attributes);
+    
+    // Build heading text style with fallback chain
+    final headingBaseStyle = baseTextStyle
+        .copyWith(
+            fontSize: level.getHeadingSize,
+            fontWeight: FontWeight.bold)
+        .merge(level.getHeadingStyle(customStyles));
+    
     for (final child in children) {
       if (child is dom.Element) {
-        final attributes =
-            await _parserFormattingElementAttributes(child, baseTextStyle);
+        // Parse with inheritBase=false to avoid overriding heading-level styles
+        final attributes = await _parserFormattingElementAttributes(
+            child, headingBaseStyle,
+            inheritBase: false);
         textAlign = attributes.$1;
 
         delta.add(TextSpan(
@@ -531,22 +632,28 @@ class WidgetsHTMLDecoder {
             annotation:
                 attributes.$3 == null ? null : AnnotationUrl(attributes.$3!)));
       } else {
-        delta.add(TextSpan(text: child.text, style: baseTextStyle));
+        delta.add(TextSpan(text: child.text, style: headingBaseStyle));
       }
     }
 
-    /// Return a RichText widget with the parsed text and styles
-    return SizedBox(
+    /// Create heading widget
+    Widget headingWidget = SizedBox(
         width: double.infinity,
         child: RichText(
             textAlign: textAlign,
             text: TextSpan(
                 children: delta,
-                style: baseTextStyle
-                    .copyWith(
-                        fontSize: level.getHeadingSize,
-                        fontWeight: FontWeight.bold)
-                    .merge(level.getHeadingStyle(customStyles)))));
+                style: headingBaseStyle)));
+    
+    // Apply spacing if specified
+    if (spacing > 0) {
+      headingWidget = Padding(
+        padding: EdgeInsets.only(bottom: spacing),
+        child: headingWidget,
+      );
+    }
+    
+    return headingWidget;
   }
 
   /// Function to parse a block quote element and return a list of widgets
@@ -567,73 +674,164 @@ class WidgetsHTMLDecoder {
 
   /// Function to parse an unordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseUnOrderListElement(
-      dom.Element element, TextStyle baseTextStyle) async {
+      dom.Element element, TextStyle baseTextStyle, {int depth = 0}) async {
     final result = <Widget>[];
+    
+    // Extract spacing from inline style
+    final spacing = _extractSpacing(element.attributes);
 
     if (element.children.isNotEmpty) {
       for (final child in element.children) {
         result.addAll(await _parseListElement(child, baseTextStyle,
-            type: BuiltInAttributeKey.bulletedList));
+            type: BuiltInAttributeKey.bulletedList, depth: depth));
       }
     } else {
       result.add(
           buildBulletwidget(Text(element.text), customStyles: customStyles));
     }
+    
+    // Apply spacing if specified
+    if (spacing > 0 && result.isNotEmpty) {
+      final lastIndex = result.length - 1;
+      result[lastIndex] = Padding(
+        padding: EdgeInsets.only(bottom: spacing),
+        child: result[lastIndex],
+      );
+    }
+    
     return result;
   }
 
   /// Function to parse an ordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseOrderListElement(
-      dom.Element element, TextStyle baseTextStyle) async {
+      dom.Element element, TextStyle baseTextStyle, {int depth = 0}) async {
     final result = <Widget>[];
+    
+    // Extract spacing from inline style
+    final spacing = _extractSpacing(element.attributes);
 
     if (element.children.isNotEmpty) {
       for (var i = 0; i < element.children.length; i++) {
         final child = element.children[i];
         result.addAll(await _parseListElement(child, baseTextStyle,
-            type: BuiltInAttributeKey.numberList, index: i + 1));
+            type: BuiltInAttributeKey.numberList, index: i + 1, depth: depth));
       }
     } else {
       result.add(buildNumberwdget(Text(element.text),
           baseTextStyle: baseTextStyle, customStyles: customStyles, index: 1));
     }
+    
+    // Apply spacing if specified
+    if (spacing > 0 && result.isNotEmpty) {
+      final lastIndex = result.length - 1;
+      result[lastIndex] = Padding(
+        padding: EdgeInsets.only(bottom: spacing),
+        child: result[lastIndex],
+      );
+    }
+    
     return result;
   }
 
   /// Function to parse a list element (unordered or ordered) and return a list of widgets
+  /// [depth] tracks nesting level for proper indentation
   Future<Iterable<Widget>> _parseListElement(
     dom.Element element,
     TextStyle baseTextStyle, {
     required String type,
     int? index,
+    int depth = 0,
   }) async {
-    final delta = await _parseDeltaElement(element, baseTextStyle);
+    // Check for nested lists within this list item
+    final nestedLists = <Widget>[];
+    final nonListChildren = <dom.Node>[];
+    
+    for (final child in element.nodes) {
+      if (child is dom.Element) {
+        if (child.localName == HTMLTags.unorderedList) {
+          // Recursively parse nested unordered list
+          final nested = await _parseUnOrderListElement(child, baseTextStyle, depth: depth + 1);
+          nestedLists.addAll(nested);
+        } else if (child.localName == HTMLTags.orderedList) {
+          // Recursively parse nested ordered list
+          final nested = await _parseOrderListElement(child, baseTextStyle, depth: depth + 1);
+          nestedLists.addAll(nested);
+        } else {
+          nonListChildren.add(child);
+        }
+      } else {
+        nonListChildren.add(child);
+      }
+    }
+    
+    // Create a temporary element with only non-list children for delta parsing
+    final tempElement = dom.Element.tag(element.localName ?? 'li');
+    tempElement.attributes.addAll(element.attributes);
+    for (final child in nonListChildren) {
+      tempElement.append(child.clone(true));
+    }
+    
+    final delta = await _parseDeltaElement(tempElement, baseTextStyle);
+    
+    Widget listItem;
+    final indentation = depth * 20.0; // 20px indentation per level
 
     /// Build a bullet list widget
     if (type == BuiltInAttributeKey.bulletedList) {
-      return [buildBulletwidget(delta, customStyles: customStyles)];
+      listItem = buildBulletwidget(delta, customStyles: customStyles);
 
       /// Build a numbered list widget
     } else if (type == BuiltInAttributeKey.numberList) {
-      return [
-        buildNumberwdget(delta,
-            index: index!,
-            customStyles: customStyles,
-            baseTextStyle: baseTextStyle)
-      ];
+      listItem = buildNumberwdget(delta,
+          index: index!,
+          customStyles: customStyles,
+          baseTextStyle: baseTextStyle);
 
       /// Build a quote  widget
     } else if (type == BuiltInAttributeKey.quote) {
-      return [buildQuotewidget(delta, customStyles: customStyles)];
+      listItem = buildQuotewidget(delta, customStyles: customStyles);
     } else {
-      return [delta];
+      listItem = delta;
     }
+    
+    // Apply indentation for nested lists
+    if (depth > 0) {
+      listItem = Padding(
+        padding: EdgeInsets.only(left: indentation),
+        child: listItem,
+      );
+    }
+    
+    // If there are nested lists, wrap them with the list item
+    if (nestedLists.isNotEmpty) {
+      return [
+        listItem,
+        ...nestedLists.map((nested) => Padding(
+          padding: EdgeInsets.only(left: indentation + 20.0),
+          child: nested,
+        )),
+      ];
+    }
+    
+    return [listItem];
   }
 
   /// Function to parse a paragraph element and return a widget
   Future<Widget> _parseParagraphElement(
       dom.Element element, TextStyle baseTextStyle) async {
     final delta = await _parseDeltaElement(element, baseTextStyle);
+    
+    // Extract spacing from inline style
+    final spacing = _extractSpacing(element.attributes);
+    
+    // Apply spacing if specified
+    if (spacing > 0) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: spacing),
+        child: delta,
+      );
+    }
+    
     return delta;
   }
 
@@ -765,6 +963,15 @@ class WidgetsHTMLDecoder {
       );
     }
 
+    /// Parse font-size (supports px, pt, and numeric values)
+    final fontSizeStr = cssMap["font-size"];
+    if (fontSizeStr != null) {
+      final fontSize = _parseFontSize(fontSizeStr);
+      if (fontSize != null) {
+        style = style.copyWith(fontSize: fontSize);
+      }
+    }
+
     ///get font weight
     final fontWeightStr = cssMap["font-weight"];
     if (fontWeightStr != null) {
@@ -799,21 +1006,21 @@ class WidgetsHTMLDecoder {
       style = style.copyWith(background: BoxDecoration(color: backgroundColor));
     }
 
-    ///apply background color on text
+    ///apply text color
     final colorstr = cssMap["color"];
-
     final color = colorstr == null ? null : ColorExtension.parse(colorstr);
     if (color != null) {
       style = style.copyWith(color: color);
     }
 
     ///apply italic tag
-
     if (cssMap["font-style"] == "italic") {
       style = style
           .copyWith(fontStyle: FontStyle.italic)
           .merge(customStyles.italicStyle);
     }
+    
+    ///apply text alignment
     final align = cssMap["text-align"];
     if (align != null) {
       textAlign = _alignText(align);
@@ -852,5 +1059,188 @@ class WidgetsHTMLDecoder {
       }
     }
     return style.copyWith(decoration: TextDecoration.combine(textdecorations));
+  }
+
+  /// Parse font-size from CSS string (supports px, pt, and numeric values)
+  static double? _parseFontSize(String fontSizeStr) {
+    final trimmed = fontSizeStr.trim().toLowerCase();
+    
+    // Handle px units
+    if (trimmed.endsWith('px')) {
+      final value = trimmed.substring(0, trimmed.length - 2);
+      return double.tryParse(value);
+    }
+    
+    // Handle pt units
+    if (trimmed.endsWith('pt')) {
+      final value = trimmed.substring(0, trimmed.length - 2);
+      return double.tryParse(value);
+    }
+    
+    // Handle numeric values without units
+    return double.tryParse(trimmed);
+  }
+
+  /// Extract spacing (padding-bottom or margin-bottom) from HTML attributes
+  double _extractSpacing(LinkedHashMap<Object, String> htmlAttributes) {
+    final styleString = htmlAttributes["style"];
+    final cssMap = _cssStringToMap(styleString);
+    
+    // Try padding-bottom first, then margin-bottom
+    final paddingBottom = cssMap["padding-bottom"];
+    if (paddingBottom != null) {
+      final spacing = _parseFontSize(paddingBottom); // Reuse font-size parser for spacing
+      if (spacing != null) return spacing;
+    }
+    
+    final marginBottom = cssMap["margin-bottom"];
+    if (marginBottom != null) {
+      final spacing = _parseFontSize(marginBottom);
+      if (spacing != null) return spacing;
+    }
+    
+    return 0.0;
+  }
+
+  /// Parse all CSS properties from HTML attributes
+  Future<CssStyles> _parseAllCssProperties(
+    LinkedHashMap<Object, String> attributes,
+  ) async {
+    final styleString = attributes["style"];
+    final cssMap = _cssStringToMap(styleString);
+
+    return CssStyles(
+      width: _parseSizeProperty(cssMap["width"]),
+      height: _parseSizeProperty(cssMap["height"]),
+      display: cssMap["display"],
+      margin: _parseSpacingProperty(cssMap, "margin"),
+      padding: _parseSpacingProperty(cssMap, "padding"),
+      fontSize: _parseFontSize(cssMap["font-size"] ?? ""),
+      fontWeight: _parseFontWeightProp(cssMap["font-weight"]),
+      fontStyle: _parseFontStyleProperty(cssMap["font-style"]),
+      fontFamily: cssMap["font-family"],
+      color: ColorExtension.parse(cssMap["color"] ?? "") ?? PdfColors.black,
+      textAlign: _parseTextAlign(cssMap["text-align"]),
+      textDecoration: _parseTextDecorationProperty(cssMap["text-decoration"]),
+      backgroundColor: ColorExtension.parse(cssMap["background-color"] ?? "") ?? PdfColors.white,
+      border: _parseBorderProperty(cssMap, "border"),
+      borderTop: _parseBorderProperty(cssMap, "border-top"),
+      borderRight: _parseBorderProperty(cssMap, "border-right"),
+      borderBottom: _parseBorderProperty(cssMap, "border-bottom"),
+      borderLeft: _parseBorderProperty(cssMap, "border-left"),
+      borderCollapse: cssMap["border-collapse"],
+      borderSpacing: _parseSizeProperty(cssMap["border-spacing"]),
+      verticalAlign: cssMap["vertical-align"],
+      colspan: int.tryParse(attributes["colspan"] ?? ""),
+      rowspan: int.tryParse(attributes["rowspan"] ?? ""),
+      listStyleType: cssMap["list-style-type"],
+    );
+  }
+
+  /// Parse size properties
+  double? _parseSizeProperty(String? value) {
+    if (value == null) return null;
+    return _parseFontSize(value);
+  }
+
+  /// Parse spacing property with CSS shorthand support
+  EdgeInsets? _parseSpacingProperty(Map<String, String> cssMap, String property) {
+    final top = _parseSizeProperty(cssMap["$property-top"]);
+    final right = _parseSizeProperty(cssMap["$property-right"]);
+    final bottom = _parseSizeProperty(cssMap["$property-bottom"]);
+    final left = _parseSizeProperty(cssMap["$property-left"]);
+
+    if (top != null || right != null || bottom != null || left != null) {
+      return EdgeInsets.only(
+        top: top ?? 0,
+        right: right ?? 0,
+        bottom: bottom ?? 0,
+        left: left ?? 0,
+      );
+    }
+
+    final value = cssMap[property];
+    if (value != null) {
+      final parts = value.trim().split(RegExp(r'\s+'));
+      final values = parts.map(_parseFontSize).whereType<double>().toList();
+      if (values.isEmpty) return null;
+
+      switch (values.length) {
+        case 1:
+          return EdgeInsets.all(values[0]);
+        case 2:
+          return EdgeInsets.symmetric(vertical: values[0], horizontal: values[1]);
+        case 3:
+          return EdgeInsets.only(top: values[0], left: values[1], right: values[1], bottom: values[2]);
+        case 4:
+          return EdgeInsets.fromLTRB(values[3], values[0], values[1], values[2]);
+      }
+    }
+    return null;
+  }
+
+  /// Parse font-weight property
+  FontWeight? _parseFontWeightProp(String? value) {
+    if (value == null) return null;
+    if (value == "bold" || value == "bolder") return FontWeight.bold;
+    if (value == "normal") return FontWeight.normal;
+    final weight = int.tryParse(value);
+    return (weight != null && weight > 500) ? FontWeight.bold : null;
+  }
+
+  /// Parse font-style property
+  FontStyle? _parseFontStyleProperty(String? value) {
+    if (value == null) return null;
+    return value.toLowerCase() == "italic" || value.toLowerCase() == "oblique"
+        ? FontStyle.italic
+        : (value == "normal" ? FontStyle.normal : null);
+  }
+
+  /// Parse text-align property
+  TextAlign? _parseTextAlign(String? value) {
+    return value == null ? null : _alignText(value);
+  }
+
+  /// Parse text-decoration property
+  TextDecoration? _parseTextDecorationProperty(String? value) {
+    if (value == null) return null;
+    if (value.contains("underline")) return TextDecoration.underline;
+    if (value.contains("line-through")) return TextDecoration.lineThrough;
+    if (value == "none") return TextDecoration.none;
+    return null;
+  }
+
+  /// Parse border property
+  BorderInfo? _parseBorderProperty(Map<String, String> cssMap, String property) {
+    final borderValue = cssMap[property];
+    if (borderValue != null) return BorderInfo.fromString(borderValue);
+
+    final widthValue = cssMap["$property-width"];
+    final styleValue = cssMap["$property-style"];
+    final colorValue = cssMap["$property-color"];
+
+    if (widthValue != null || styleValue != null || colorValue != null) {
+      return BorderInfo(
+        width: _parseSizeProperty(widthValue) ?? 1.0,
+        color: ColorExtension.parse(colorValue ?? "") ?? PdfColors.black,
+        style: _parseBorderStyle(styleValue),
+      );
+    }
+    return null;
+  }
+
+  /// Parse border-style value
+  BorderStyle _parseBorderStyle(String? value) {
+    if (value == null) return BorderStyle.solid;
+    switch (value.toLowerCase()) {
+      case "dashed":
+        return BorderStyle.dashed;
+      case "dotted":
+        return BorderStyle.dotted;
+      case "none":
+        return BorderStyle.none;
+      default:
+        return BorderStyle.solid;
+    }
   }
 }

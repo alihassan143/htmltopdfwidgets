@@ -1,3 +1,21 @@
+## 2.0.0
+
+*   **New Architecture**: Introduced a "Browser Rendering Engine" architecture for more robust HTML to PDF conversion.
+    *   **Style Engine**: Comprehensive CSS parsing and cascading support (`lib/src/browser/css_style.dart`).
+    *   **Render Tree**: Intermediate DOM representation with fully computed styles (`lib/src/browser/render_node.dart`).
+    *   **PDF Builder**: Modular PDF widget generation with better layout handling (`lib/src/browser/pdf_builder.dart`).
+*   **Unified API**: Updated `HTMLToPdf.convert` to support the new engine via `useNewEngine: true`.
+*   **Enhanced Support**:
+    *   Improved Table rendering with full CSS support (borders, padding, background).
+    *   Better List handling (nested lists, custom bullets).
+    *   Support for `blockquote`, `pre`, `code`, `hr`, `checkbox`, and more.
+*   **Rendering Improvements**:
+    *   Fixed inline content rendering (bold, italic, mixed text).
+    *   Fixed list item text visibility.
+    *   Optimized default spacing to match legacy engine.
+*   **Custom Styles**: Added full support for `HtmlTagStyle` in the new engine.
+*   **Legacy Support**: Maintained full backward compatibility with the legacy engine (default).
+
 ## 1.1.3
 * *([#52](https://github.com/alihassan143/htmltopdfwidgets/pull/52)) fix css color parsing
 ## 1.1.1
