@@ -1,9 +1,8 @@
 import 'dart:io';
 
-import 'package:test/test.dart';
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart';
+import 'package:test/test.dart';
 
 void main() {
   const markdown = '''
@@ -28,7 +27,8 @@ Code block
 ''';
 
   test('Markdown Test - New Browser Engine', () async {
-    final widgets = await HTMLToPdf().convertMarkdown(markdown, useNewEngine: true);
+    final widgets =
+        await HTMLToPdf().convertMarkdown(markdown, useNewEngine: true);
     expect(widgets, isNotEmpty);
 
     final pdf = pw.Document();

@@ -22,8 +22,24 @@ class RenderNode {
 
   static Display _getDefaultDisplay(String tagName) {
     const blockTags = {
-      'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-      'ul', 'ol', 'li', 'blockquote', 'table', 'tr', 'header', 'footer', 'section', 'article'
+      'div',
+      'p',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'ul',
+      'ol',
+      'li',
+      'blockquote',
+      'table',
+      'tr',
+      'header',
+      'footer',
+      'section',
+      'article'
     };
     if (blockTags.contains(tagName.toLowerCase())) {
       return Display.block;

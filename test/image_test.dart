@@ -1,17 +1,17 @@
-import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 
-import 'package:test/test.dart';
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart';
+import 'package:test/test.dart';
 
 void main() {
   // Create a dummy 1x1 red pixel png
-  final redPixel = base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
-  final redPixelBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-  
+  final redPixel = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+  final redPixelBase64 =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
   setUp(() async {
     await File('test_image.png').writeAsBytes(redPixel);
   });
@@ -22,7 +22,7 @@ void main() {
     }
   });
 
-  const html = '''
+  final html = '''
     <h1>Image Test</h1>
     <p>Network Image:</p>
     <img src="https://via.placeholder.com/150" width="100" height="100" />

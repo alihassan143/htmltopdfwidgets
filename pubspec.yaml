@@ -1,6 +1,6 @@
 name: htmltopdfwidgets
 description: A Dart package that converts HTML and Markdown rich text content into high-quality PDF widgets. Simplify the creation of PDF documents by seamlessly transforming your structured text content into printable, professional PDFs. Perfect for generating reports, invoices, and more!
-version: 2.0.0-beta.1
+version: 2.0.0-beta.2
 homepage: https://github.com/alihassan143/htmltopdfwidgets
 
 environment:
@@ -11,6 +11,7 @@ dependencies:
   html: ">=0.15.5 <1.0.0"
   http: ">=1.2.2 <2.0.0"
   markdown: ^7.3.0
+  csslib: ^1.0.2
 
 dev_dependencies:
   flutter_lints: ^4.0.0

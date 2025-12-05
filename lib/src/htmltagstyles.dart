@@ -1,6 +1,11 @@
 // ignore_for_file: public_member_api_docs, sort_constructors_first
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
 
+/// Builder function type for creating custom checkbox widgets.
+/// [isChecked] indicates whether the checkbox is checked.
+/// Return a [Widget] to render as the checkbox.
+typedef CheckboxBuilder = Widget Function(bool isChecked);
+
 //apply custom styles to html stylee
 class HtmlTagStyle {
   //bold  style that will merge with default style
@@ -84,6 +89,27 @@ class HtmlTagStyle {
   /// Custom table header cell padding (overrides browser defaults if set)
   final EdgeInsets? tableHeaderPadding;
 
+  /// Custom checkbox builder function for complete control over checkbox rendering.
+  /// Takes precedence over [checkedIconSvg] and [uncheckedIconSvg].
+  final CheckboxBuilder? checkboxBuilder;
+
+  /// SVG string for the checked checkbox icon.
+  /// Used when [checkboxBuilder] is not provided.
+  final String? checkedIconSvg;
+
+  /// SVG string for the unchecked checkbox icon.
+  /// Used when [checkboxBuilder] is not provided.
+  final String? uncheckedIconSvg;
+
+  /// Size of the checkbox icon in points.
+  final double checkboxSize;
+
+  /// Color for the checked checkbox icon (used when rendering default or SVG).
+  final PdfColor? checkedIconColor;
+
+  /// Color for the unchecked checkbox icon (used when rendering default or SVG).
+  final PdfColor? uncheckedIconColor;
+
   const HtmlTagStyle({
     this.boldStyle,
     this.italicStyle,
@@ -115,6 +141,11 @@ class HtmlTagStyle {
     this.listMargin,
     this.tableCellPadding,
     this.tableHeaderPadding,
+    this.checkboxBuilder,
+    this.checkedIconSvg,
+    this.uncheckedIconSvg,
+    this.checkboxSize = 14.0,
+    this.checkedIconColor,
+    this.uncheckedIconColor,
   });
 }
-

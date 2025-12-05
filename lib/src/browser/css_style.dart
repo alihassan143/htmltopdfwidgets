@@ -3,6 +3,12 @@ import 'package:pdf/widgets.dart';
 
 enum Display { block, inline, none }
 
+/// Image fit mode, similar to CSS object-fit
+enum ObjectFit { contain, cover, fill, fitWidth, fitHeight, none, scaleDown }
+
+/// Vertical alignment for table cells
+enum VerticalAlign { top, middle, bottom, baseline }
+
 class CSSStyle {
   final PdfColor? color;
   final PdfColor? backgroundColor;
@@ -13,6 +19,7 @@ class CSSStyle {
   final Display? display;
   final double? width;
   final double? height;
+  final double? lineHeight;
   final EdgeInsets? padding;
   final EdgeInsets? margin;
   final Border? border;
@@ -22,6 +29,11 @@ class CSSStyle {
   final Border? borderLeft;
   final String? fontFamily;
   final TextAlign? textAlign;
+  final ObjectFit? objectFit;
+  final VerticalAlign? verticalAlign;
+  final double? borderRadius;
+  final bool? borderCollapse;
+  final TextDirection? textDirection;
 
   const CSSStyle({
     this.color,
@@ -33,6 +45,7 @@ class CSSStyle {
     this.display,
     this.width,
     this.height,
+    this.lineHeight,
     this.padding,
     this.margin,
     this.border,
@@ -42,6 +55,11 @@ class CSSStyle {
     this.borderLeft,
     this.fontFamily,
     this.textAlign,
+    this.objectFit,
+    this.verticalAlign,
+    this.borderRadius,
+    this.borderCollapse,
+    this.textDirection,
   });
 
   /// Merges this style with another style. The other style takes precedence.
@@ -56,6 +74,7 @@ class CSSStyle {
       display: other.display ?? display,
       width: other.width ?? width,
       height: other.height ?? height,
+      lineHeight: other.lineHeight ?? lineHeight,
       padding: other.padding ?? padding,
       margin: other.margin ?? margin,
       border: other.border ?? border,
@@ -65,6 +84,11 @@ class CSSStyle {
       borderLeft: other.borderLeft ?? borderLeft,
       fontFamily: other.fontFamily ?? fontFamily,
       textAlign: other.textAlign ?? textAlign,
+      objectFit: other.objectFit ?? objectFit,
+      verticalAlign: other.verticalAlign ?? verticalAlign,
+      borderRadius: other.borderRadius ?? borderRadius,
+      borderCollapse: other.borderCollapse ?? borderCollapse,
+      textDirection: other.textDirection ?? textDirection,
     );
   }
 
@@ -78,6 +102,7 @@ class CSSStyle {
       textDecoration: textDecoration ?? parent.textDecoration,
       fontFamily: fontFamily ?? parent.fontFamily,
       textAlign: textAlign ?? parent.textAlign,
+      textDirection: textDirection ?? parent.textDirection,
       // Non-inherited properties
       backgroundColor: backgroundColor,
       display: display,
@@ -90,6 +115,10 @@ class CSSStyle {
       borderRight: borderRight,
       borderBottom: borderBottom,
       borderLeft: borderLeft,
+      objectFit: objectFit,
+      verticalAlign: verticalAlign,
+      borderRadius: borderRadius,
+      borderCollapse: borderCollapse,
     );
   }
 
@@ -106,11 +135,17 @@ class CSSStyle {
     Display? display;
     double? width;
     double? height;
+    double? lineHeight;
     EdgeInsets? padding;
     EdgeInsets? margin;
     Border? border;
     String? fontFamily;
     TextAlign? textAlign;
+    ObjectFit? objectFit;
+    VerticalAlign? verticalAlign;
+    double? borderRadius;
+    bool? borderCollapse;
+    TextDirection? textDirection;
 
     final declarations = cssString.split(';');
     for (var declaration in declarations) {
@@ -148,6 +183,9 @@ class CSSStyle {
         case 'height':
           height = _parseLength(value);
           break;
+        case 'line-height':
+          lineHeight = _parseLength(value);
+          break;
         case 'padding':
           padding = _parseEdgeInsets(value);
           break;
@@ -163,6 +201,23 @@ class CSSStyle {
         case 'text-align':
           textAlign = _parseTextAlign(value);
           break;
+        case 'object-fit':
+          objectFit = _parseObjectFit(value);
+          break;
+        case 'vertical-align':
+          verticalAlign = _parseVerticalAlign(value);
+          break;
+        case 'border-radius':
+          borderRadius = _parseLength(value);
+          break;
+        case 'border-collapse':
+          if (value == 'collapse') borderCollapse = true;
+          if (value == 'separate') borderCollapse = false;
+          break;
+        case 'direction':
+          if (value == 'rtl') textDirection = TextDirection.rtl;
+          if (value == 'ltr') textDirection = TextDirection.ltr;
+          break;
       }
     }
 
@@ -176,25 +231,33 @@ class CSSStyle {
       display: display,
       width: width,
       height: height,
+      lineHeight: lineHeight,
       padding: padding,
       margin: margin,
       border: border,
       fontFamily: fontFamily,
       textAlign: textAlign,
+      objectFit: objectFit,
+      verticalAlign: verticalAlign,
+      borderRadius: borderRadius,
+      borderCollapse: borderCollapse,
+      textDirection: textDirection,
     );
   }
 
   static PdfColor? _parseColor(String value) {
     final trimmed = value.trim().toLowerCase();
-    
+
     // Handle hex colors
     if (trimmed.startsWith('#')) {
       return PdfColor.fromHex(trimmed);
     }
-    
+
     // Handle rgb/rgba
     if (trimmed.startsWith('rgb')) {
-      final match = RegExp(r'rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)').firstMatch(trimmed);
+      final match = RegExp(
+              r'rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)')
+          .firstMatch(trimmed);
       if (match != null) {
         final r = int.tryParse(match.group(1) ?? '0') ?? 0;
         final g = int.tryParse(match.group(2) ?? '0') ?? 0;
@@ -203,7 +266,7 @@ class CSSStyle {
         return PdfColor(r / 255, g / 255, b / 255, a);
       }
     }
-    
+
     // Handle named colors
     switch (trimmed) {
       case 'red':
@@ -263,12 +326,12 @@ class CSSStyle {
     } else if (value.endsWith('pt')) {
       return double.tryParse(value.replaceAll('pt', ''));
     } else if (value.endsWith('em')) {
-      // Assuming 1em = 12pt for simplicity if base not known, 
-      // but ideally this should be resolved later. 
+      // Assuming 1em = 12pt for simplicity if base not known,
+      // but ideally this should be resolved later.
       // For now, let's treat it as a scale factor or fixed size.
-      // Let's assume standard 16px (12pt) base? 
+      // Let's assume standard 16px (12pt) base?
       // Actually, let's just parse the number.
-      return (double.tryParse(value.replaceAll('em', '')) ?? 1) * 12.0; 
+      return (double.tryParse(value.replaceAll('em', '')) ?? 1) * 12.0;
     } else if (value.endsWith('rem')) {
       return (double.tryParse(value.replaceAll('rem', '')) ?? 1) * 12.0;
     }
@@ -339,7 +402,8 @@ class CSSStyle {
       return EdgeInsets.symmetric(vertical: values[0], horizontal: values[1]);
     } else if (values.length == 3) {
       // top, horizontal, bottom
-      return EdgeInsets.only(top: values[0], left: values[1], right: values[1], bottom: values[2]);
+      return EdgeInsets.only(
+          top: values[0], left: values[1], right: values[1], bottom: values[2]);
     } else if (values.length == 4) {
       return EdgeInsets.fromLTRB(values[3], values[0], values[1], values[2]);
     }
@@ -368,6 +432,38 @@ class CSSStyle {
         return TextAlign.center;
       case 'justify':
         return TextAlign.justify;
+      default:
+        return null;
+    }
+  }
+
+  static ObjectFit? _parseObjectFit(String value) {
+    switch (value.toLowerCase()) {
+      case 'contain':
+        return ObjectFit.contain;
+      case 'cover':
+        return ObjectFit.cover;
+      case 'fill':
+        return ObjectFit.fill;
+      case 'none':
+        return ObjectFit.none;
+      case 'scale-down':
+        return ObjectFit.scaleDown;
+      default:
+        return null;
+    }
+  }
+
+  static VerticalAlign? _parseVerticalAlign(String value) {
+    switch (value.toLowerCase()) {
+      case 'top':
+        return VerticalAlign.top;
+      case 'middle':
+        return VerticalAlign.middle;
+      case 'bottom':
+        return VerticalAlign.bottom;
+      case 'baseline':
+        return VerticalAlign.baseline;
       default:
         return null;
     }

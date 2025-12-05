@@ -3,11 +3,7 @@ import 'dart:io';
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
 import 'package:htmltopdfwidgets/src/browser/css_style.dart';
 import 'package:htmltopdfwidgets/src/browser/html_parser.dart';
-import 'package:htmltopdfwidgets/src/browser/pdf_builder.dart';
-import 'package:htmltopdfwidgets/src/browser/render_node.dart';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/widgets.dart'; // For EdgeInsets
 import 'package:test/test.dart';
 
 void main() {
@@ -35,13 +31,14 @@ void main() {
     });
 
     test('Inherit styles', () {
-      final parent = const CSSStyle(color: PdfColors.red, fontSize: 12.0, margin: EdgeInsets.all(10));
+      final parent = const CSSStyle(
+          color: PdfColors.red, fontSize: 12.0, margin: EdgeInsets.all(10));
       final child = const CSSStyle().inheritFrom(parent);
-      
+
       // Inherited properties
       expect(child.color, PdfColors.red);
       expect(child.fontSize, 12.0);
-      
+
       // Non-inherited properties should be null/reset
       expect(child.margin, null);
     });
@@ -51,7 +48,7 @@ void main() {
     test('Parse simple HTML structure', () {
       final parser = HtmlParser(htmlString: '<div><p>Hello</p></div>');
       final root = parser.parse();
-      
+
       expect(root.tagName, 'body'); // Parser wraps in body if missing
       expect(root.children.length, 1);
       expect(root.children[0].tagName, 'div');
@@ -60,20 +57,22 @@ void main() {
     });
 
     test('Compute styles correctly', () {
-      final parser = HtmlParser(htmlString: '<div style="color: red;"><p>Text</p></div>');
+      final parser =
+          HtmlParser(htmlString: '<div style="color: red;"><p>Text</p></div>');
       final root = parser.parse();
       final div = root.children[0];
       final p = div.children[0];
-      
+
       expect(div.style.color, PdfColors.red);
       expect(p.style.color, PdfColors.red); // Inherited
     });
 
     test('Parse attributes', () {
-      final parser = HtmlParser(htmlString: '<a href="https://example.com">Link</a>');
+      final parser =
+          HtmlParser(htmlString: '<a href="https://example.com">Link</a>');
       final root = parser.parse();
       final a = root.children[0];
-      
+
       expect(a.attributes['href'], 'https://example.com');
     });
   });

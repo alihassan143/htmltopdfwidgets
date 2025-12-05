@@ -1,9 +1,8 @@
 import 'dart:io';
 
-import 'package:test/test.dart';
 import 'package:htmltopdfwidgets/htmltopdfwidgets.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart';
+import 'package:test/test.dart';
 
 void main() {
   const complexHtml = '''
@@ -53,12 +52,12 @@ void main() {
   test('Full Document Test - Legacy Engine', () async {
     final widgets = await HTMLToPdf().convert(complexHtml, useNewEngine: false);
     expect(widgets, isNotEmpty);
-    
+
     final pdf = pw.Document();
     pdf.addPage(pw.MultiPage(build: (c) => widgets));
     final bytes = await pdf.save();
     expect(bytes.length, greaterThan(0));
-    
+
     final file = File('test_output_legacy.pdf');
     await file.writeAsBytes(bytes);
   });

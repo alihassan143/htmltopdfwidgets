@@ -1,3 +1,14 @@
+## 2.0.0-beta.2
+
+* **Checkbox Enhancements**:
+    * Fixed inline rendering of checkboxes (now flow with text).
+    * Improved vertical alignment (centered by default, respects `vertical-align`).
+* **Multi-Language Support**:
+    * Added `textDirection` support for RTL languages (Arabic, Hebrew).
+    * Added `fontFallback` support for Emojis and complex scripts in the new engine.
+* **Robustness**:
+    * Improved error handling for images and fonts.
+
 ## 2.0.0-beta.1
 
 *   **New Architecture**: Introduced a "Browser Rendering Engine" architecture for more robust HTML to PDF conversion.

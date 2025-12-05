@@ -26,7 +26,6 @@ class HTMLToPdf extends HtmlCodec {
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle(),
       bool useNewEngine = false}) async {
-    
     if (useNewEngine) {
       final parser = HtmlParser(
         htmlString: html,
@@ -41,7 +40,8 @@ class HTMLToPdf extends HtmlCodec {
         ),
       );
       final renderTree = parser.parse();
-      final builder = PdfBuilder(root: renderTree);
+      final builder = PdfBuilder(
+          root: renderTree, tagStyle: tagStyle, fontFallback: fontFallback);
       return await builder.build();
     }
 
@@ -80,7 +80,6 @@ class HTMLToPdf extends HtmlCodec {
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle(),
       bool useNewEngine = false}) async {
-    
     final html = markdownToHtml(
       markDown,
       extensionSet: extensionSet ?? ExtensionSet.gitHubFlavored,
@@ -109,7 +108,8 @@ class HTMLToPdf extends HtmlCodec {
         ),
       );
       final renderTree = parser.parse();
-      final builder = PdfBuilder(root: renderTree);
+      final builder = PdfBuilder(
+          root: renderTree, tagStyle: tagStyle, fontFallback: fontFallback);
       return await builder.build();
     }
 

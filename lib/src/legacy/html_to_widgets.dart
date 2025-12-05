@@ -404,7 +404,8 @@ class WidgetsHTMLDecoder {
         case 'thead':
           for (final tr in child.children) {
             if (tr.localName == 'tr') {
-              headerRows.add(await _parseTableRow(tr, baseTextStyle, isHeader: true));
+              headerRows
+                  .add(await _parseTableRow(tr, baseTextStyle, isHeader: true));
             }
           }
           break;
@@ -433,16 +434,16 @@ class WidgetsHTMLDecoder {
 
     // Determine border style
     TableBorder? tableBorder;
-    
-    if (cssStyles.border != null || 
+
+    if (cssStyles.border != null ||
         cssStyles.borderTop != null ||
         cssStyles.borderRight != null ||
         cssStyles.borderBottom != null ||
         cssStyles.borderLeft != null) {
       // Use CSS border if specified
-      final border = cssStyles.border ?? 
-          BorderInfo(width: 1.0, color: PdfColors.black);
-      
+      final border =
+          cssStyles.border ?? BorderInfo(width: 1.0, color: PdfColors.black);
+
       if (cssStyles.borderCollapse == 'collapse') {
         tableBorder = TableBorder.all(
           color: border.color,
@@ -488,7 +489,8 @@ class WidgetsHTMLDecoder {
     for (final cell in element.children) {
       if (cell.localName == 'td' || cell.localName == 'th') {
         final isHeaderCell = cell.localName == 'th' || isHeader;
-        cells.add(await _parseTableCell(cell, baseTextStyle, isHeader: isHeaderCell));
+        cells.add(
+            await _parseTableCell(cell, baseTextStyle, isHeader: isHeaderCell));
       }
     }
 
@@ -509,7 +511,8 @@ class WidgetsHTMLDecoder {
     final cssStyles = await _parseAllCssProperties(element.attributes);
 
     // Parse cell content
-    final content = await _parseTableCellContent(element, baseTextStyle, isHeader: isHeader);
+    final content = await _parseTableCellContent(element, baseTextStyle,
+        isHeader: isHeader);
 
     // Determine cell padding
     EdgeInsets cellPadding;
@@ -520,16 +523,16 @@ class WidgetsHTMLDecoder {
     } else if (customStyles.tableHeaderPadding != null && isHeader) {
       cellPadding = customStyles.tableHeaderPadding!;
     } else if (customStyles.useDefaultStyles) {
-      cellPadding = isHeader 
-          ? HtmlDefaultStyles.thCellPadding 
+      cellPadding = isHeader
+          ? HtmlDefaultStyles.thCellPadding
           : HtmlDefaultStyles.tableCellPadding;
     } else {
       cellPadding = const EdgeInsets.all(2.0);
     }
 
     // Determine text alignment
-    final textAlign = cssStyles.textAlign ??
-        (isHeader ? TextAlign.center : TextAlign.left);
+    final textAlign =
+        cssStyles.textAlign ?? (isHeader ? TextAlign.center : TextAlign.left);
 
     // Apply cell style with border
     Widget cell = Container(
@@ -571,11 +574,11 @@ class WidgetsHTMLDecoder {
     }
 
     final widgets = await _parseElement(element.nodes, cellBaseStyle);
-    
+
     if (widgets.length == 1) {
       return widgets.first;
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: widgets,
@@ -607,17 +610,15 @@ class WidgetsHTMLDecoder {
     TextAlign? textAlign;
     final delta = <TextSpan>[];
     final children = element.nodes.toList();
-    
+
     // Extract spacing from inline style
     final spacing = _extractSpacing(element.attributes);
-    
+
     // Build heading text style with fallback chain
     final headingBaseStyle = baseTextStyle
-        .copyWith(
-            fontSize: level.getHeadingSize,
-            fontWeight: FontWeight.bold)
+        .copyWith(fontSize: level.getHeadingSize, fontWeight: FontWeight.bold)
         .merge(level.getHeadingStyle(customStyles));
-    
+
     for (final child in children) {
       if (child is dom.Element) {
         // Parse with inheritBase=false to avoid overriding heading-level styles
@@ -641,10 +642,8 @@ class WidgetsHTMLDecoder {
         width: double.infinity,
         child: RichText(
             textAlign: textAlign,
-            text: TextSpan(
-                children: delta,
-                style: headingBaseStyle)));
-    
+            text: TextSpan(children: delta, style: headingBaseStyle)));
+
     // Apply spacing if specified
     if (spacing > 0) {
       headingWidget = Padding(
@@ -652,7 +651,7 @@ class WidgetsHTMLDecoder {
         child: headingWidget,
       );
     }
-    
+
     return headingWidget;
   }
 
@@ -674,9 +673,10 @@ class WidgetsHTMLDecoder {
 
   /// Function to parse an unordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseUnOrderListElement(
-      dom.Element element, TextStyle baseTextStyle, {int depth = 0}) async {
+      dom.Element element, TextStyle baseTextStyle,
+      {int depth = 0}) async {
     final result = <Widget>[];
-    
+
     // Extract spacing from inline style
     final spacing = _extractSpacing(element.attributes);
 
@@ -689,7 +689,7 @@ class WidgetsHTMLDecoder {
       result.add(
           buildBulletwidget(Text(element.text), customStyles: customStyles));
     }
-    
+
     // Apply spacing if specified
     if (spacing > 0 && result.isNotEmpty) {
       final lastIndex = result.length - 1;
@@ -698,15 +698,16 @@ class WidgetsHTMLDecoder {
         child: result[lastIndex],
       );
     }
-    
+
     return result;
   }
 
   /// Function to parse an ordered list element and return a list of widgets
   Future<Iterable<Widget>> _parseOrderListElement(
-      dom.Element element, TextStyle baseTextStyle, {int depth = 0}) async {
+      dom.Element element, TextStyle baseTextStyle,
+      {int depth = 0}) async {
     final result = <Widget>[];
-    
+
     // Extract spacing from inline style
     final spacing = _extractSpacing(element.attributes);
 
@@ -720,7 +721,7 @@ class WidgetsHTMLDecoder {
       result.add(buildNumberwdget(Text(element.text),
           baseTextStyle: baseTextStyle, customStyles: customStyles, index: 1));
     }
-    
+
     // Apply spacing if specified
     if (spacing > 0 && result.isNotEmpty) {
       final lastIndex = result.length - 1;
@@ -729,7 +730,7 @@ class WidgetsHTMLDecoder {
         child: result[lastIndex],
       );
     }
-    
+
     return result;
   }
 
@@ -745,16 +746,18 @@ class WidgetsHTMLDecoder {
     // Check for nested lists within this list item
     final nestedLists = <Widget>[];
     final nonListChildren = <dom.Node>[];
-    
+
     for (final child in element.nodes) {
       if (child is dom.Element) {
         if (child.localName == HTMLTags.unorderedList) {
           // Recursively parse nested unordered list
-          final nested = await _parseUnOrderListElement(child, baseTextStyle, depth: depth + 1);
+          final nested = await _parseUnOrderListElement(child, baseTextStyle,
+              depth: depth + 1);
           nestedLists.addAll(nested);
         } else if (child.localName == HTMLTags.orderedList) {
           // Recursively parse nested ordered list
-          final nested = await _parseOrderListElement(child, baseTextStyle, depth: depth + 1);
+          final nested = await _parseOrderListElement(child, baseTextStyle,
+              depth: depth + 1);
           nestedLists.addAll(nested);
         } else {
           nonListChildren.add(child);
@@ -763,16 +766,16 @@ class WidgetsHTMLDecoder {
         nonListChildren.add(child);
       }
     }
-    
+
     // Create a temporary element with only non-list children for delta parsing
     final tempElement = dom.Element.tag(element.localName ?? 'li');
     tempElement.attributes.addAll(element.attributes);
     for (final child in nonListChildren) {
       tempElement.append(child.clone(true));
     }
-    
+
     final delta = await _parseDeltaElement(tempElement, baseTextStyle);
-    
+
     Widget listItem;
     final indentation = depth * 20.0; // 20px indentation per level
 
@@ -793,7 +796,7 @@ class WidgetsHTMLDecoder {
     } else {
       listItem = delta;
     }
-    
+
     // Apply indentation for nested lists
     if (depth > 0) {
       listItem = Padding(
@@ -801,18 +804,18 @@ class WidgetsHTMLDecoder {
         child: listItem,
       );
     }
-    
+
     // If there are nested lists, wrap them with the list item
     if (nestedLists.isNotEmpty) {
       return [
         listItem,
         ...nestedLists.map((nested) => Padding(
-          padding: EdgeInsets.only(left: indentation + 20.0),
-          child: nested,
-        )),
+              padding: EdgeInsets.only(left: indentation + 20.0),
+              child: nested,
+            )),
       ];
     }
-    
+
     return [listItem];
   }
 
@@ -820,10 +823,10 @@ class WidgetsHTMLDecoder {
   Future<Widget> _parseParagraphElement(
       dom.Element element, TextStyle baseTextStyle) async {
     final delta = await _parseDeltaElement(element, baseTextStyle);
-    
+
     // Extract spacing from inline style
     final spacing = _extractSpacing(element.attributes);
-    
+
     // Apply spacing if specified
     if (spacing > 0) {
       return Padding(
@@ -831,7 +834,7 @@ class WidgetsHTMLDecoder {
         child: delta,
       );
     }
-    
+
     return delta;
   }
 
@@ -1019,7 +1022,7 @@ class WidgetsHTMLDecoder {
           .copyWith(fontStyle: FontStyle.italic)
           .merge(customStyles.italicStyle);
     }
-    
+
     ///apply text alignment
     final align = cssMap["text-align"];
     if (align != null) {
@@ -1064,19 +1067,19 @@ class WidgetsHTMLDecoder {
   /// Parse font-size from CSS string (supports px, pt, and numeric values)
   static double? _parseFontSize(String fontSizeStr) {
     final trimmed = fontSizeStr.trim().toLowerCase();
-    
+
     // Handle px units
     if (trimmed.endsWith('px')) {
       final value = trimmed.substring(0, trimmed.length - 2);
       return double.tryParse(value);
     }
-    
+
     // Handle pt units
     if (trimmed.endsWith('pt')) {
       final value = trimmed.substring(0, trimmed.length - 2);
       return double.tryParse(value);
     }
-    
+
     // Handle numeric values without units
     return double.tryParse(trimmed);
   }
@@ -1085,20 +1088,21 @@ class WidgetsHTMLDecoder {
   double _extractSpacing(LinkedHashMap<Object, String> htmlAttributes) {
     final styleString = htmlAttributes["style"];
     final cssMap = _cssStringToMap(styleString);
-    
+
     // Try padding-bottom first, then margin-bottom
     final paddingBottom = cssMap["padding-bottom"];
     if (paddingBottom != null) {
-      final spacing = _parseFontSize(paddingBottom); // Reuse font-size parser for spacing
+      final spacing =
+          _parseFontSize(paddingBottom); // Reuse font-size parser for spacing
       if (spacing != null) return spacing;
     }
-    
+
     final marginBottom = cssMap["margin-bottom"];
     if (marginBottom != null) {
       final spacing = _parseFontSize(marginBottom);
       if (spacing != null) return spacing;
     }
-    
+
     return 0.0;
   }
 
@@ -1122,7 +1126,8 @@ class WidgetsHTMLDecoder {
       color: ColorExtension.parse(cssMap["color"] ?? "") ?? PdfColors.black,
       textAlign: _parseTextAlign(cssMap["text-align"]),
       textDecoration: _parseTextDecorationProperty(cssMap["text-decoration"]),
-      backgroundColor: ColorExtension.parse(cssMap["background-color"] ?? "") ?? PdfColors.white,
+      backgroundColor: ColorExtension.parse(cssMap["background-color"] ?? "") ??
+          PdfColors.white,
       border: _parseBorderProperty(cssMap, "border"),
       borderTop: _parseBorderProperty(cssMap, "border-top"),
       borderRight: _parseBorderProperty(cssMap, "border-right"),
@@ -1144,7 +1149,8 @@ class WidgetsHTMLDecoder {
   }
 
   /// Parse spacing property with CSS shorthand support
-  EdgeInsets? _parseSpacingProperty(Map<String, String> cssMap, String property) {
+  EdgeInsets? _parseSpacingProperty(
+      Map<String, String> cssMap, String property) {
     final top = _parseSizeProperty(cssMap["$property-top"]);
     final right = _parseSizeProperty(cssMap["$property-right"]);
     final bottom = _parseSizeProperty(cssMap["$property-bottom"]);
@@ -1169,11 +1175,17 @@ class WidgetsHTMLDecoder {
         case 1:
           return EdgeInsets.all(values[0]);
         case 2:
-          return EdgeInsets.symmetric(vertical: values[0], horizontal: values[1]);
+          return EdgeInsets.symmetric(
+              vertical: values[0], horizontal: values[1]);
         case 3:
-          return EdgeInsets.only(top: values[0], left: values[1], right: values[1], bottom: values[2]);
+          return EdgeInsets.only(
+              top: values[0],
+              left: values[1],
+              right: values[1],
+              bottom: values[2]);
         case 4:
-          return EdgeInsets.fromLTRB(values[3], values[0], values[1], values[2]);
+          return EdgeInsets.fromLTRB(
+              values[3], values[0], values[1], values[2]);
       }
     }
     return null;
@@ -1211,7 +1223,8 @@ class WidgetsHTMLDecoder {
   }
 
   /// Parse border property
-  BorderInfo? _parseBorderProperty(Map<String, String> cssMap, String property) {
+  BorderInfo? _parseBorderProperty(
+      Map<String, String> cssMap, String property) {
     final borderValue = cssMap[property];
     if (borderValue != null) return BorderInfo.fromString(borderValue);
 
