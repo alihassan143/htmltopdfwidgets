@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:htmltopdfwidgets_syncfusion/htmltopdfwidgets_syncfusion.dart';
+import 'package:htmltopdf_syncfusion/htmltopdf_syncfusion.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 void main() {

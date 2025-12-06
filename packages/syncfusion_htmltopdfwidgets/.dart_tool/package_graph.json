@@ -1,13 +1,15 @@
 {
   "roots": [
-    "htmltopdfwidgets_syncfusion"
+    "htmltopdf_syncfusion"
   ],
   "packages": [
     {
-      "name": "htmltopdfwidgets_syncfusion",
+      "name": "htmltopdf_syncfusion",
       "version": "0.0.1",
       "dependencies": [
+        "bidi",
         "csslib",
+        "dartarabic",
         "flutter",
         "html",
         "http",
@@ -43,6 +45,19 @@
         "test_api",
         "vector_math"
       ]
+    },
+    {
+      "name": "dartarabic",
+      "version": "0.3.1",
+      "dependencies": [
+        "characters",
+        "string_validator"
+      ]
+    },
+    {
+      "name": "bidi",
+      "version": "2.0.13",
+      "dependencies": []
     },
     {
       "name": "csslib",
@@ -191,6 +206,16 @@
       ]
     },
     {
+      "name": "characters",
+      "version": "1.4.0",
+      "dependencies": []
+    },
+    {
+      "name": "string_validator",
+      "version": "1.2.0",
+      "dependencies": []
+    },
+    {
       "name": "source_span",
       "version": "1.10.1",
       "dependencies": [
@@ -278,11 +303,6 @@
       "dependencies": [
         "collection"
       ]
-    },
-    {
-      "name": "characters",
-      "version": "1.4.0",
-      "dependencies": []
     },
     {
       "name": "leak_tracker_testing",

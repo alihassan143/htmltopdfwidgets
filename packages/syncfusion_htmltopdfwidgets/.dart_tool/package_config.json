@@ -14,6 +14,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "bidi",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/bidi-2.0.13",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "boolean_selector",
       "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/boolean_selector-2.1.2",
       "packageUri": "lib/",
@@ -52,6 +58,12 @@
     {
       "name": "csslib",
       "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/csslib-1.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.1"
+    },
+    {
+      "name": "dartarabic",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/dartarabic-0.3.1",
       "packageUri": "lib/",
       "languageVersion": "3.1"
     },
@@ -194,6 +206,12 @@
       "languageVersion": "3.1"
     },
     {
+      "name": "string_validator",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/string_validator-1.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "syncfusion_flutter_core",
       "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/syncfusion_flutter_core-24.2.9",
       "packageUri": "lib/",
@@ -248,7 +266,7 @@
       "languageVersion": "3.8"
     },
     {
-      "name": "htmltopdfwidgets_syncfusion",
+      "name": "htmltopdf_syncfusion",
       "rootUri": "../",
       "packageUri": "lib/",
       "languageVersion": "3.0"

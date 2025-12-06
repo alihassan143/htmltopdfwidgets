@@ -1,4 +1,4 @@
-library htmltopdfwidgets_syncfusion;
+library htmltopdf_syncfusion;
 
 export 'src/attributes.dart';
 export 'src/html_to_pdf.dart';

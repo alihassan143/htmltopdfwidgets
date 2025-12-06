@@ -76,7 +76,7 @@ class HtmlParser {
           }
         } catch (e) {
           // Ignore invalid CSS
-          print('Error parsing CSS: $e');
+          debugPrint('Error parsing CSS: $e');
         }
       }
     }
@@ -312,8 +312,8 @@ class HtmlParser {
             fontStyle: FontStyle.italic);
         if (tagStyle.quoteBarColor != null) {
           style = style.merge(CSSStyle(
-              borderLeft: Border(
-                  left: BorderSide(color: tagStyle.quoteBarColor!, width: 3))));
+              borderLeft:
+                  BorderSide(color: tagStyle.quoteBarColor!, width: 3)));
         }
         return style;
       case 'pre':
@@ -342,14 +342,12 @@ class HtmlParser {
         style = const CSSStyle(
             display: Display.block,
             margin: EdgeInsets.symmetric(vertical: 4.0),
-            borderBottom: Border(
-                bottom: BorderSide(
-                    width: 1.0, color: Color(0xFFBDBDBD)))); // Grey400
+            borderBottom:
+                BorderSide(width: 1.0, color: Color(0xFFBDBDBD))); // Grey400
         style = style.merge(CSSStyle(
-            borderBottom: Border(
-                bottom: BorderSide(
-                    width: tagStyle.dividerthickness,
-                    color: tagStyle.dividerColor))));
+            borderBottom: BorderSide(
+                width: tagStyle.dividerthickness,
+                color: tagStyle.dividerColor)));
         return style;
       case 'del':
       case 's':
@@ -502,6 +500,7 @@ class HtmlParser {
         final a = double.tryParse(match.group(4) ?? '1') ?? 1.0;
         return Color.fromRGBO(r, g, b, a);
       }
+      return const Color(0xFF000000);
     }
 
     // ... named colors (simplified list)
@@ -560,7 +559,7 @@ class HtmlParser {
 
   /// Converts CSS declaration group to [CSSStyle].
   CSSStyle _styleFromDeclaration(css.DeclarationGroup declarationGroup) {
-    var style = CSSStyle();
+    var style = const CSSStyle();
     for (var declaration in declarationGroup.declarations) {
       if (declaration is css.Declaration) {
         final property = declaration.property;

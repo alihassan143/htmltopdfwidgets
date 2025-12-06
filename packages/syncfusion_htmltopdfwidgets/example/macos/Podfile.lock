@@ -1,0 +1,47 @@
+PODS:
+  - device_info_plus (0.0.1):
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
+  - open_file_mac (0.0.1):
+    - FlutterMacOS
+  - path_provider_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
+  - syncfusion_pdfviewer_macos (0.0.1):
+    - FlutterMacOS
+  - url_launcher_macos (0.0.1):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - device_info_plus (from `Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - open_file_mac (from `Flutter/ephemeral/.symlinks/plugins/open_file_mac/macos`)
+  - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
+  - syncfusion_pdfviewer_macos (from `Flutter/ephemeral/.symlinks/plugins/syncfusion_pdfviewer_macos/macos`)
+  - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
+
+EXTERNAL SOURCES:
+  device_info_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/device_info_plus/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  open_file_mac:
+    :path: Flutter/ephemeral/.symlinks/plugins/open_file_mac/macos
+  path_provider_foundation:
+    :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
+  syncfusion_pdfviewer_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/syncfusion_pdfviewer_macos/macos
+  url_launcher_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos
+
+SPEC CHECKSUMS:
+  device_info_plus: b0fafc687fb901e2af612763340f1b0d4352f8e5
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  open_file_mac: 01874b6d6a2c1485ac9b126d7105b99102dea2cf
+  path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
+  syncfusion_pdfviewer_macos: 94d2eafcb3475d32309d4ba282ef02dc75fd682f
+  url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
+
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+
+COCOAPODS: 1.16.2

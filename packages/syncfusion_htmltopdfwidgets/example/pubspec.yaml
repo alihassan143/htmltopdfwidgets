@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  htmltopdfwidgets_syncfusion:
+  htmltopdf_syncfusion:
     path: ../
   syncfusion_flutter_pdf: ^24.1.41
   path_provider: ^2.1.1
@@ -23,3 +23,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/

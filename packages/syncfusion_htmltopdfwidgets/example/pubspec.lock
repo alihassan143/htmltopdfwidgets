@@ -17,6 +17,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.0"
+  bidi:
+    dependency: transitive
+    description:
+      name: bidi
+      sha256: "77f475165e94b261745cf1032c751e2032b8ed92ccb2bf5716036db79320637d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.13"
   boolean_selector:
     dependency: transitive
     description:
@@ -73,6 +81,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
+  dartarabic:
+    dependency: transitive
+    description:
+      name: dartarabic
+      sha256: "69728e84531daea5a1545e3e70dd544e3bf6d3300eb652ee5d83e626e27145d6"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.1"
   device_info_plus:
     dependency: transitive
     description:
@@ -152,7 +168,7 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.15.6"
-  htmltopdfwidgets_syncfusion:
+  htmltopdf_syncfusion:
     dependency: "direct main"
     description:
       path: ".."
@@ -436,6 +452,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  string_validator:
+    dependency: transitive
+    description:
+      name: string_validator
+      sha256: "240f4c98027dfbe8639c8271ef18cc9de735b47067aa15a720cfed9576a512b1"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.0"
   syncfusion_flutter_core:
     dependency: transitive
     description:

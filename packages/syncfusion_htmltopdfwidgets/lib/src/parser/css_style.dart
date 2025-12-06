@@ -22,10 +22,10 @@ class CSSStyle {
   final EdgeInsets? padding;
   final EdgeInsets? margin;
   final Border? border;
-  final Border? borderTop;
-  final Border? borderRight;
-  final Border? borderBottom;
-  final Border? borderLeft;
+  final BorderSide? borderTop;
+  final BorderSide? borderRight;
+  final BorderSide? borderBottom;
+  final BorderSide? borderLeft;
   final String? fontFamily;
   final TextAlign? textAlign;
   final ObjectFit? objectFit;
@@ -147,6 +147,11 @@ class CSSStyle {
     TextDirection? textDirection;
 
     final declarations = cssString.split(';');
+    BorderSide? borderLeft;
+    BorderSide? borderRight;
+    BorderSide? borderTop;
+    BorderSide? borderBottom;
+
     for (var declaration in declarations) {
       final parts = declaration.split(':');
       if (parts.length != 2) continue;
@@ -192,7 +197,25 @@ class CSSStyle {
           margin = _parseEdgeInsets(value);
           break;
         case 'border':
-          border = _parseBorder(value);
+          final b = _parseBorder(value);
+          if (b != null) {
+            borderTop = b.top;
+            borderBottom = b.bottom;
+            borderLeft = b.left;
+            borderRight = b.right;
+          }
+          break;
+        case 'border-left':
+          borderLeft = _parseBorderSide(value);
+          break;
+        case 'border-right':
+          borderRight = _parseBorderSide(value);
+          break;
+        case 'border-top':
+          borderTop = _parseBorderSide(value);
+          break;
+        case 'border-bottom':
+          borderBottom = _parseBorderSide(value);
           break;
         case 'font-family':
           fontFamily = value.replaceAll(RegExp(r"['\u0022]"), '');
@@ -218,6 +241,18 @@ class CSSStyle {
           if (value == 'ltr') textDirection = TextDirection.ltr;
           break;
       }
+    }
+
+    if (borderTop != null ||
+        borderBottom != null ||
+        borderLeft != null ||
+        borderRight != null) {
+      border = Border(
+        top: borderTop ?? BorderSide.none,
+        bottom: borderBottom ?? BorderSide.none,
+        left: borderLeft ?? BorderSide.none,
+        right: borderRight ?? BorderSide.none,
+      );
     }
 
     return CSSStyle(
@@ -414,13 +449,21 @@ class CSSStyle {
   }
 
   static Border? _parseBorder(String value) {
+    final side = _parseBorderSide(value);
+    if (side == null) return null;
+    return Border.all(width: side.width, color: side.color);
+  }
+
+  static BorderSide? _parseBorderSide(String value) {
     final parts = value.split(' ').where((s) => s.isNotEmpty).toList();
     if (parts.length < 3) return null;
 
+    // e.g. "1px solid black" or "5px solid #ccc"
     final width = _parseLength(parts[0]) ?? 1.0;
+    // parts[1] is style (solid, dashed), currently ignored/assumed solid
     final color = _parseColor(parts[2]) ?? Colors.black;
 
-    return Border.all(width: width, color: color);
+    return BorderSide(width: width, color: color);
   }
 
   static TextAlign? _parseTextAlign(String value) {
