@@ -7,7 +7,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 void main() {
   test('Basic HTML conversion', () async {
     final pdf = PdfDocument();
-    final html = '''
+    const html = '''
       <h1>Hello World</h1>
       <p>This is a paragraph with <b>bold</b> and <i>italic</i> text.</p>
       <ul>
@@ -22,7 +22,7 @@ void main() {
     ''';
 
     final converter = HtmlToPdf();
-    await converter.convert(html, pdf);
+    await converter.convert(html, targetDocument: pdf);
 
     final bytes = await pdf.save();
     pdf.dispose();

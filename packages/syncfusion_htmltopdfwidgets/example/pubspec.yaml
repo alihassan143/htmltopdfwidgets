@@ -1,0 +1,25 @@
+name: example
+description: A fresh new Flutter project.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  htmltopdfwidgets_syncfusion:
+    path: ../
+  syncfusion_flutter_pdf: ^24.1.41
+  path_provider: ^2.1.1
+  open_file: ^3.3.2
+  syncfusion_flutter_pdfviewer: ^24.2.9
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart'
     show FontWeight, FontStyle, TextDecoration;
@@ -19,9 +20,9 @@ class HtmlToPdf {
   /// [document] The Syncfusion [PdfDocument] to add the content to.
   /// [tagStyle] Optional custom styles for HTML tags.
   /// [baseStyle] Optional base style for the document.
-  Future<void> convert(
-    String html,
-    PdfDocument document, {
+  Future<Uint8List> convert(
+    String html, {
+    PdfDocument? targetDocument,
     HtmlTagStyle tagStyle = const HtmlTagStyle(),
     CSSStyle? baseStyle,
   }) async {
@@ -39,9 +40,19 @@ class HtmlToPdf {
 
     final root = parser.parse();
 
+    final document = targetDocument ?? PdfDocument();
     final builder =
         PdfBuilder(root: root, document: document, tagStyle: tagStyle);
 
     await builder.build();
+
+    final List<int> bytes = await document.save();
+
+    // Dispose only if we created it
+    if (targetDocument == null) {
+      document.dispose();
+    }
+
+    return Uint8List.fromList(bytes);
   }
 }
