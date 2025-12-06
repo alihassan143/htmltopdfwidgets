@@ -1,0 +1,21 @@
+name: htmltopdfwidgets_syncfusion
+description: A Dart package that converts HTML and Markdown content into Syncfusion PDF widgets.
+version: 0.0.1
+homepage: https://github.com/alihassan143/htmltopdfwidgets
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  syncfusion_flutter_pdf: ^24.1.41
+  html: ">=0.15.4 <1.0.0"
+  http: ">=1.1.0 <2.0.0"
+  markdown: ^7.1.1
+  csslib: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0

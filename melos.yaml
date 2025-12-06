@@ -1,0 +1,60 @@
+name: htmltopdfwidgets
+packages:
+  - packages/*
+
+scripts:
+  analyze:
+    run: |
+      melos run analyze:dart
+      melos run analyze:flutter
+
+  analyze:dart:
+    run: dart analyze .
+    exec:
+      concurrency: 1
+    description: Run dart analyze in a specific package.
+    packageFilters:
+      flutter: false
+
+  analyze:flutter:
+    run: flutter analyze .
+    exec:
+      concurrency: 1
+    description: Run flutter analyze in a specific package.
+    packageFilters:
+      flutter: true
+
+  test:
+    run: |
+      melos run test:dart
+      melos run test:flutter
+
+  test:dart:
+    run: dart test
+    exec:
+      concurrency: 1
+    description: Run dart test in a specific package.
+    packageFilters:
+      flutter: false
+      dirExists: test
+
+  test:flutter:
+    run: flutter test
+    exec:
+      concurrency: 1
+    description: Run flutter test in a specific package.
+    packageFilters:
+      flutter: true
+      dirExists: test
+
+  format:
+    run: dart format .
+    exec:
+      concurrency: 1
+    description: Format code in all packages.
+
+  get:
+    run: dart pub get
+    exec:
+      concurrency: 1
+    description: Run pub get in all packages.

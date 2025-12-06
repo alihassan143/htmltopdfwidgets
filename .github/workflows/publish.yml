@@ -1,0 +1,44 @@
+name: Publish to Pub.dev
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [htmltopdfwidgets, syncfusion_htmltopdfwidgets]
+    environment:
+      name: release
+      url: https://pub.dev/packages/${{ matrix.package }}
+    permissions:
+      id-token: write # Required for authentication using OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          # Check if the package directory has changes in the last commit
+          if git diff --name-only HEAD~1 HEAD | grep "^packages/${{ matrix.package }}/"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in packages/${{ matrix.package }}"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes in packages/${{ matrix.package }}"
+          fi
+
+      - name: Install dependencies
+        if: steps.check_changes.outputs.changed == 'true'
+        working-directory: packages/${{ matrix.package }}
+        run: dart pub get
+
+      - name: Publish package
+        if: steps.check_changes.outputs.changed == 'true'
+        working-directory: packages/${{ matrix.package }}
+        run: dart pub publish -f
