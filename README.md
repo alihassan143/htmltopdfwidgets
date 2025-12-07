@@ -7,7 +7,7 @@ Welcome to the `htmltopdfwidgets` monorepo! This repository contains packages fo
 | Package | Version | Description |
 | :--- | :--- | :--- |
 | [htmltopdfwidgets](packages/htmltopdfwidgets) | [![pub package](https://img.shields.io/pub/v/htmltopdfwidgets.svg)](https://pub.dev/packages/htmltopdfwidgets) | The core package for converting HTML and Markdown to PDF widgets. Supports both legacy and new browser-like rendering engines. |
-| [htmltopdfwidgets_syncfusion](packages/syncfusion_htmltopdfwidgets) | [![pub package](https://img.shields.io/pub/v/htmltopdfwidgets_syncfusion.svg)](https://pub.dev/packages/htmltopdfwidgets_syncfusion) | A finalized package that uses Syncfusion PDF widgets for rendering. |
+| [htmltopdf_syncfusion](packages/htmltopdf_syncfusion) | [![pub package](https://img.shields.io/pub/v/htmltopdf_syncfusion.svg)](https://pub.dev/packages/htmltopdf_syncfusion) | A finalized package that uses Syncfusion PDF widgets for rendering. |
 
 ## Workspace Management
 

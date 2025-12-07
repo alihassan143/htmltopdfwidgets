@@ -1,4 +1,4 @@
-# htmltopdfwidgets_syncfusion
+# htmltopdf_syncfusion
 
 A robust Flutter package that simplifies the process of converting HTML and Markdown content into high-quality PDFs using the **Syncfusion Flutter PDF** library. This package handles complex text layouts, multi-language support (including Arabic RTL), and basic CSS styling.
 
@@ -28,7 +28,7 @@ A robust Flutter package that simplifies the process of converting HTML and Mark
 
 ```yaml
 dependencies:
-  htmltopdfwidgets_syncfusion:
+  htmltopdf_syncfusion:
     path: ./ # Or git url/pub version
   syncfusion_flutter_pdf: ^24.1.41
 ```
@@ -36,7 +36,7 @@ dependencies:
 2.  Import the package:
 
 ```dart
-import 'package:htmltopdfwidgets_syncfusion/htmltopdfwidgets_syncfusion.dart';
+import 'package:htmltopdf_syncfusion/htmltopdf_syncfusion.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 ```
 
