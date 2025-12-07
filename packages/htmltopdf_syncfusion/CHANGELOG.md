@@ -1,3 +1,8 @@
+## 0.0.2
+
+*   **Refactor**: Renamed package to `htmltopdf_syncfusion` for consistency.
+*   **Chore**: Updated CI workflows to use Flutter and Melos for improved reliability.
+
 ## 0.0.1
 
 *   **Initial Release**:

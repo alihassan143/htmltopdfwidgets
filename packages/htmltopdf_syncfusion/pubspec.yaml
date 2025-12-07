@@ -1,6 +1,6 @@
 name: htmltopdf_syncfusion
 description: A Dart package that converts HTML and Markdown content into Syncfusion PDF.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/alihassan143/htmltopdfwidgets
 
 environment:
