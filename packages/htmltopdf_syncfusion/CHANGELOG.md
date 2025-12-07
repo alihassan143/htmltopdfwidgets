@@ -1,3 +1,8 @@
+## 0.0.3
+
+*   **Documentation**: Improved README with clear usage examples.
+*   **Fix**: Resolved lint errors in tests.
+
 ## 0.0.2
 
 *   **Refactor**: Renamed package to `htmltopdf_syncfusion` for consistency.
