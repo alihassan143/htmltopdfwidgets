@@ -25,6 +25,8 @@ jobs:
         with:
           channel: "stable"
 
+      - uses: dart-lang/setup-dart@v1
+
       - name: Check for changes
         id: check_changes
         run: |
@@ -40,9 +42,9 @@ jobs:
       - name: Install dependencies
         if: steps.check_changes.outputs.changed == 'true'
         working-directory: packages/${{ matrix.package }}
-        run: dart pub get
+        run: flutter pub get
 
       - name: Publish package
         if: steps.check_changes.outputs.changed == 'true'
         working-directory: packages/${{ matrix.package }}
-        run: dart pub publish -f
+        run: flutter pub publish -f

@@ -1,3 +1,7 @@
+## 0.0.6
+
+*   **Fixed**: Resolved OIDC authentication for automated publishing by injecting Dart credentials.
+
 ## 0.0.5
 
 *   **Fixed**: Resolved CI/CD issue where changes were not detected during release.
