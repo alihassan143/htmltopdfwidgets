@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:htmltopdf_syncfusion/htmltopdf_syncfusion.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
@@ -31,6 +32,6 @@ void main() {
     await file.writeAsBytes(bytes);
 
     expect(bytes.isNotEmpty, true);
-    print('PDF saved to ${file.absolute.path}');
+    debugPrint('PDF saved to ${file.absolute.path}');
   });
 }
