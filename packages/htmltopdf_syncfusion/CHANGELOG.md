@@ -1,4 +1,4 @@
-## 0.0.3
+## 0.0.4
 
 *   **Documentation**: Improved README with clear usage examples.
 *   **Fix**: Resolved lint errors in tests.
