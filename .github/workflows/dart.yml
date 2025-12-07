@@ -24,6 +24,9 @@ jobs:
         with:
           channel: "stable"
 
+      - name: Debug - List files
+        run: ls -la
+
       - name: Install Melos
         run: dart pub global activate melos
 
