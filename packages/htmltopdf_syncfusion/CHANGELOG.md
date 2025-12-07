@@ -1,3 +1,7 @@
+## 0.0.5
+
+*   **Fixed**: Resolved CI/CD issue where changes were not detected during release.
+
 ## 0.0.4
 
 *   **Documentation**: Improved README with clear usage examples.
