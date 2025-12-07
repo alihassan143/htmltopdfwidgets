@@ -42,38 +42,64 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 ## Usage
 
-### Basic Example
+### 1. Simple Usage (Generate Bytes)
+
+Directly convert HTML string to PDF bytes.
 
 ```dart
-// 1. Create a new PDF document
-final PdfDocument document = PdfDocument();
+import 'dart:io';
+import 'package:htmltopdf_syncfusion/htmltopdf_syncfusion.dart';
 
-// 2. Define your HTML content
-const String htmlContent = '''
-  <h1>Hello, PDF!</h1>
-  <p>This is a paragraph with <b>bold</b> and <i>italic</i> text.</p>
-  <ul>
-    <li>First item</li>
-    <li>Second item</li>
-  </ul>
-''';
+void main() async {
+  const String htmlContent = '''
+    <h1>Hello, PDF!</h1>
+    <p>This is a paragraph with <b>bold</b> and <i>italic</i> text.</p>
+  ''';
 
-// 3. Convert and draw HTML to the document
-// The `HTMLToPdf` widget handles the parsing and drawing.
-// Note: This package currently provides a builder pattern internally.
-// Use the `HTMLToPdf` class to convert:
+  // Converts HTML directly to PDF bytes
+  final List<int> bytes = await HtmlToPdf().convert(htmlContent);
 
-final HTMLToPdf converter = HTMLToPdf(
-  htmlContent: htmlContent,
-  defaultFontSize: 12,
-);
+  final File file = File('output.pdf');
+  await file.writeAsBytes(bytes);
+}
+```
 
-// Draw content onto the page
-await converter.convert(document);
+### 2. Advanced Usage (Add to existing PdfDocument)
 
-// 4. Save the document
-final List<int> bytes = await document.save();
-document.dispose();
+Useful if you want to add pages or content to an existing Syncfusion `PdfDocument`.
+
+```dart
+import 'dart:io';
+import 'package:htmltopdf_syncfusion/htmltopdf_syncfusion.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
+
+void main() async {
+  // Create a new PDF document or load an existing one
+  final PdfDocument document = PdfDocument();
+  
+  // Add some initial content manually if needed
+  document.pages.add().graphics.drawString(
+      'Document Header', PdfStandardFont(PdfFontFamily.helvetica, 18));
+
+  const String htmlContent = '''
+    <h2>HTML Section</h2>
+    <ul>
+      <li>Item 1</li>
+      <li>Item 2</li>
+    </ul>
+  ''';
+
+  final HtmlToPdf converter = HtmlToPdf();
+  
+  // Convert and add to the existing document
+  await converter.convert(htmlContent, targetDocument: document);
+
+  // Save the document
+  final List<int> bytes = await document.save();
+  document.dispose();
+
+  await File('combined.pdf').writeAsBytes(bytes);
+}
 ```
 
 ### Handling Assets/Fonts
