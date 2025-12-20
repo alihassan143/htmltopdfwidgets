@@ -20,6 +20,7 @@ dependencies:
   image: ^4.7.1
   markdown: ^7.3.0
   html: ^0.15.6
+  http: ^1.6.0
 
 dev_dependencies:
   lints: ^6.0.0

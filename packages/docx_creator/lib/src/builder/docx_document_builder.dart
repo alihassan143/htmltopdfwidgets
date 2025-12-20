@@ -1,3 +1,4 @@
+import '../ast/docx_background_image.dart';
 import '../ast/docx_block.dart';
 import '../ast/docx_image.dart';
 import '../ast/docx_list.dart';
@@ -30,6 +31,7 @@ class DocxDocumentBuilder {
     DocxHeader? header,
     DocxFooter? footer,
     DocxColor? backgroundColor,
+    DocxBackgroundImage? backgroundImage,
   }) {
     _currentSection = DocxSectionDef(
       orientation: orientation,
@@ -37,6 +39,7 @@ class DocxDocumentBuilder {
       header: header,
       footer: footer,
       backgroundColor: backgroundColor,
+      backgroundImage: backgroundImage,
     );
     return this;
   }

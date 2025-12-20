@@ -39,10 +39,12 @@ class HtmlExporter {
 
     final styles = <String>[];
     if (para.align.name != 'left') styles.add('text-align: ${para.align.name}');
-    if (para.indentLeft != null)
+    if (para.indentLeft != null) {
       styles.add('margin-left: ${para.indentLeft! / 20}px');
-    if (para.shadingFill != null)
+    }
+    if (para.shadingFill != null) {
       styles.add('background-color: #${para.shadingFill}');
+    }
 
     final styleAttr = styles.isNotEmpty ? ' style="${styles.join(';')}"' : '';
     final content = para.children.map(_convertInline).join();
@@ -53,10 +55,12 @@ class HtmlExporter {
   String _convertInline(DocxInline inline) {
     if (inline is DocxText) return _convertText(inline);
     if (inline is DocxLineBreak) return '<br>';
-    if (inline is DocxPageNumber)
+    if (inline is DocxPageNumber) {
       return '<span class="page-number">[Page]</span>';
-    if (inline is DocxPageCount)
+    }
+    if (inline is DocxPageCount) {
       return '<span class="page-count">[Total]</span>';
+    }
     return '';
   }
 
@@ -68,14 +72,22 @@ class HtmlExporter {
     if (text.isStrike) content = '<del>$content</del>';
 
     final styles = <String>[];
-    if (text.effectiveColorHex != null)
+    if (text.effectiveColorHex != null) {
       styles.add('color: #${text.effectiveColorHex}');
-    if (text.fontSize != null) styles.add('font-size: ${text.fontSize}pt');
-    if (text.fontFamily != null) styles.add('font-family: ${text.fontFamily}');
+    }
+    if (text.fontSize != null) {
+      styles.add('font-size: ${text.fontSize}pt');
+    }
+    if (text.fontFamily != null) {
+      styles.add('font-family: ${text.fontFamily}');
+    }
 
-    if (styles.isNotEmpty)
+    if (styles.isNotEmpty) {
       content = '<span style="${styles.join(';')}">$content</span>';
-    if (text.href != null) content = '<a href="${text.href}">$content</a>';
+    }
+    if (text.href != null) {
+      content = '<a href="${text.href}">$content</a>';
+    }
     return content;
   }
 
@@ -86,8 +98,9 @@ class HtmlExporter {
       for (var cell in row.cells) {
         buffer.write('<td');
         if (cell.colSpan > 1) buffer.write(' colspan="${cell.colSpan}"');
-        if (cell.shadingFill != null)
+        if (cell.shadingFill != null) {
           buffer.write(' style="background-color: #${cell.shadingFill}"');
+        }
         buffer.write('>');
         for (var child in cell.children) {
           buffer.write(_convertNode(child));

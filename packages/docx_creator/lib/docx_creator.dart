@@ -11,8 +11,9 @@
 ///
 /// await DocxExporter().exportToFile(doc, 'output.docx');
 /// ```
-library docx_creator;
+library;
 
+export 'src/ast/docx_background_image.dart';
 export 'src/ast/docx_block.dart';
 export 'src/ast/docx_image.dart';
 export 'src/ast/docx_inline.dart';

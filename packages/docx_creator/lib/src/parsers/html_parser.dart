@@ -127,7 +127,9 @@ class DocxParser {
 
   static List<DocxInline> _parseInlines(List<dom.Node> nodes) {
     final results = <DocxInline>[];
-    for (var node in nodes) results.addAll(_parseInline(node));
+    for (var node in nodes) {
+      results.addAll(_parseInline(node));
+    }
     return results;
   }
 
@@ -181,8 +183,7 @@ class DocxParser {
   }
 
   static DocxText _parseStyledText(String text, String style) {
-    bool isBold =
-        style.contains('font-weight') &&
+    bool isBold = style.contains('font-weight') &&
         (style.contains('bold') || style.contains('700'));
     bool isItalic = style.contains('font-style') && style.contains('italic');
     String? colorHex;
@@ -201,7 +202,6 @@ class DocxParser {
       fontWeight: isBold ? DocxFontWeight.bold : DocxFontWeight.normal,
       fontStyle: isItalic ? DocxFontStyle.italic : DocxFontStyle.normal,
       color: colorHex != null ? DocxColor(colorHex) : DocxColor.black,
-
       fontSize: fontSize,
     );
   }

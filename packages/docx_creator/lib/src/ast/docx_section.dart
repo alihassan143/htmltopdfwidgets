@@ -2,6 +2,7 @@ import 'package:xml/xml.dart';
 
 import '../core/defaults.dart';
 import '../core/enums.dart';
+import 'docx_background_image.dart';
 import 'docx_block.dart';
 import 'docx_inline.dart';
 import 'docx_node.dart';
@@ -81,6 +82,12 @@ class DocxSectionDef extends DocxSection {
   /// Background color for all pages in this section.
   final DocxColor? backgroundColor;
 
+  /// Background image for all pages in this section.
+  ///
+  /// If both [backgroundColor] and [backgroundImage] are set,
+  /// the image will be rendered on top of the color.
+  final DocxBackgroundImage? backgroundImage;
+
   const DocxSectionDef({
     this.orientation = DocxPageOrientation.portrait,
     this.pageSize = DocxPageSize.letter,
@@ -94,12 +101,14 @@ class DocxSectionDef extends DocxSection {
     this.header,
     this.footer,
     this.backgroundColor,
+    this.backgroundImage,
     super.id,
   });
 
   int get effectiveWidth {
-    if (pageSize == DocxPageSize.custom && customWidth != null)
+    if (pageSize == DocxPageSize.custom && customWidth != null) {
       return customWidth!;
+    }
     switch (pageSize) {
       case DocxPageSize.letter:
         return 12240;
@@ -115,8 +124,9 @@ class DocxSectionDef extends DocxSection {
   }
 
   int get effectiveHeight {
-    if (pageSize == DocxPageSize.custom && customHeight != null)
+    if (pageSize == DocxPageSize.custom && customHeight != null) {
       return customHeight!;
+    }
     switch (pageSize) {
       case DocxPageSize.letter:
         return 15840;

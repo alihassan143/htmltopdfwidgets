@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:docx_creator/docx_creator.dart';
 import 'package:test/test.dart';
 
@@ -96,10 +98,8 @@ void main() {
     });
 
     test('with section', () {
-      final doc = docx()
-          .section(header: DocxHeader.text('Header'))
-          .h1('Title')
-          .build();
+      final doc =
+          docx().section(header: DocxHeader.text('Header')).h1('Title').build();
       expect(doc.section?.header, isNotNull);
     });
   });
@@ -132,6 +132,136 @@ void main() {
       final doc = docx().h1('Title').build();
       final html = HtmlExporter().export(doc);
       expect(html.contains('<h1>'), true);
+    });
+  });
+
+  group('DocxBackgroundImage', () {
+    test('basic creation with defaults', () {
+      final bg = DocxBackgroundImage(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        extension: 'png',
+      );
+      expect(bg.fillMode, DocxBackgroundFillMode.stretch);
+      expect(bg.opacity, 1.0);
+      expect(bg.normalizedExtension, 'png');
+    });
+
+    test('normalizes jpg to jpeg', () {
+      final bg = DocxBackgroundImage(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        extension: 'jpg',
+      );
+      expect(bg.normalizedExtension, 'jpeg');
+    });
+
+    test('normalizes tif to tiff', () {
+      final bg = DocxBackgroundImage(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        extension: 'tif',
+      );
+      expect(bg.normalizedExtension, 'tiff');
+    });
+
+    test('tile fill mode returns correct VML type', () {
+      final bg = DocxBackgroundImage(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        extension: 'png',
+        fillMode: DocxBackgroundFillMode.tile,
+      );
+      expect(bg.vmlFillType, 'tile');
+    });
+
+    test('stretch fill mode returns frame VML type', () {
+      final bg = DocxBackgroundImage(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        extension: 'png',
+        fillMode: DocxBackgroundFillMode.stretch,
+      );
+      expect(bg.vmlFillType, 'frame');
+    });
+
+    test('content type for various formats', () {
+      expect(
+        DocxBackgroundImage(
+          bytes: Uint8List.fromList([1]),
+          extension: 'png',
+        ).contentType,
+        'image/png',
+      );
+      expect(
+        DocxBackgroundImage(
+          bytes: Uint8List.fromList([1]),
+          extension: 'jpeg',
+        ).contentType,
+        'image/jpeg',
+      );
+      expect(
+        DocxBackgroundImage(
+          bytes: Uint8List.fromList([1]),
+          extension: 'gif',
+        ).contentType,
+        'image/gif',
+      );
+    });
+
+    test('section with background image', () {
+      final bg = DocxBackgroundImage(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        extension: 'png',
+      );
+      final doc = docx().section(backgroundImage: bg).h1('Title').build();
+      expect(doc.section?.backgroundImage, isNotNull);
+      expect(doc.section?.backgroundImage?.fillMode,
+          DocxBackgroundFillMode.stretch);
+    });
+
+    test('exports document with background image', () async {
+      final bg = DocxBackgroundImage(
+        bytes: Uint8List.fromList([
+          0x89,
+          0x50,
+          0x4E,
+          0x47,
+          0x0D,
+          0x0A,
+          0x1A,
+          0x0A,
+          0x00,
+          0x00,
+          0x00,
+          0x0D,
+          0x49,
+          0x48,
+          0x44,
+          0x52,
+          0x00,
+          0x00,
+          0x00,
+          0x01,
+          0x00,
+          0x00,
+          0x00,
+          0x01,
+          0x08,
+          0x02,
+          0x00,
+          0x00,
+          0x00,
+          0x90,
+          0x77,
+          0x53,
+          0xDE,
+        ]),
+        extension: 'png',
+        opacity: 0.5,
+      );
+      final doc = docx().section(backgroundImage: bg).h1('Test').build();
+
+      final bytes = await DocxExporter().exportToBytes(doc);
+      expect(bytes.length, greaterThan(0));
+      // ZIP signature
+      expect(bytes[0], 0x50);
+      expect(bytes[1], 0x4B);
     });
   });
 }
