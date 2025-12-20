@@ -1,3 +1,28 @@
+## 2.0.0
+
+* **New Architecture**: Introduced a "Browser Rendering Engine" architecture for more robust HTML to PDF conversion.
+    * **Style Engine**: Comprehensive CSS parsing and cascading support.
+    * **Render Tree**: Intermediate DOM representation with fully computed styles.
+    * **PDF Builder**: Modular PDF widget generation with better layout handling.
+* **Unified API**: Updated `HTMLToPdf.convert` to support the new engine via `useNewEngine: true`.
+* **Checkbox Enhancements**:
+    * Fixed inline rendering of checkboxes (now flow with text).
+    * Improved vertical alignment (centered by default, respects `vertical-align`).
+* **Multi-Language Support**:
+    * Added `textDirection` support for RTL languages (Arabic, Hebrew).
+    * Added `fontFallback` support for Emojis and complex scripts in the new engine.
+* **Enhanced Element Support**:
+    * Improved Table rendering with full CSS support (borders, padding, background).
+    * Better List handling (nested lists, custom bullets).
+    * Support for `blockquote`, `pre`, `code`, `hr`, `checkbox`, and more.
+* **Rendering Improvements**:
+    * Fixed inline content rendering (bold, italic, mixed text).
+    * Fixed list item text visibility.
+    * Optimized default spacing to match legacy engine.
+* **Custom Styles**: Added full support for `HtmlTagStyle` in the new engine.
+* **Robustness**: Improved error handling for images and fonts.
+* **Legacy Support**: Maintained full backward compatibility with the legacy engine (default).
+
 ## 2.0.0-beta.2
 
 * **Checkbox Enhancements**:

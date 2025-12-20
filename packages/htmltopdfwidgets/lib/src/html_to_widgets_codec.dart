@@ -25,7 +25,7 @@ class HTMLToPdf extends HtmlCodec {
       double defaultFontSize = 12.0,
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle(),
-      bool useNewEngine = false}) async {
+      bool useNewEngine = true}) async {
     if (useNewEngine) {
       final parser = HtmlParser(
         htmlString: html,
@@ -79,7 +79,7 @@ class HTMLToPdf extends HtmlCodec {
       bool withDefaultInlineSyntaxes = true,
       //custom html tag styles
       HtmlTagStyle tagStyle = const HtmlTagStyle(),
-      bool useNewEngine = false}) async {
+      bool useNewEngine = true}) async {
     final html = markdownToHtml(
       markDown,
       extensionSet: extensionSet ?? ExtensionSet.gitHubFlavored,
@@ -141,7 +141,7 @@ abstract class HtmlCodec {
       bool wrapInParagraph = false,
       FutureOr<Font> Function(String, bool, bool)? fontResolver,
       HtmlTagStyle tagStyle = const HtmlTagStyle(),
-      bool useNewEngine = false});
+      bool useNewEngine = true});
   Future<List<Widget>> convertMarkdown(String markDown,
       {List<Font> fontFallback = const [],
       //font resolver (font name, bold, italic) => font
