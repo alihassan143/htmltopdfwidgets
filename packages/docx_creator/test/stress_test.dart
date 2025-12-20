@@ -96,8 +96,7 @@ void main() {
       final doc = docx()
           .h1('Unicode Test 日本語 العربية')
           .p('Emojis: 🎉🚀💻')
-          .bullet(['日本語', 'العربية', '中文'])
-          .build();
+          .bullet(['日本語', 'العربية', '中文']).build();
 
       final bytes = await DocxExporter().exportToBytes(doc);
       expect(bytes.length, greaterThan(0));
@@ -132,20 +131,20 @@ void main() {
       expect(html.length, greaterThan(0));
     });
 
-    test('Markdown parsing', () {
+    test('Markdown parsing', () async {
       final md = '''
 # Heading 1
 This is **bold** and *italic*.
 - Bullet 1
 - Bullet 2
 ''';
-      final elements = DocxParser.fromMarkdown(md);
+      final elements = await DocxParser.fromMarkdown(md);
       expect(elements.length, greaterThan(0));
     });
 
-    test('HTML parsing', () {
+    test('HTML parsing', () async {
       final html = '<h1>Title</h1><p><strong>bold</strong></p>';
-      final elements = DocxParser.fromHtml(html);
+      final elements = await DocxParser.fromHtml(html);
       expect(elements.length, greaterThan(0));
     });
   });

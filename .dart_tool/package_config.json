@@ -219,8 +219,8 @@
     }
   ],
   "generator": "pub",
-  "generatorVersion": "3.10.4",
-  "flutterRoot": "file:///Users/mac/development/flutter",
-  "flutterVersion": "3.38.5",
+  "generatorVersion": "3.9.2",
+  "flutterRoot": "file:///opt/homebrew/Caskroom/flutter/3.27.2/flutter",
+  "flutterVersion": "3.35.4",
   "pubCache": "file:///Users/mac/.pub-cache"
 }

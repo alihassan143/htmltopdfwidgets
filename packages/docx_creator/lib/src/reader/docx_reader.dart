@@ -54,8 +54,19 @@ class _DocxReaderInternal {
     final body = documentXml.findAllElements('w:body').first;
     final elements = _parseBody(body);
 
+    // Parse Document Background
+    DocxColor? backgroundColor;
+    final bgElem = documentXml.findAllElements('w:background').firstOrNull;
+    if (bgElem != null) {
+      final colorHex = bgElem.getAttribute('w:color');
+      if (colorHex != null && colorHex != 'auto') {
+        backgroundColor = DocxColor('#$colorHex');
+      }
+    }
+
     // Parse Section Properties
-    final section = _parseSectionProperties(body);
+    final section =
+        _parseSectionProperties(body, backgroundColor: backgroundColor);
 
     // Read Styles and Numbering (Raw)
     final stylesXml = _readXmlContent('word/styles.xml');
@@ -117,68 +128,22 @@ class _DocxReaderInternal {
   }
 
   List<DocxNode> _parseBody(XmlElement body) {
-    final nodes = <DocxNode>[];
-    final pendingListItems = <DocxParagraph>[];
-    int? currentNumId;
-
-    void flushPendingList() {
-      if (pendingListItems.isNotEmpty && currentNumId != null) {
-        nodes.add(_createListFromParagraphs(pendingListItems, currentNumId!));
-        pendingListItems.clear();
-        currentNumId = null;
-      }
-    }
-
-    for (var child in body.children) {
-      if (child is XmlElement) {
-        if (child.name.local == 'p') {
-          final para = _parseParagraph(child);
-
-          // Check if this is a list item
-          if (para.numId != null) {
-            // Start new list or continue existing
-            if (currentNumId == null || currentNumId == para.numId) {
-              pendingListItems.add(para);
-              currentNumId = para.numId;
-            } else {
-              // Different numId, flush previous list
-              flushPendingList();
-              pendingListItems.add(para);
-              currentNumId = para.numId;
-            }
-          } else {
-            // Not a list item, flush any pending list
-            flushPendingList();
-            nodes.add(para);
-          }
-        } else if (child.name.local == 'tbl') {
-          // Flush pending list before table
-          flushPendingList();
-          nodes.add(_parseTable(child));
-        } else if (child.name.local == 'sectPr') {
-          // Handled separately
-          continue;
-        } else {
-          // Flush pending list before unknown node
-          flushPendingList();
-          // Provide raw XML preservation for unknown nodes
-          nodes.add(DocxRawXml(child.toXmlString()));
-        }
-      }
-    }
-
-    // Flush any remaining list
-    flushPendingList();
-
-    return nodes;
+    return _parseBlocks(body.children);
   }
 
   DocxParagraph _parseParagraph(XmlElement xml) {
     final children = <DocxInline>[];
     String? pStyle;
     DocxAlign align = DocxAlign.left;
+    String? shadingFill;
     int? numId;
     int? ilvl;
+    int? spacingAfter;
+    int? spacingBefore;
+    int? lineSpacing;
+    int? indentLeft;
+    int? indentRight;
+    int? indentFirstLine;
 
     // Parse paragraph properties
     final pPr = xml.getElement('w:pPr');
@@ -194,8 +159,44 @@ class _DocxReaderInternal {
       if (jcElem != null) {
         final val = jcElem.getAttribute('w:val');
         if (val == 'center') align = DocxAlign.center;
-        if (val == 'right') align = DocxAlign.right;
+        if (val == 'right' || val == 'end') align = DocxAlign.right;
         if (val == 'both' || val == 'distribute') align = DocxAlign.justify;
+        if (val == 'left' || val == 'start') align = DocxAlign.left;
+      }
+
+      // Spacing
+      final spacingElem = pPr.getElement('w:spacing');
+      if (spacingElem != null) {
+        final after = spacingElem.getAttribute('w:after');
+        if (after != null) spacingAfter = int.tryParse(after);
+
+        final before = spacingElem.getAttribute('w:before');
+        if (before != null) spacingBefore = int.tryParse(before);
+
+        final line = spacingElem.getAttribute('w:line');
+        if (line != null) lineSpacing = int.tryParse(line);
+      }
+
+      // Indentation
+      final indElem = pPr.getElement('w:ind');
+      if (indElem != null) {
+        final left =
+            indElem.getAttribute('w:left') ?? indElem.getAttribute('w:start');
+        if (left != null) indentLeft = int.tryParse(left);
+
+        final right =
+            indElem.getAttribute('w:right') ?? indElem.getAttribute('w:end');
+        if (right != null) indentRight = int.tryParse(right);
+
+        final firstLine = indElem.getAttribute('w:firstLine');
+        if (firstLine != null) indentFirstLine = int.tryParse(firstLine);
+      }
+
+      // Shading
+      final shdElem = pPr.getElement('w:shd');
+      if (shdElem != null) {
+        shadingFill = shdElem.getAttribute('w:fill');
+        if (shadingFill == 'auto') shadingFill = null;
       }
 
       // Numbering/Lists
@@ -219,10 +220,26 @@ class _DocxReaderInternal {
         if (child.name.local == 'r') {
           children.add(_parseRun(child));
         } else if (child.name.local == 'hyperlink') {
-          // TODO: Handle hyperlinks more gracefully
-          // For now, flatten content
+          // Extract href from relationship
+          final rId = child.getAttribute('r:id');
+          String? href;
+          if (rId != null && _documentRelationships.containsKey(rId)) {
+            href = _documentRelationships[rId]!.target;
+          }
+
+          // Parse all runs within the hyperlink
           for (var grandChild in child.findAllElements('w:r')) {
-            children.add(_parseRun(grandChild));
+            final run = _parseRun(grandChild);
+            // Apply href to DocxText elements
+            if (run is DocxText && href != null) {
+              children.add(run.copyWith(
+                href: href,
+                decoration: DocxTextDecoration.underline,
+                color: DocxColor.blue,
+              ));
+            } else {
+              children.add(run);
+            }
           }
         }
       }
@@ -232,8 +249,15 @@ class _DocxReaderInternal {
       children: children,
       styleId: pStyle,
       align: align,
+      shadingFill: shadingFill,
       numId: numId,
       ilvl: ilvl,
+      spacingAfter: spacingAfter,
+      spacingBefore: spacingBefore,
+      lineSpacing: lineSpacing,
+      indentLeft: indentLeft,
+      indentRight: indentRight,
+      indentFirstLine: indentFirstLine,
     );
   }
 
@@ -267,8 +291,19 @@ class _DocxReaderInternal {
     var fontStyle = DocxFontStyle.normal;
     var decoration = DocxTextDecoration.none;
     DocxColor? color;
+    String? shadingFill;
     double? fontSize;
     String? fontFamily;
+    var highlight = DocxHighlight.none;
+    bool isSuperscript = false;
+    bool isSubscript = false;
+    bool isAllCaps = false;
+    bool isSmallCaps = false;
+    bool isDoubleStrike = false;
+    bool isOutline = false;
+    bool isShadow = false;
+    bool isEmboss = false;
+    bool isImprint = false;
 
     final rPr = run.getElement('w:rPr');
     if (rPr != null) {
@@ -289,6 +324,12 @@ class _DocxReaderInternal {
         }
       }
 
+      final shdElem = rPr.getElement('w:shd');
+      if (shdElem != null) {
+        shadingFill = shdElem.getAttribute('w:fill');
+        if (shadingFill == 'auto') shadingFill = null;
+      }
+
       final szElem = rPr.getElement('w:sz');
       if (szElem != null) {
         final val = szElem.getAttribute('w:val');
@@ -304,6 +345,38 @@ class _DocxReaderInternal {
       if (rFonts != null) {
         fontFamily = rFonts.getAttribute('w:ascii');
       }
+
+      // Highlight
+      final highlightElem = rPr.getElement('w:highlight');
+      if (highlightElem != null) {
+        final val = highlightElem.getAttribute('w:val');
+        if (val != null) {
+          // Map string to enum
+          for (var h in DocxHighlight.values) {
+            if (h.name == val) {
+              highlight = h;
+              break;
+            }
+          }
+        }
+      }
+
+      // Text Effects
+      if (rPr.getElement('w:caps') != null) isAllCaps = true;
+      if (rPr.getElement('w:smallCaps') != null) isSmallCaps = true;
+      if (rPr.getElement('w:dstrike') != null) isDoubleStrike = true;
+      if (rPr.getElement('w:outline') != null) isOutline = true;
+      if (rPr.getElement('w:shadow') != null) isShadow = true;
+      if (rPr.getElement('w:emboss') != null) isEmboss = true;
+      if (rPr.getElement('w:imprint') != null) isImprint = true;
+
+      // Vertical Align (Super/Sub)
+      final vertAlignElem = rPr.getElement('w:vertAlign');
+      if (vertAlignElem != null) {
+        final val = vertAlignElem.getAttribute('w:val');
+        if (val == 'superscript') isSuperscript = true;
+        if (val == 'subscript') isSubscript = true;
+      }
     }
 
     final textElem = run.getElement('w:t');
@@ -314,8 +387,19 @@ class _DocxReaderInternal {
         fontStyle: fontStyle,
         decoration: decoration,
         color: color,
+        shadingFill: shadingFill,
         fontSize: fontSize,
         fontFamily: fontFamily,
+        highlight: highlight,
+        isSuperscript: isSuperscript,
+        isSubscript: isSubscript,
+        isAllCaps: isAllCaps,
+        isSmallCaps: isSmallCaps,
+        isDoubleStrike: isDoubleStrike,
+        isOutline: isOutline,
+        isShadow: isShadow,
+        isEmboss: isEmboss,
+        isImprint: isImprint,
       );
     }
 
@@ -376,18 +460,67 @@ class _DocxReaderInternal {
     );
   }
 
+  List<DocxBlock> _parseBlocks(Iterable<XmlNode> children) {
+    final nodes = <DocxBlock>[];
+    final pendingListItems = <DocxParagraph>[];
+    int? currentNumId;
+
+    void flushPendingList() {
+      if (pendingListItems.isNotEmpty && currentNumId != null) {
+        nodes.add(_createListFromParagraphs(pendingListItems, currentNumId!)
+            as DocxBlock);
+        pendingListItems.clear();
+        currentNumId = null;
+      }
+    }
+
+    for (var child in children) {
+      if (child is XmlElement) {
+        if (child.name.local == 'p') {
+          final para = _parseParagraph(child);
+          if (para.numId != null) {
+            if (currentNumId == null || currentNumId == para.numId) {
+              pendingListItems.add(para);
+              currentNumId = para.numId;
+            } else {
+              flushPendingList();
+              pendingListItems.add(para);
+              currentNumId = para.numId;
+            }
+          } else {
+            flushPendingList();
+            nodes.add(para);
+          }
+        } else if (child.name.local == 'tbl') {
+          flushPendingList();
+          nodes.add(_parseTable(child));
+        } else if (child.name.local == 'sectPr') {
+          continue;
+        }
+      }
+    }
+    flushPendingList();
+    return nodes;
+  }
+
   DocxTable _parseTable(XmlElement xml) {
     final rows = <DocxTableRow>[];
-    for (var child in xml.findAllElements('w:tr')) {
+    for (var row in xml.findElements('w:tr')) {
       final cells = <DocxTableCell>[];
-      for (var cell in child.findAllElements('w:tc')) {
-        final cellContent = <DocxBlock>[];
-        // Parse cell content
-        for (var p in cell.findAllElements('w:p')) {
-          cellContent.add(_parseParagraph(p));
+      for (var cell in row.findElements('w:tc')) {
+        String? shadingFill;
+        final tcPr = cell.getElement('w:tcPr');
+        if (tcPr != null) {
+          final shd = tcPr.getElement('w:shd');
+          if (shd != null) {
+            shadingFill = shd.getAttribute('w:fill');
+            if (shadingFill == 'auto') shadingFill = null;
+          }
         }
-        // TODO: Tables can also contain other tables, checking recursively would be good
-        cells.add(DocxTableCell(children: cellContent));
+
+        final cellContent = _parseBlocks(cell.children);
+        cells.add(
+            DocxTableCell(children: cellContent, shadingFill: shadingFill));
       }
       rows.add(DocxTableRow(cells: cells));
     }
@@ -397,7 +530,7 @@ class _DocxReaderInternal {
   DocxList _createListFromParagraphs(
       List<DocxParagraph> paragraphs, int numId) {
     final items = paragraphs.map((para) {
-      return DocxListItem(para.children);
+      return DocxListItem(para.children, level: para.ilvl ?? 0);
     }).toList();
 
     // Determine if ordered/unordered by checking numbering.xml
@@ -417,7 +550,8 @@ class _DocxReaderInternal {
     return numId.isOdd;
   }
 
-  DocxSectionDef _parseSectionProperties(XmlElement body) {
+  DocxSectionDef _parseSectionProperties(XmlElement body,
+      {DocxColor? backgroundColor}) {
     // Find the last sectPr
     final sectPr = body.getElement('w:sectPr');
 
@@ -431,6 +565,7 @@ class _DocxReaderInternal {
     int marginRight = kDefaultMarginRight;
     DocxHeader? header;
     DocxFooter? footer;
+    DocxBackgroundImage? backgroundImage;
 
     if (sectPr != null) {
       // Page Size
@@ -468,14 +603,16 @@ class _DocxReaderInternal {
         marginRight =
             int.tryParse(pgMar.getAttribute('w:right') ?? '') ?? marginRight;
       }
-
       // Headers and Footers
       for (var headerRef in sectPr.findAllElements('w:headerReference')) {
         final rId = headerRef.getAttribute('r:id');
+        final type = headerRef.getAttribute('w:type') ?? 'default';
         if (rId != null && _documentRelationships.containsKey(rId)) {
-          // Only handling 'default' for now for simplicity, or just taking the first one
-          // TODO: Handle 'first' and 'even'
-          header = _readHeader(_documentRelationships[rId]!);
+          if (rId == 'rIdBgHdr' || _isBackgroundHeader(rId)) {
+            backgroundImage = _readBackgroundImage(rId);
+          } else if (type == 'default' || header == null) {
+            header = _readHeader(_documentRelationships[rId]!);
+          }
         }
       }
 
@@ -498,7 +635,50 @@ class _DocxReaderInternal {
       marginRight: marginRight,
       header: header,
       footer: footer,
+      backgroundColor: backgroundColor,
+      backgroundImage: backgroundImage,
     );
+  }
+
+  bool _isBackgroundHeader(String rId) {
+    // Relationship target usually points to header_bg.xml or contains 'header_bg'
+    final rel = _documentRelationships[rId];
+    return rel?.target.contains('header_bg') ?? false;
+  }
+
+  DocxBackgroundImage? _readBackgroundImage(String rId) {
+    final rel = _documentRelationships[rId]!;
+    final xml = _readXmlFile(rel.target);
+    if (xml == null) return null;
+
+    // Look for drawing -> blip
+    final blip = xml.findAllElements('a:blip').firstOrNull;
+    if (blip == null) return null;
+
+    final embedId = blip.getAttribute('r:embed');
+    if (embedId == null) return null;
+
+    // We need the relationship relative to the header file
+    final headerPath = rel.target; // e.g. "header_bg.xml"
+    final relsFile = archive.findFile('word/_rels/$headerPath.rels');
+    if (relsFile == null) return null;
+
+    final relsXml =
+        XmlDocument.parse(utf8.decode(relsFile.content as List<int>));
+    for (var r in relsXml.findAllElements('Relationship')) {
+      if (r.getAttribute('Id') == embedId) {
+        final target = r.getAttribute('Target')!;
+        final imgPath = 'word/$target';
+        final imgFile = archive.findFile(imgPath);
+        if (imgFile != null) {
+          return DocxBackgroundImage(
+            bytes: Uint8List.fromList(imgFile.content as List<int>),
+            extension: target.split('.').last,
+          );
+        }
+      }
+    }
+    return null;
   }
 
   DocxHeader? _readHeader(_DocxRelationship rel) {

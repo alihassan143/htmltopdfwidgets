@@ -24,6 +24,7 @@ class DocxText extends DocxInline {
   final DocxTextDecoration decoration;
   final DocxColor? color;
   final DocxHighlight highlight;
+  final String? shadingFill; // Background color hex
   final double? fontSize;
   final String? fontFamily;
   final double? characterSpacing;
@@ -46,6 +47,7 @@ class DocxText extends DocxInline {
     this.decoration = DocxTextDecoration.none,
     this.color,
     this.highlight = DocxHighlight.none,
+    this.shadingFill,
     this.fontSize,
     this.fontFamily,
     this.characterSpacing,
@@ -70,13 +72,14 @@ class DocxText extends DocxInline {
   const DocxText.bold(
     this.content, {
     this.color,
+    this.highlight = DocxHighlight.none,
+    this.shadingFill,
     this.fontSize,
     this.fontFamily,
     super.id,
   })  : fontWeight = DocxFontWeight.bold,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
-        highlight = DocxHighlight.none,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -93,13 +96,14 @@ class DocxText extends DocxInline {
   const DocxText.italic(
     this.content, {
     this.color,
+    this.highlight = DocxHighlight.none,
+    this.shadingFill,
     this.fontSize,
     this.fontFamily,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.italic,
         decoration = DocxTextDecoration.none,
-        highlight = DocxHighlight.none,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -116,13 +120,14 @@ class DocxText extends DocxInline {
   const DocxText.boldItalic(
     this.content, {
     this.color,
+    this.highlight = DocxHighlight.none,
+    this.shadingFill,
     this.fontSize,
     this.fontFamily,
     super.id,
   })  : fontWeight = DocxFontWeight.bold,
         fontStyle = DocxFontStyle.italic,
         decoration = DocxTextDecoration.none,
-        highlight = DocxHighlight.none,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -139,13 +144,14 @@ class DocxText extends DocxInline {
   const DocxText.underline(
     this.content, {
     this.color,
+    this.highlight = DocxHighlight.none,
+    this.shadingFill,
     this.fontSize,
     this.fontFamily,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.underline,
-        highlight = DocxHighlight.none,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -162,13 +168,14 @@ class DocxText extends DocxInline {
   const DocxText.strike(
     this.content, {
     this.color,
+    this.highlight = DocxHighlight.none,
+    this.shadingFill,
     this.fontSize,
     this.fontFamily,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.strikethrough,
-        highlight = DocxHighlight.none,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -187,6 +194,7 @@ class DocxText extends DocxInline {
     required this.href,
     this.fontSize,
     this.fontFamily,
+    this.shadingFill,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -205,7 +213,7 @@ class DocxText extends DocxInline {
         isImprint = false;
 
   /// Inline code text.
-  const DocxText.code(this.content, {this.fontSize, super.id})
+  const DocxText.code(this.content, {this.fontSize, this.shadingFill, super.id})
       : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
@@ -228,6 +236,7 @@ class DocxText extends DocxInline {
   const DocxText.highlighted(
     this.content, {
     this.highlight = DocxHighlight.yellow,
+    this.shadingFill,
     this.fontSize,
     this.fontFamily,
     super.id,
@@ -248,7 +257,8 @@ class DocxText extends DocxInline {
         isImprint = false;
 
   /// Superscript text (e.g., x²).
-  const DocxText.superscript(this.content, {this.fontSize, super.id})
+  const DocxText.superscript(this.content,
+      {this.fontSize, this.shadingFill, super.id})
       : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
@@ -268,7 +278,8 @@ class DocxText extends DocxInline {
         isImprint = false;
 
   /// Subscript text (e.g., H₂O).
-  const DocxText.subscript(this.content, {this.fontSize, super.id})
+  const DocxText.subscript(this.content,
+      {this.fontSize, this.shadingFill, super.id})
       : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
@@ -292,6 +303,7 @@ class DocxText extends DocxInline {
     this.content, {
     this.fontSize,
     this.fontFamily,
+    this.shadingFill,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -315,6 +327,7 @@ class DocxText extends DocxInline {
     this.content, {
     this.fontSize,
     this.fontFamily,
+    this.shadingFill,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -344,6 +357,7 @@ class DocxText extends DocxInline {
     DocxTextDecoration? decoration,
     DocxColor? color,
     DocxHighlight? highlight,
+    String? shadingFill,
     double? fontSize,
     String? fontFamily,
     double? characterSpacing,
@@ -365,6 +379,7 @@ class DocxText extends DocxInline {
       decoration: decoration ?? this.decoration,
       color: color ?? this.color,
       highlight: highlight ?? this.highlight,
+      shadingFill: shadingFill ?? this.shadingFill,
       fontSize: fontSize ?? this.fontSize,
       fontFamily: fontFamily ?? this.fontFamily,
       characterSpacing: characterSpacing ?? this.characterSpacing,
@@ -564,6 +579,111 @@ class DocxTab extends DocxInline {
       'w:r',
       nest: () {
         builder.element('w:tab');
+      },
+    );
+  }
+}
+
+/// A clickable checkbox (form field).
+class DocxCheckbox extends DocxInline {
+  final bool isChecked;
+  final double? fontSize;
+  final DocxFontWeight fontWeight;
+  final DocxFontStyle fontStyle;
+  final DocxColor? color;
+
+  const DocxCheckbox({
+    this.isChecked = false,
+    this.fontSize,
+    this.fontWeight = DocxFontWeight.normal,
+    this.fontStyle = DocxFontStyle.normal,
+    this.color,
+    super.id,
+  });
+
+  @override
+  void accept(DocxVisitor visitor) => visitor.visitText(
+        DocxText(
+          isChecked ? '☒' : '☐',
+          fontWeight: fontWeight,
+          fontStyle: fontStyle,
+          color: color,
+          fontSize: fontSize,
+        ),
+      );
+
+  @override
+  void buildXml(XmlBuilder builder) {
+    builder.element(
+      'w:sdt',
+      nest: () {
+        builder.element(
+          'w:sdtPr',
+          nest: () {
+            builder.element(
+              'w14:checkbox',
+              nest: () {
+                builder.element('w14:checked', nest: () {
+                  builder.attribute('w14:val', isChecked ? '1' : '0');
+                });
+              },
+            );
+            builder.element('w:alias', nest: () {
+              builder.attribute('w:val', 'Checkbox');
+            });
+            builder.element('w:tag', nest: () {
+              builder.attribute('w:val', 'checkbox');
+            });
+          },
+        );
+        builder.element(
+          'w:sdtContent',
+          nest: () {
+            builder.element(
+              'w:r',
+              nest: () {
+                if (fontSize != null ||
+                    fontWeight == DocxFontWeight.bold ||
+                    fontStyle == DocxFontStyle.italic ||
+                    color != null) {
+                  builder.element(
+                    'w:rPr',
+                    nest: () {
+                      if (fontSize != null) {
+                        builder.element(
+                          'w:sz',
+                          nest: () {
+                            builder.attribute(
+                              'w:val',
+                              (fontSize! * 2).toInt().toString(),
+                            );
+                          },
+                        );
+                      }
+                      if (fontWeight == DocxFontWeight.bold) {
+                        builder.element('w:b');
+                      }
+                      if (fontStyle == DocxFontStyle.italic) {
+                        builder.element('w:i');
+                      }
+                      if (color != null) {
+                        builder.element('w:color', nest: () {
+                          builder.attribute('w:val', color!.hex);
+                        });
+                      }
+                    },
+                  );
+                }
+                builder.element(
+                  'w:t',
+                  nest: () {
+                    builder.text(isChecked ? '☒' : '☐');
+                  },
+                );
+              },
+            );
+          },
+        );
       },
     );
   }

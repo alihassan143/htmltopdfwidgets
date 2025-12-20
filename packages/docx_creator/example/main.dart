@@ -352,6 +352,7 @@ Future<void> createManualDocument() async {
       .build();
 
   await DocxExporter().exportToFile(doc, 'manual_showcase.docx');
+
   print('   ✓ Created manual_showcase.docx (11 pages)');
 }
 
@@ -414,7 +415,7 @@ void main() {
 Markdown parsing makes it easy to convert existing content to DOCX format.
 ''';
 
-  final elements = DocxParser.fromMarkdown(markdown);
+  final elements = await DocxParser.fromMarkdown(markdown);
 
   final builder = docx().section(
     header: DocxHeader.text('Markdown Example'),
@@ -434,80 +435,151 @@ Future<void> createHtmlDocument() async {
   print('🌐 Creating html_parsed.docx...');
 
   const html = '''
-<h1>HTML Document Example</h1>
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>    body { font-family: Calibri, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { font-size: 24pt; color: #2E74B5; }
+    h2 { font-size: 18pt; color: #2E74B5; }
+    h3 { font-size: 14pt; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    td, th { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    ul, ol { margin: 1em 0; padding-left: 2em; }
+    li { margin-bottom: 0.5em; }
+    a { color: #0563C1; }
+    img { max-width: 100%; height: auto; }
+  </style>
+</head><body>
+<h1>Document Generation Made Easy</h1>
+<p></p>
+<p style="text-align: center"><span style="color: #808080;font-size: 16.0pt">A Developer-First DOCX Library for Dart</span></p>
+<p></p>
+<p style="text-align: center"><span style="color: #D3D3D3">Version 1.0 | December 2024</span></p>
+<p></p>
+<h1>Table of Contents</h1>
+<p></p>
+<ol><li>Text Formatting</li><li>Color System</li><li>Headings &amp; Paragraphs</li><li>Lists (Bullet &amp; Numbered)</li><li>Tables &amp; Styling</li><li>Headers &amp; Footers</li><li>Parsing (Markdown &amp; HTML)</li><li>Complete API Reference</li></ol>
+<p></p>
+<h1>1. Text Formatting</h1>
+<p>The package supports comprehensive text formatting options:</p>
+<p></p>
+<h2>Basic Formatting</h2>
+<p>Normal text, <strong>Bold text, </strong><em>Italic text, </em><em><strong>Bold + Italic, </strong></em><u>Underlined text, </u><del>Strikethrough text.</del></p>
+<p></p>
+<h2>Advanced Formatting</h2>
+<p>Superscript: E = mc<sup>2</sup>, Subscript: H<sub>2</sub>O</p>
+<p><span style="text-transform: uppercase">All Caps Text</span>, <span style="font-variant: small-caps">Small Caps Text</span></p>
+<p><span style="font-family: 'Courier New';background-color: lightGray">inline_code()</span> and <span style="background-color: yellow">highlighted text</span></p>
+<p></p>
+<h2>Links</h2>
+<p>Visit <a href="https://dart.dev"><span style="color: #0000FF"><u>Dart Website</u></span></a> for more information.</p>
+<p></p>
+<h1>2. Color System</h1>
+<p>Use predefined colors or custom hex values:</p>
+<p></p>
+<h2>Predefined Colors</h2>
+<p><span style="color: #FF0000">Red </span><span style="color: #0000FF">Blue </span><span style="color: #00FF00">Green </span><span style="color: #FFA500">Orange </span><span style="color: #800080">Purple </span><span style="color: #808080">Gray </span></p>
+<p></p>
+<h2>Custom Hex Colors</h2>
+<p><span style="color: #4285F4">Google Blue </span><span style="color: #FF5722">Material Orange </span><span style="color: #009688">Teal </span><span style="color: #673AB7">Deep Purple </span></p>
+<p></p>
+<h2>Brand Colors</h2>
+<table><tr><td style="background-color: #4472C4"><p><strong>Brand</strong></p></td><td style="background-color: #4472C4"><p><strong>Primary Color</strong></p></td><td style="background-color: #4472C4"><p><strong>Hex Code</strong></p></td></tr><tr><td><p>Facebook</p></td><td><p>Blue</p></td><td><p>#1877F2</p></td></tr><tr><td><p>Twitter/X</p></td><td><p>Black</p></td><td><p>#000000</p></td></tr><tr><td><p>LinkedIn</p></td><td><p>Blue</p></td><td><p>#0A66C2</p></td></tr><tr><td><p>YouTube</p></td><td><p>Red</p></td><td><p>#FF0000</p></td></tr><tr><td><p>Spotify</p></td><td><p>Green</p></td><td><p>#1DB954</p></td></tr></table>
+<p></p>
+<h1>3. Headings &amp; Paragraphs</h1>
+<p>Six levels of headings are supported:</p>
+<p></p>
+<h1>Heading 1 - Main Title</h1>
+<h2>Heading 2 - Section</h2>
+<h3>Heading 3 - Subsection</h3>
+<h4>Heading 4 - Minor Section</h4>
+<h5>Heading 5 - Subheading</h5>
+<h6>Heading 6 - Smallest</h6>
+<p></p>
+<h2>Paragraph Styles</h2>
+<p style="margin-left: 36.0pt"><em>This is a blockquote. Use it for important quotes or callouts. It automatically applies indentation and italic styling.</em></p>
+<p></p>
+<p>Code blocks are also supported:</p>
+<p style="background-color: #F5F5F5"><span style="font-family: 'Courier New';background-color: lightGray">void main() {
+  print(&quot;Hello, DOCX!&quot;);
+  final doc = docx().h1(&quot;Title&quot;).build();
+}</span></p>
+<p></p>
+<p></p>
+<p>Horizontal rules separate content sections.</p>
+<p></p>
+<h1>4. Lists (Bullet &amp; Numbered)</h1>
+<p></p>
+<h2>Bullet Lists</h2>
+<ul><li>First bullet item</li><li>Second bullet item</li><li>Third bullet item with more text to show wrapping behavior</li><li>Fourth item</li><li>Fifth item</li></ul>
+<p></p>
+<h2>Numbered Lists</h2>
+<ol><li>Step one: Initialize the document</li><li>Step two: Add content using the fluent API</li><li>Step three: Build the document</li><li>Step four: Export to DOCX or HTML</li><li>Step five: Share with your users</li></ol>
+<p></p>
+<h2>Mixed Content Example</h2>
+<p>Here's how to combine different elements:</p>
+<ul><li>Introduction paragraph</li><li>Setup requirements</li><li>Implementation details</li></ul>
+<p>Each step can have additional explanation text.</p>
+<p></p>
+<h1>5. Tables &amp; Styling</h1>
+<p>Tables support multiple styling options:</p>
+<p></p>
+<h2>Grid Style (Default)</h2>
+<table><tr><td><p><strong>Feature</strong></p></td><td><p><strong>Status</strong></p></td><td><p><strong>Notes</strong></p></td></tr><tr><td><p>Bold</p></td><td><p>✓</p></td><td><p>Implemented</p></td></tr><tr><td><p>Italic</p></td><td><p>✓</p></td><td><p>Implemented</p></td></tr><tr><td><p>Underline</p></td><td><p>✓</p></td><td><p>Implemented</p></td></tr><tr><td><p>Custom Colors</p></td><td><p>✓</p></td><td><p>Hex support</p></td></tr></table>
+<p></p>
+<h2>Zebra Style (Alternating Rows)</h2>
+<table><tr><td style="background-color: #E0E0E0"><p><strong>Month</strong></p></td><td style="background-color: #E0E0E0"><p><strong>Revenue</strong></p></td><td style="background-color: #E0E0E0"><p><strong>Growth</strong></p></td></tr><tr><td><p>January</p></td><td><p>\$10,000</p></td><td><p>+5%</p></td></tr><tr><td style="background-color: #F5F5F5"><p>February</p></td><td style="background-color: #F5F5F5"><p>\$12,500</p></td><td style="background-color: #F5F5F5"><p>+8%</p></td></tr><tr><td><p>March</p></td><td><p>\$15,000</p></td><td><p>+12%</p></td></tr><tr><td style="background-color: #F5F5F5"><p>April</p></td><td style="background-color: #F5F5F5"><p>\$18,000</p></td><td style="background-color: #F5F5F5"><p>+15%</p></td></tr><tr><td><p>May</p></td><td><p>\$22,000</p></td><td><p>+20%</p></td></tr></table>
+<p></p>
+<h2>Professional Style (Blue Header)</h2>
+<table><tr><td style="background-color: #4472C4"><p><strong>Metric</strong></p></td><td style="background-color: #4472C4"><p><strong>Q1</strong></p></td><td style="background-color: #4472C4"><p><strong>Q2</strong></p></td><td style="background-color: #4472C4"><p><strong>Q3</strong></p></td><td style="background-color: #4472C4"><p><strong>Q4</strong></p></td></tr><tr><td><p>Sales</p></td><td><p>1.2M</p></td><td><p>1.5M</p></td><td><p>1.8M</p></td><td><p>2.1M</p></td></tr><tr><td><p>Costs</p></td><td><p>0.8M</p></td><td><p>0.9M</p></td><td><p>1.0M</p></td><td><p>1.1M</p></td></tr><tr><td><p>Profit</p></td><td><p>0.4M</p></td><td><p>0.6M</p></td><td><p>0.8M</p></td><td><p>1.0M</p></td></tr></table>
+<p></p>
+<h2>Plain Style (No Borders)</h2>
+<table><tr><td><p><strong>Name</strong></p></td><td><p><strong>Role</strong></p></td></tr><tr><td><p>Alice</p></td><td><p>Developer</p></td></tr><tr><td><p>Bob</p></td><td><p>Designer</p></td></tr><tr><td><p>Charlie</p></td><td><p>Manager</p></td></tr></table>
+<p></p>
+<h1>6. Headers &amp; Footers</h1>
+<p>The document you're reading demonstrates headers and footers.</p>
+<p></p>
+<h2>Header Types</h2>
+<ul><li>Simple text: DocxHeader.text(&quot;Title&quot;)</li><li>Styled: DocxHeader.styled(&quot;Title&quot;, color: DocxColor.blue)</li><li>Rich content: DocxHeader(children: [...])</li></ul>
+<p></p>
+<h2>Footer Types</h2>
+<ul><li>Simple text: DocxFooter.text(&quot;© 2024&quot;)</li><li>Page numbers: DocxFooter.pageNumbers()</li><li>Styled: DocxFooter.styled(&quot;Confidential&quot;, color: DocxColor.gray)</li></ul>
+<p></p>
+<h2>Page Layout</h2>
+<table><tr><td style="background-color: #E0E0E0"><p><strong>Property</strong></p></td><td style="background-color: #E0E0E0"><p><strong>Default</strong></p></td><td style="background-color: #E0E0E0"><p><strong>Options</strong></p></td></tr><tr><td><p>Orientation</p></td><td><p>Portrait</p></td><td><p>Portrait, Landscape</p></td></tr><tr><td><p>Page Size</p></td><td><p>Letter</p></td><td><p>Letter, A4, Legal, Tabloid</p></td></tr><tr><td><p>Margins</p></td><td><p>1 inch</p></td><td><p>Customizable in twips</p></td></tr></table>
+<p></p>
+<h1>7. Parsing Capabilities</h1>
+<p></p>
+<h2>Markdown Parsing</h2>
+<p style="background-color: #F5F5F5"><span style="font-family: 'Courier New';background-color: lightGray">final nodes = DocxParser.fromMarkdown(&quot;&quot;&quot;
+# Heading
+This is **bold** and *italic*.
+- Bullet 1
+- Bullet 2
+&quot;&quot;&quot;);</span></p>
+<p></p>
+<h2>HTML Parsing</h2>
+<p style="background-color: #F5F5F5"><span style="font-family: 'Courier New';background-color: lightGray">final nodes = DocxParser.fromHtml(&quot;&quot;&quot;
+&lt;h1&gt;Title&lt;/h1&gt;
+&lt;p&gt;&lt;strong&gt;Bold&lt;/strong&gt; and &lt;em&gt;italic&lt;/em&gt;.&lt;/p&gt;
+&quot;&quot;&quot;);</span></p>
+<p></p>
+<h2>Supported Tags</h2>
+<table><tr><td style="background-color: #E0E0E0"><p><strong>Markdown</strong></p></td><td style="background-color: #E0E0E0"><p><strong>HTML</strong></p></td><td style="background-color: #E0E0E0"><p><strong>Result</strong></p></td></tr><tr><td><p># Title</p></td><td><p>&lt;h1&gt;Title&lt;/h1&gt;</p></td><td><p>Heading 1</p></td></tr><tr><td style="background-color: #F5F5F5"><p>**bold**</p></td><td style="background-color: #F5F5F5"><p>&lt;strong&gt;bold&lt;/strong&gt;</p></td><td style="background-color: #F5F5F5"><p>Bold text</p></td></tr><tr><td><p>*italic*</p></td><td><p>&lt;em&gt;italic&lt;/em&gt;</p></td><td><p>Italic text</p></td></tr><tr><td style="background-color: #F5F5F5"><p>- item</p></td><td style="background-color: #F5F5F5"><p>&lt;li&gt;item&lt;/li&gt;</p></td><td style="background-color: #F5F5F5"><p>List item</p></td></tr><tr><td><p>`code`</p></td><td><p>&lt;code&gt;code&lt;/code&gt;</p></td><td><p>Inline code</p></td></tr><tr><td style="background-color: #F5F5F5"><p>[link](url)</p></td><td style="background-color: #F5F5F5"><p>&lt;a href=&quot;...&quot;&gt;link&lt;/a&gt;</p></td><td style="background-color: #F5F5F5"><p>Hyperlink</p></td></tr></table>
+<p></p>
+<h1>8. Complete API Reference</h1>
+<p></p>
+<h2>Document Builder</h2>
+<table><tr><td style="background-color: #E0E0E0"><p><strong>Method</strong></p></td><td style="background-color: #E0E0E0"><p><strong>Description</strong></p></td></tr><tr><td><p>.h1(text)</p></td><td><p>Add heading level 1</p></td></tr><tr><td><p>.h2(text)</p></td><td><p>Add heading level 2</p></td></tr><tr><td><p>.h3(text)</p></td><td><p>Add heading level 3</p></td></tr><tr><td><p>.p(text)</p></td><td><p>Add paragraph</p></td></tr><tr><td><p>.bullet([...])</p></td><td><p>Add bullet list</p></td></tr><tr><td><p>.numbered([...])</p></td><td><p>Add numbered list</p></td></tr><tr><td><p>.table(data)</p></td><td><p>Add table</p></td></tr><tr><td><p>.quote(text)</p></td><td><p>Add blockquote</p></td></tr><tr><td><p>.code(text)</p></td><td><p>Add code block</p></td></tr><tr><td><p>.hr()</p></td><td><p>Add horizontal rule</p></td></tr><tr><td><p>.pageBreak()</p></td><td><p>Add page break</p></td></tr><tr><td><p>.section(...)</p></td><td><p>Set page properties</p></td></tr><tr><td><p>.build()</p></td><td><p>Build document</p></td></tr></table>
+<p></p>
+<h2>Export Options</h2>
+<ul><li>DocxExporter().exportToFile(doc, &quot;output.docx&quot;)</li><li>DocxExporter().exportToBytes(doc)</li><li>HtmlExporter().export(doc)</li></ul>
+<p></p>
+<p>Thank you for using docx_creator!</p>
+</body></html>
 
-<p>This document was generated by parsing <strong>HTML</strong> content.</p>
-
-<h2>Text Formatting</h2>
-
-<p>
-  HTML supports <strong>bold</strong>, <em>italic</em>, 
-  <u>underline</u>, and <del>strikethrough</del> text.
-</p>
-
-<p>
-  You can also use <code>inline code</code>, 
-  <sup>superscript</sup>, and <sub>subscript</sub>.
-</p>
-
-<h2>Lists</h2>
-
-<h3>Unordered List</h3>
-<ul>
-  <li>HTML parsing</li>
-  <li>CSS styles</li>
-  <li>Rich content</li>
-  <li>Easy conversion</li>
-</ul>
-
-<h3>Ordered List</h3>
-<ol>
-  <li>Parse HTML</li>
-  <li>Convert to AST</li>
-  <li>Export to DOCX</li>
-  <li>Open in Word</li>
-</ol>
-
-<h2>Tables</h2>
-
-<table>
-  <tr>
-    <th>Product</th>
-    <th>Price</th>
-    <th>Stock</th>
-  </tr>
-  <tr>
-    <td>Widget A</td>
-    <td>\$10.00</td>
-    <td>In Stock</td>
-  </tr>
-  <tr>
-    <td>Widget B</td>
-    <td>\$15.00</td>
-    <td>Low Stock</td>
-  </tr>
-  <tr>
-    <td>Widget C</td>
-    <td>\$20.00</td>
-    <td>Out of Stock</td>
-  </tr>
-</table>
-
-<h2>Blockquote</h2>
-
-<blockquote>
-  The best way to predict the future is to invent it.
-  - Alan Kay
-</blockquote>
-
-<h2>Conclusion</h2>
-
-<p>
-  HTML parsing enables easy conversion of web content to Word documents.
-</p>
 ''';
 
-  final elements = DocxParser.fromHtml(html);
+  final elements = await DocxParser.fromHtml(html);
 
   final builder = docx().section(
     header: DocxHeader.styled('HTML Example', color: DocxColor('4285F4')),

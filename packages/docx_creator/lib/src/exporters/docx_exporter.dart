@@ -273,7 +273,7 @@ class DocxExporter {
         );
       },
     );
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       '[Content_Types].xml',
       utf8.encode(xml).length,
@@ -311,7 +311,7 @@ class DocxExporter {
         );
       },
     );
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       '_rels/.rels',
       utf8.encode(xml).length,
@@ -349,6 +349,10 @@ class DocxExporter {
           'xmlns:o',
           'urn:schemas-microsoft-com:office:office',
         );
+        builder.attribute(
+          'xmlns:w14',
+          'http://schemas.microsoft.com/office/word/2010/wordml',
+        );
 
         // Add background (color and/or image)
         _buildBackground(builder, doc);
@@ -366,7 +370,7 @@ class DocxExporter {
         );
       },
     );
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       'word/document.xml',
       utf8.encode(xml).length,
@@ -776,7 +780,7 @@ class DocxExporter {
       },
     );
 
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       'word/header_bg.xml',
       utf8.encode(xml).length,
@@ -816,7 +820,7 @@ class DocxExporter {
         );
       },
     );
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       'word/_rels/header_bg.xml.rels',
       utf8.encode(xml).length,
@@ -957,7 +961,7 @@ class DocxExporter {
         }
       },
     );
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       'word/_rels/document.xml.rels',
       utf8.encode(xml).length,
@@ -1047,22 +1051,80 @@ class DocxExporter {
       '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
     );
 
-    // Abstract numbering for bullets (abstractNumId=0)
+    // Abstract numbering for bullets (abstractNumId=0) - multi-level
     buffer.writeln('''
   <w:abstractNum w:abstractNumId="0">
+    <w:nsid w:val="FFFFFF89"/>
     <w:multiLevelType w:val="hybridMultilevel"/>
-    <w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr></w:lvl>
-    <w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="○"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="▪"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>
+    <w:tmpl w:val="29761A62"/>
+    <w:lvl w:ilvl="0">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="bullet"/>
+      <w:lvlText w:val="•"/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr>
+        <w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs>
+        <w:ind w:left="720" w:hanging="360"/>
+      </w:pPr>
+    </w:lvl>
+    <w:lvl w:ilvl="1">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="bullet"/>
+      <w:lvlText w:val="○"/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr>
+        <w:tabs><w:tab w:val="num" w:pos="1440"/></w:tabs>
+        <w:ind w:left="1440" w:hanging="360"/>
+      </w:pPr>
+    </w:lvl>
+    <w:lvl w:ilvl="2">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="bullet"/>
+      <w:lvlText w:val="▪"/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr>
+        <w:tabs><w:tab w:val="num" w:pos="2160"/></w:tabs>
+        <w:ind w:left="2160" w:hanging="360"/>
+      </w:pPr>
+    </w:lvl>
   </w:abstractNum>''');
 
-    // Abstract numbering for decimal numbers (abstractNumId=1)
+    // Abstract numbering for decimals (abstractNumId=1) - multi-level
     buffer.writeln('''
   <w:abstractNum w:abstractNumId="1">
+    <w:nsid w:val="FFFFFF88"/>
     <w:multiLevelType w:val="hybridMultilevel"/>
-    <w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%2."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr></w:lvl>
-    <w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%3."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>
+    <w:tmpl w:val="D0A62B40"/>
+    <w:lvl w:ilvl="0">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="decimal"/>
+      <w:lvlText w:val="%1."/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr>
+        <w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs>
+        <w:ind w:left="720" w:hanging="360"/>
+      </w:pPr>
+    </w:lvl>
+    <w:lvl w:ilvl="1">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="lowerLetter"/>
+      <w:lvlText w:val="%2."/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr>
+        <w:tabs><w:tab w:val="num" w:pos="1440"/></w:tabs>
+        <w:ind w:left="1440" w:hanging="360"/>
+      </w:pPr>
+    </w:lvl>
+    <w:lvl w:ilvl="2">
+      <w:start w:val="1"/>
+      <w:numFmt w:val="lowerRoman"/>
+      <w:lvlText w:val="%3."/>
+      <w:lvlJc w:val="left"/>
+      <w:pPr>
+        <w:tabs><w:tab w:val="num" w:pos="2160"/></w:tabs>
+        <w:ind w:left="2160" w:hanging="360"/>
+      </w:pPr>
+    </w:lvl>
   </w:abstractNum>''');
 
     // Generate num instances linking to correct abstractNumId
@@ -1099,7 +1161,7 @@ class DocxExporter {
         (header as DocxNode).buildXml(builder);
       },
     );
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       'word/header1.xml',
       utf8.encode(xml).length,
@@ -1123,7 +1185,7 @@ class DocxExporter {
         (footer as DocxNode).buildXml(builder);
       },
     );
-    final xml = builder.buildDocument().toXmlString(pretty: true);
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       'word/footer1.xml',
       utf8.encode(xml).length,

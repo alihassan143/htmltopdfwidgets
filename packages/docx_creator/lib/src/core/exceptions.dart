@@ -60,9 +60,8 @@ class DocxParserException extends DocxException {
 
   @override
   String toString() {
-    final location = line != null
-        ? ' at line $line${column != null ? ':$column' : ''}'
-        : '';
+    final location =
+        line != null ? ' at line $line${column != null ? ':$column' : ''}' : '';
     return 'DocxParserException ($sourceFormat$location): $message'
         '${context != null ? '\nContext: $context' : ''}';
   }

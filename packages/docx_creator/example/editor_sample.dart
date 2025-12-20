@@ -71,7 +71,7 @@ class ApiClient {
 
   print('📝 Step 1: Parsing Markdown to DOCX AST...');
   // Parse markdown to DOCX AST
-  final nodes = MarkdownParser.parse(markdown);
+  final nodes = await MarkdownParser.parse(markdown);
   print('✅ Parsed ${nodes.length} nodes from markdown');
 
   print('\n📦 Step 2: Creating DOCX document...');

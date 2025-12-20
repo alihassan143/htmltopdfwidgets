@@ -25,7 +25,7 @@ A **developer-first** Dart package for creating professional DOCX documents with
 
 ```yaml
 dependencies:
-  docx_creator: ^1.0.0
+  docx_creator: ^1.0.1
 ```
 
 ---

@@ -76,7 +76,7 @@ class ApiClient {
 ''';
 
       // 1. Create from Markdown
-      final elements = MarkdownParser.parse(markdown);
+      final elements = await MarkdownParser.parse(markdown);
       final doc1 = DocxBuiltDocument(elements: elements);
 
       // Verify initial parsing structure

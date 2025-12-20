@@ -1,13 +1,23 @@
-import '../ast/docx_block.dart';
-import '../ast/docx_inline.dart';
-import '../ast/docx_list.dart';
-import '../ast/docx_node.dart';
-import '../ast/docx_section.dart';
-import '../ast/docx_table.dart';
-import '../builder/docx_document_builder.dart';
+import 'dart:io';
+
+import '../../docx_creator.dart';
 
 /// Exports [DocxBuiltDocument] to HTML format.
 class HtmlExporter {
+  Future<void> exportToFile(DocxBuiltDocument doc, String filePath) async {
+    try {
+      final bytes = export(doc);
+      final file = File(filePath);
+      await file.writeAsString(bytes);
+    } catch (e) {
+      throw DocxExportException(
+        'Failed to write file: $e',
+        targetFormat: 'HTML',
+        context: filePath,
+      );
+    }
+  }
+
   /// Exports to HTML string.
   String export(DocxBuiltDocument doc) {
     final buffer = StringBuffer();
@@ -28,6 +38,7 @@ class HtmlExporter {
     if (node is DocxParagraph) return _convertParagraph(node);
     if (node is DocxTable) return _convertTable(node);
     if (node is DocxList) return _convertList(node);
+    if (node is DocxImage) return _convertBlockImage(node);
     return '';
   }
 
@@ -39,9 +50,34 @@ class HtmlExporter {
 
     final styles = <String>[];
     if (para.align.name != 'left') styles.add('text-align: ${para.align.name}');
+
+    // Indentation
     if (para.indentLeft != null) {
-      styles.add('margin-left: ${para.indentLeft! / 20}px');
+      styles.add('margin-left: ${para.indentLeft! / 20}pt');
     }
+    if (para.indentRight != null) {
+      styles.add('margin-right: ${para.indentRight! / 20}pt');
+    }
+    if (para.indentFirstLine != null) {
+      styles.add('text-indent: ${para.indentFirstLine! / 20}pt');
+    }
+
+    // Spacing
+    if (para.spacingBefore != null) {
+      styles.add('margin-top: ${para.spacingBefore! / 20}pt');
+    }
+    if (para.spacingAfter != null) {
+      styles.add('margin-bottom: ${para.spacingAfter! / 20}pt');
+    }
+    if (para.lineSpacing != null) {
+      // Word line spacing 240 = 1 line. CSS line-height unitless usually 1.0, 1.5 etc.
+      // or explicit pt.
+      // lineSpacing 240 = 12pt approx? No, 240 is 240/240 lines.
+      // Let's assume standard multiple rule for now.
+      styles.add('line-height: ${para.lineSpacing! / 240}');
+    }
+
+    // Shading
     if (para.shadingFill != null) {
       styles.add('background-color: #${para.shadingFill}');
     }
@@ -52,9 +88,23 @@ class HtmlExporter {
     return '<$tag$styleAttr>$content</$tag>';
   }
 
+  String _convertBlockImage(DocxImage image) {
+    // Block image is wrapped in a div/p with alignment
+    final styles = <String>[];
+    if (image.align != DocxAlign.left) {
+      styles.add('text-align: ${image.align.name}');
+    }
+
+    final content = _convertInlineImage(image.asInline);
+    final styleAttr = styles.isNotEmpty ? ' style="${styles.join(';')}"' : '';
+
+    return '<div$styleAttr>$content</div>';
+  }
+
   String _convertInline(DocxInline inline) {
     if (inline is DocxText) return _convertText(inline);
     if (inline is DocxLineBreak) return '<br>';
+    if (inline is DocxInlineImage) return _convertInlineImage(inline);
     if (inline is DocxPageNumber) {
       return '<span class="page-number">[Page]</span>';
     }
@@ -64,12 +114,27 @@ class HtmlExporter {
     return '';
   }
 
+  String _convertInlineImage(DocxInlineImage image) {
+    // Use Base64 for images in HTML export for portability
+    final base64 =
+        Uri.dataFromBytes(image.bytes, mimeType: 'image/${image.extension}')
+            .toString();
+
+    final styles = <String>[];
+    styles.add('width: ${image.width}pt');
+    styles.add('height: ${image.height}pt');
+
+    return '<img src="$base64" alt="${image.altText ?? ''}" style="${styles.join(';')}" />';
+  }
+
   String _convertText(DocxText text) {
     var content = _escapeHtml(text.content);
     if (text.isBold) content = '<strong>$content</strong>';
     if (text.isItalic) content = '<em>$content</em>';
     if (text.isUnderline) content = '<u>$content</u>';
-    if (text.isStrike) content = '<del>$content</del>';
+    if (text.isStrike || text.isDoubleStrike) content = '<del>$content</del>';
+    if (text.isSuperscript) content = '<sup>$content</sup>';
+    if (text.isSubscript) content = '<sub>$content</sub>';
 
     final styles = <String>[];
     if (text.effectiveColorHex != null) {
@@ -79,8 +144,21 @@ class HtmlExporter {
       styles.add('font-size: ${text.fontSize}pt');
     }
     if (text.fontFamily != null) {
-      styles.add('font-family: ${text.fontFamily}');
+      styles.add("font-family: '${text.fontFamily}'");
     }
+
+    // Highlight
+    if (text.highlight != DocxHighlight.none) {
+      // Simple mapping for standard highlight colors
+      styles.add('background-color: ${text.highlight.name}');
+    } else if (text.shadingFill != null) {
+      styles.add('background-color: #${text.shadingFill}');
+    }
+
+    // Effects
+    if (text.isAllCaps) styles.add('text-transform: uppercase');
+    if (text.isSmallCaps) styles.add('font-variant: small-caps');
+    if (text.isShadow) styles.add('text-shadow: 1px 1px 2px grey');
 
     if (styles.isNotEmpty) {
       content = '<span style="${styles.join(';')}">$content</span>';
@@ -114,12 +192,39 @@ class HtmlExporter {
   }
 
   String _convertList(DocxList list) {
-    final tag = list.isOrdered ? 'ol' : 'ul';
-    final buffer = StringBuffer('<$tag>');
+    if (list.items.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    final stack = <String>[]; // Stack of closing tags </ol> or </ul>
+    int currentLevel = -1;
+
+    void openLevel(int targetLevel, bool ordered) {
+      while (currentLevel < targetLevel) {
+        final tag = ordered ? 'ol' : 'ul';
+        buffer.write('<$tag>');
+        stack.add('</$tag>');
+        currentLevel++;
+      }
+    }
+
+    void closeLevel(int targetLevel) {
+      while (currentLevel > targetLevel) {
+        buffer.write(stack.removeLast());
+        currentLevel--;
+      }
+    }
+
     for (var item in list.items) {
+      if (item.level > currentLevel) {
+        openLevel(item.level, list.isOrdered);
+      } else if (item.level < currentLevel) {
+        closeLevel(item.level);
+      }
+
       buffer.write('<li>${item.children.map(_convertInline).join()}</li>');
     }
-    buffer.write('</$tag>');
+
+    closeLevel(-1); // Close all
     return buffer.toString();
   }
 
@@ -137,8 +242,10 @@ class HtmlExporter {
     h2 { font-size: 18pt; color: #2E74B5; }
     h3 { font-size: 14pt; }
     table { border-collapse: collapse; width: 100%; margin: 1em 0; }
-    td, th { border: 1px solid #ddd; padding: 8px; }
+    td, th { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
     ul, ol { margin: 1em 0; padding-left: 2em; }
+    li { margin-bottom: 0.5em; }
     a { color: #0563C1; }
+    img { max-width: 100%; height: auto; }
   ''';
 }

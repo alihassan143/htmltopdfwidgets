@@ -1,79 +1,65 @@
 import 'package:markdown/markdown.dart' as md;
 
-import '../ast/docx_block.dart';
-import '../ast/docx_inline.dart';
-import '../ast/docx_list.dart';
-import '../ast/docx_node.dart';
-import '../ast/docx_table.dart';
-import '../core/enums.dart';
+import '../../docx_creator.dart';
+import '../utils/document_builder.dart';
+import '../utils/image_resolver.dart';
 
 /// Parses Markdown content into [DocxNode] elements.
-///
-/// ## Usage
-/// ```dart
-/// final elements = DocxParser.fromMarkdown('''
-/// # Heading 1
-/// This is **bold** and *italic*.
-///
-/// - Item 1
-/// - Item 2
-///
-/// | A | B |
-/// |---|---|
-/// | 1 | 2 |
-/// ''');
-/// ```
 class MarkdownParser {
   MarkdownParser._();
 
   /// Parses Markdown string into DocxNode elements.
-  static List<DocxNode> parse(String markdown) {
+  static Future<List<DocxNode>> parse(String markdown) async {
+    // Enable GFM (tables, strikethrough, autolinks, task lists)
     final document = md.Document(extensionSet: md.ExtensionSet.gitHubFlavored);
     final nodes = document.parseLines(markdown.split('\n'));
     return _parseNodes(nodes);
   }
 
-  static List<DocxNode> _parseNodes(List<md.Node> nodes) {
+  static Future<List<DocxNode>> _parseNodes(List<md.Node> nodes) async {
     final results = <DocxNode>[];
     for (var node in nodes) {
-      final parsed = _parseNode(node);
+      final parsed = await _parseNode(node);
       if (parsed != null) results.add(parsed);
     }
     return results;
   }
 
-  static DocxNode? _parseNode(md.Node node) {
+  static Future<DocxNode?> _parseNode(md.Node node) async {
     if (node is md.Element) {
       return _parseElement(node);
     } else if (node is md.Text) {
       final text = node.text.trim();
       if (text.isEmpty) return null;
-      return DocxParagraph(children: [DocxText(text)]);
+      return DocumentBuilder.buildBlockElement(
+        tag: 'p',
+        children: [DocxText(text)],
+      );
     }
     return null;
   }
 
-  static DocxNode? _parseElement(md.Element element) {
-    switch (element.tag) {
-      // Headings
-      case 'h1':
-        return DocxParagraph.heading1(_extractText(element));
-      case 'h2':
-        return DocxParagraph.heading2(_extractText(element));
-      case 'h3':
-        return DocxParagraph.heading3(_extractText(element));
-      case 'h4':
-        return DocxParagraph.heading4(_extractText(element));
-      case 'h5':
-        return DocxParagraph.heading5(_extractText(element));
-      case 'h6':
-        return DocxParagraph.heading6(_extractText(element));
+  static Future<DocxNode?> _parseElement(md.Element element) async {
+    final tag = element.tag;
+    final inlines = await _parseInlines(element.children ?? []);
 
+    // 1. Try Shared Builder
+    final built = DocumentBuilder.buildBlockElement(
+      tag: tag,
+      children: [],
+      textContent: await _extractText(element),
+    );
+
+    // If built is a heading/quote/pre/hr, return it.
+    if (built != null && !['p', 'div'].contains(tag)) {
+      return built;
+    }
+
+    switch (tag) {
       // Paragraph
       case 'p':
-        final inlines = _parseInlines(element.children ?? []);
         if (inlines.isEmpty) return null;
-        return DocxParagraph(children: inlines);
+        return DocumentBuilder.buildBlockElement(tag: 'p', children: inlines);
 
       // Lists
       case 'ul':
@@ -81,45 +67,35 @@ class MarkdownParser {
       case 'ol':
         return _parseList(element, ordered: true);
 
-      // Blockquote
-      case 'blockquote':
-        return DocxParagraph.quote(_extractText(element));
-
-      // Code block
-      case 'pre':
-        return DocxParagraph.code(_extractText(element));
-
       // Table
       case 'table':
         return _parseTable(element);
 
-      // Horizontal rule
-      case 'hr':
-        return DocxParagraph(borderBottom: DocxBorder.single, children: []);
-
+      // Explicit handling if DocumentBuilder didn't catch or we need specific logic
       default:
-        // Try as paragraph
-        final inlines = _parseInlines(element.children ?? []);
-        if (inlines.isEmpty) return null;
-        return DocxParagraph(children: inlines);
+        // Fallback
+        if (inlines.isNotEmpty) {
+          return DocumentBuilder.buildBlockElement(tag: 'p', children: inlines);
+        }
+        return null;
     }
   }
 
-  static List<DocxInline> _parseInlines(List<md.Node> nodes) {
+  static Future<List<DocxInline>> _parseInlines(List<md.Node> nodes) async {
     final results = <DocxInline>[];
     for (var node in nodes) {
-      results.addAll(_parseInline(node));
+      results.addAll(await _parseInline(node));
     }
     return results;
   }
 
-  static List<DocxInline> _parseInline(md.Node node) {
+  static Future<List<DocxInline>> _parseInline(md.Node node) async {
     if (node is md.Text) {
       return [DocxText(node.text)];
     }
 
     if (node is md.Element) {
-      final text = _extractText(node);
+      final text = await _extractText(node);
 
       switch (node.tag) {
         case 'strong':
@@ -130,6 +106,7 @@ class MarkdownParser {
           return [DocxText.italic(text)];
         case 'del':
         case 's':
+        case 'strike':
           return [DocxText.strike(text)];
         case 'code':
           return [DocxText.code(text)];
@@ -138,12 +115,39 @@ class MarkdownParser {
           return [DocxText.link(text, href: href)];
         case 'br':
           return [DocxLineBreak()];
-        case 'sup':
-          return [DocxText.superscript(text)];
-        case 'sub':
-          return [DocxText.subscript(text)];
+        case 'img':
+          // Async Image Resolution
+          final src = node.attributes['src'] ?? '';
+          final alt = node.attributes['alt'] ?? text;
+          final result = await ImageResolver.resolve(src, alt: alt);
+
+          if (result != null) {
+            return [
+              DocxInlineImage(
+                bytes: result.bytes,
+                extension: result.extension,
+                width: result.width,
+                height: result.height,
+                altText: result.altText,
+              )
+            ];
+          }
+          // Fallback
+          return [
+            DocxText('[📷 '),
+            DocxText.link(alt.isEmpty ? 'Image' : alt, href: src),
+            DocxText(']'),
+          ];
+
+        case 'input':
+          // GFM task list checkbox
+          if (node.attributes['type'] == 'checkbox') {
+            final isChecked = node.attributes.containsKey('checked');
+            return [DocumentBuilder.buildCheckbox(isChecked: isChecked)];
+          }
+          return [];
+
         default:
-          // Recursively parse children
           return _parseInlines(node.children ?? []);
       }
     }
@@ -151,14 +155,37 @@ class MarkdownParser {
     return [];
   }
 
-  static DocxList _parseList(md.Element element, {required bool ordered}) {
+  static Future<DocxList> _parseList(
+    md.Element element, {
+    required bool ordered,
+    int level = 0,
+  }) async {
     final items = <DocxListItem>[];
 
     for (var child in element.children ?? []) {
       if (child is md.Element && child.tag == 'li') {
-        final inlines = _parseInlines(child.children ?? []);
+        final inlines = <DocxInline>[];
+        final nestedLists = <DocxList>[];
+
+        // Process children of LI
+        for (var node in child.children ?? []) {
+          if (node is md.Element && (node.tag == 'ul' || node.tag == 'ol')) {
+            // Found nested list
+            nestedLists.add(await _parseList(node,
+                ordered: node.tag == 'ol', level: level + 1));
+          } else {
+            // Regular inline content
+            inlines.addAll(await _parseInline(node));
+          }
+        }
+
         if (inlines.isNotEmpty) {
-          items.add(DocxListItem(inlines));
+          items.add(DocxListItem(inlines, level: level));
+        }
+
+        // Flatten nested items
+        for (var nested in nestedLists) {
+          items.addAll(nested.items);
         }
       }
     }
@@ -194,7 +221,7 @@ class MarkdownParser {
       if (child is md.Element && (child.tag == 'td' || child.tag == 'th')) {
         cells.add(
           DocxTableCell.text(
-            _extractText(child),
+            _extractTextSync(child), // Table cells textual for now
             isBold: isHeader,
             shadingFill: isHeader ? 'E0E0E0' : null,
           ),
@@ -205,10 +232,22 @@ class MarkdownParser {
     return DocxTableRow(cells: cells);
   }
 
-  static String _extractText(md.Node node) {
+  static Future<String> _extractText(md.Node node) async {
     if (node is md.Text) return node.text;
     if (node is md.Element) {
-      return (node.children ?? []).map(_extractText).join();
+      final buffer = StringBuffer();
+      for (var child in node.children ?? []) {
+        buffer.write(await _extractText(child));
+      }
+      return buffer.toString();
+    }
+    return '';
+  }
+
+  static String _extractTextSync(md.Node node) {
+    if (node is md.Text) return node.text;
+    if (node is md.Element) {
+      return (node.children ?? []).map(_extractTextSync).join();
     }
     return '';
   }

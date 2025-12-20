@@ -105,13 +105,13 @@ void main() {
   });
 
   group('DocxParser', () {
-    test('parses HTML', () {
-      final elements = DocxParser.fromHtml('<h1>Title</h1>');
+    test('parses HTML', () async {
+      final elements = await DocxParser.fromHtml('<h1>Title</h1>');
       expect(elements.length, 1);
     });
 
-    test('parses Markdown', () {
-      final elements = DocxParser.fromMarkdown('# Title');
+    test('parses Markdown', () async {
+      final elements = await DocxParser.fromMarkdown('# Title');
       expect(elements.length, 1);
     });
   });
