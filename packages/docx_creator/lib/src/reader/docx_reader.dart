@@ -118,22 +118,58 @@ class _DocxReaderInternal {
 
   List<DocxNode> _parseBody(XmlElement body) {
     final nodes = <DocxNode>[];
+    final pendingListItems = <DocxParagraph>[];
+    int? currentNumId;
+
+    void flushPendingList() {
+      if (pendingListItems.isNotEmpty && currentNumId != null) {
+        nodes.add(_createListFromParagraphs(pendingListItems, currentNumId!));
+        pendingListItems.clear();
+        currentNumId = null;
+      }
+    }
 
     for (var child in body.children) {
       if (child is XmlElement) {
         if (child.name.local == 'p') {
-          nodes.add(_parseParagraph(child));
+          final para = _parseParagraph(child);
+
+          // Check if this is a list item
+          if (para.numId != null) {
+            // Start new list or continue existing
+            if (currentNumId == null || currentNumId == para.numId) {
+              pendingListItems.add(para);
+              currentNumId = para.numId;
+            } else {
+              // Different numId, flush previous list
+              flushPendingList();
+              pendingListItems.add(para);
+              currentNumId = para.numId;
+            }
+          } else {
+            // Not a list item, flush any pending list
+            flushPendingList();
+            nodes.add(para);
+          }
         } else if (child.name.local == 'tbl') {
+          // Flush pending list before table
+          flushPendingList();
           nodes.add(_parseTable(child));
         } else if (child.name.local == 'sectPr') {
           // Handled separately
           continue;
         } else {
+          // Flush pending list before unknown node
+          flushPendingList();
           // Provide raw XML preservation for unknown nodes
           nodes.add(DocxRawXml(child.toXmlString()));
         }
       }
     }
+
+    // Flush any remaining list
+    flushPendingList();
+
     return nodes;
   }
 
@@ -141,6 +177,8 @@ class _DocxReaderInternal {
     final children = <DocxInline>[];
     String? pStyle;
     DocxAlign align = DocxAlign.left;
+    int? numId;
+    int? ilvl;
 
     // Parse paragraph properties
     final pPr = xml.getElement('w:pPr');
@@ -160,7 +198,19 @@ class _DocxReaderInternal {
         if (val == 'both' || val == 'distribute') align = DocxAlign.justify;
       }
 
-      // TODO: Numbering/Lists
+      // Numbering/Lists
+      final numPr = pPr.getElement('w:numPr');
+      if (numPr != null) {
+        final numIdElem = numPr.getElement('w:numId');
+        final ilvlElem = numPr.getElement('w:ilvl');
+
+        if (numIdElem != null) {
+          numId = int.tryParse(numIdElem.getAttribute('w:val') ?? '');
+        }
+        if (ilvlElem != null) {
+          ilvl = int.tryParse(ilvlElem.getAttribute('w:val') ?? '');
+        }
+      }
     }
 
     // Parse runs and other inline content
@@ -182,6 +232,8 @@ class _DocxReaderInternal {
       children: children,
       styleId: pStyle,
       align: align,
+      numId: numId,
+      ilvl: ilvl,
     );
   }
 
@@ -340,6 +392,29 @@ class _DocxReaderInternal {
       rows.add(DocxTableRow(cells: cells));
     }
     return DocxTable(rows: rows);
+  }
+
+  DocxList _createListFromParagraphs(
+      List<DocxParagraph> paragraphs, int numId) {
+    final items = paragraphs.map((para) {
+      return DocxListItem(para.children);
+    }).toList();
+
+    // Determine if ordered/unordered by checking numbering.xml
+    final isOrdered = _isOrderedList(numId);
+
+    return DocxList(
+      items: items,
+      isOrdered: isOrdered,
+    )..numId = numId;
+  }
+
+  bool _isOrderedList(int numId) {
+    // Parse numbering.xml to determine list type
+    // For now, use simple heuristic: even numId = unordered, odd = ordered
+    // This matches the common pattern in the exporter
+    // TODO: Actually parse numbering.xml for more accurate detection
+    return numId.isOdd;
   }
 
   DocxSectionDef _parseSectionProperties(XmlElement body) {
