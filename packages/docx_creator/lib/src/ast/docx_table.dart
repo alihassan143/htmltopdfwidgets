@@ -61,33 +61,6 @@ class DocxTableStyle {
 }
 
 /// A table element in the document.
-///
-/// ## Basic Usage
-/// ```dart
-/// DocxTable.fromData([
-///   ['Name', 'Age'],
-///   ['Alice', '30'],
-/// ])
-/// ```
-///
-/// ## With Styling
-/// ```dart
-/// DocxTable.fromData(
-///   data,
-///   style: DocxTableStyle.zebra,
-/// )
-/// ```
-///
-/// ## Custom Style
-/// ```dart
-/// DocxTable(
-///   rows: [...],
-///   style: DocxTableStyle(
-///     border: DocxBorder.double,
-///     headerFill: 'FF0000',
-///   ),
-/// )
-/// ```
 class DocxTable extends DocxBlock {
   /// Table rows.
   final List<DocxTableRow> rows;
@@ -143,6 +116,23 @@ class DocxTable extends DocxBlock {
       rows.add(DocxTableRow(cells: cells));
     }
     return DocxTable(rows: rows, style: style, hasHeader: hasHeader);
+  }
+
+  DocxTable copyWith({
+    List<DocxTableRow>? rows,
+    DocxTableStyle? style,
+    int? width,
+    DocxWidthType? widthType,
+    bool? hasHeader,
+  }) {
+    return DocxTable(
+      rows: rows ?? this.rows,
+      style: style ?? this.style,
+      width: width ?? this.width,
+      widthType: widthType ?? this.widthType,
+      hasHeader: hasHeader ?? this.hasHeader,
+      id: id,
+    );
   }
 
   @override
@@ -259,6 +249,17 @@ class DocxTableRow extends DocxNode {
 
   const DocxTableRow({required this.cells, this.height, super.id});
 
+  DocxTableRow copyWith({
+    List<DocxTableCell>? cells,
+    int? height,
+  }) {
+    return DocxTableRow(
+      cells: cells ?? this.cells,
+      height: height ?? this.height,
+      id: id,
+    );
+  }
+
   @override
   void accept(DocxVisitor visitor) {
     visitor.visitTableRow(this);
@@ -359,6 +360,25 @@ class DocxTableCell extends DocxNode {
     return DocxTableCell(
       shadingFill: shadingFill,
       children: [DocxParagraph(children: content)],
+    );
+  }
+
+  DocxTableCell copyWith({
+    List<DocxBlock>? children,
+    int? colSpan,
+    int? rowSpan,
+    DocxVerticalAlign? verticalAlign,
+    String? shadingFill,
+    int? width,
+  }) {
+    return DocxTableCell(
+      children: children ?? this.children,
+      colSpan: colSpan ?? this.colSpan,
+      rowSpan: rowSpan ?? this.rowSpan,
+      verticalAlign: verticalAlign ?? this.verticalAlign,
+      shadingFill: shadingFill ?? this.shadingFill,
+      width: width ?? this.width,
+      id: id,
     );
   }
 

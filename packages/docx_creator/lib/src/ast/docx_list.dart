@@ -160,6 +160,22 @@ class DocxList extends DocxBlock {
     return DocxList(items: items, isOrdered: ordered, style: style);
   }
 
+  DocxList copyWith({
+    List<DocxListItem>? items,
+    bool? isOrdered,
+    DocxListStyle? style,
+    int? numId,
+  }) {
+    final list = DocxList(
+      items: items ?? this.items,
+      isOrdered: isOrdered ?? this.isOrdered,
+      style: style ?? this.style,
+      id: id,
+    );
+    list.numId = numId ?? this.numId;
+    return list;
+  }
+
   @override
   void accept(DocxVisitor visitor) {}
 
@@ -184,6 +200,17 @@ class DocxListItem extends DocxNode {
 
   factory DocxListItem.rich(List<DocxInline> content, {int level = 0}) {
     return DocxListItem(content, level: level);
+  }
+
+  DocxListItem copyWith({
+    List<DocxInline>? children,
+    int? level,
+  }) {
+    return DocxListItem(
+      children ?? this.children,
+      level: level ?? this.level,
+      id: id,
+    );
   }
 
   @override

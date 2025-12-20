@@ -190,7 +190,28 @@ class DocxBuiltDocument {
   final List<DocxNode> elements;
   final DocxSectionDef? section;
 
-  const DocxBuiltDocument({required this.elements, this.section});
+  // Raw XML content preserved from original document (for round-tripping)
+  final String? stylesXml;
+  final String? numberingXml;
+  final String? settingsXml;
+  final String? fontTableXml;
+  final String? contentTypesXml;
+  final String? rootRelsXml;
+  final String? headerBgXml;
+  final String? headerBgRelsXml;
+
+  const DocxBuiltDocument({
+    required this.elements,
+    this.section,
+    this.stylesXml,
+    this.numberingXml,
+    this.settingsXml,
+    this.fontTableXml,
+    this.contentTypesXml,
+    this.rootRelsXml,
+    this.headerBgXml,
+    this.headerBgRelsXml,
+  });
 }
 
 /// Shorthand alias for [DocxDocumentBuilder].

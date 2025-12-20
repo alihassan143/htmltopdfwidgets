@@ -34,3 +34,4 @@ export 'src/exporters/html_exporter.dart';
 // Parsers
 export 'src/parsers/html_parser.dart';
 export 'src/parsers/markdown_parser.dart';
+export 'src/reader/docx_reader.dart';

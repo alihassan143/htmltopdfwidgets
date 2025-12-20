@@ -48,30 +48,32 @@ class DocxExporter {
       _images['word/media/background.$ext'] = _backgroundImage!.bytes;
     }
 
-    // Process images and lists
-    for (var element in doc.elements) {
-      if (element is DocxImage) {
-        _imageCounter++;
-        final rId = 'rId${_imageCounter + 10}';
-        element.setRelationshipId(rId, _uniqueIdCounter++);
-        _images['word/media/image$_imageCounter.${element.extension}'] =
-            element.bytes;
-      } else if (element is DocxList) {
-        element.numId = _numIdCounter++;
-        _listTypes.add(element.isOrdered);
-      }
+    // Process images recursively
+    final allImages = _collectImages(doc);
+    for (var img in allImages) {
+      _imageCounter++;
+      final rId = 'rId${_imageCounter + 10}';
+      img.setRelationshipId(rId, _uniqueIdCounter++);
+      _images['word/media/image$_imageCounter.${img.extension}'] = img.bytes;
+    }
+
+    // Process lists recursively
+    final allLists = _collectLists(doc);
+    for (var list in allLists) {
+      list.numId = _numIdCounter++;
+      _listTypes.add(list.isOrdered);
     }
 
     final archive = Archive();
 
-    archive.addFile(_createContentTypes());
-    archive.addFile(_createRootRels());
+    archive.addFile(_createContentTypes(doc));
+    archive.addFile(_createRootRels(doc));
     archive.addFile(_createDocument(doc));
-    archive.addFile(_createDocumentRels());
-    archive.addFile(_createSettings());
-    archive.addFile(_createStyles());
-    archive.addFile(_createFontTable());
-    archive.addFile(_createNumbering());
+    archive.addFile(_createDocumentRels(doc));
+    archive.addFile(_createSettings(doc));
+    archive.addFile(_createStyles(doc));
+    archive.addFile(_createFontTable(doc));
+    archive.addFile(_createNumbering(doc));
 
     // Headers and Footers
     if (doc.section?.header != null) {
@@ -82,8 +84,8 @@ class DocxExporter {
     }
     // Background header (for background image)
     if (_backgroundImage != null) {
-      archive.addFile(_createBackgroundHeader());
-      archive.addFile(_createBackgroundHeaderRels());
+      archive.addFile(_createBackgroundHeader(doc));
+      archive.addFile(_createBackgroundHeaderRels(doc));
     }
 
     // Images
@@ -100,7 +102,14 @@ class DocxExporter {
     return Uint8List.fromList(bytes);
   }
 
-  ArchiveFile _createContentTypes() {
+  ArchiveFile _createContentTypes(DocxBuiltDocument doc) {
+    if (doc.contentTypesXml != null) {
+      return ArchiveFile(
+        '[Content_Types].xml',
+        utf8.encode(doc.contentTypesXml!).length,
+        utf8.encode(doc.contentTypesXml!),
+      );
+    }
     final builder = XmlBuilder();
     builder.processing(
       'xml',
@@ -272,7 +281,14 @@ class DocxExporter {
     );
   }
 
-  ArchiveFile _createRootRels() {
+  ArchiveFile _createRootRels(DocxBuiltDocument doc) {
+    if (doc.rootRelsXml != null) {
+      return ArchiveFile(
+        '_rels/.rels',
+        utf8.encode(doc.rootRelsXml!).length,
+        utf8.encode(doc.rootRelsXml!),
+      );
+    }
     final builder = XmlBuilder();
     builder.processing('xml', 'version="1.0" encoding="UTF-8"');
     builder.element(
@@ -720,7 +736,14 @@ class DocxExporter {
   }
 
   /// Creates a header file containing the background image
-  ArchiveFile _createBackgroundHeader() {
+  ArchiveFile _createBackgroundHeader(DocxBuiltDocument doc) {
+    if (doc.headerBgXml != null) {
+      return ArchiveFile(
+        'word/header_bg.xml',
+        utf8.encode(doc.headerBgXml!).length,
+        utf8.encode(doc.headerBgXml!),
+      );
+    }
     final builder = XmlBuilder();
     builder.processing(
         'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
@@ -762,7 +785,14 @@ class DocxExporter {
   }
 
   /// Creates relationships file for background header (references the image)
-  ArchiveFile _createBackgroundHeaderRels() {
+  ArchiveFile _createBackgroundHeaderRels(DocxBuiltDocument doc) {
+    if (doc.headerBgRelsXml != null) {
+      return ArchiveFile(
+        'word/_rels/header_bg.xml.rels',
+        utf8.encode(doc.headerBgRelsXml!).length,
+        utf8.encode(doc.headerBgRelsXml!),
+      );
+    }
     final builder = XmlBuilder();
     builder.processing('xml', 'version="1.0" encoding="UTF-8"');
     builder.element(
@@ -794,7 +824,7 @@ class DocxExporter {
     );
   }
 
-  ArchiveFile _createDocumentRels() {
+  ArchiveFile _createDocumentRels(DocxBuiltDocument doc) {
     final builder = XmlBuilder();
     builder.processing('xml', 'version="1.0" encoding="UTF-8"');
     builder.element(
@@ -848,6 +878,37 @@ class DocxExporter {
             builder.attribute('Target', 'numbering.xml');
           },
         );
+
+        // Header (rId5)
+        if (doc.section?.header != null) {
+          builder.element(
+            'Relationship',
+            nest: () {
+              builder.attribute('Id', 'rId5');
+              builder.attribute(
+                'Type',
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/header',
+              );
+              builder.attribute('Target', 'header1.xml');
+            },
+          );
+        }
+
+        // Footer (rId6)
+        if (doc.section?.footer != null) {
+          builder.element(
+            'Relationship',
+            nest: () {
+              builder.attribute('Id', 'rId6');
+              builder.attribute(
+                'Type',
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer',
+              );
+              builder.attribute('Target', 'footer1.xml');
+            },
+          );
+        }
+
         // Background image relationship
         if (_backgroundImage != null) {
           builder.element(
@@ -904,7 +965,14 @@ class DocxExporter {
     );
   }
 
-  ArchiveFile _createSettings() {
+  ArchiveFile _createSettings(DocxBuiltDocument doc) {
+    if (doc.settingsXml != null) {
+      return ArchiveFile(
+        'word/settings.xml',
+        utf8.encode(doc.settingsXml!).length,
+        utf8.encode(doc.settingsXml!),
+      );
+    }
     final xml =
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat/><w:displayBackgroundShape/></w:settings>';
     return ArchiveFile(
@@ -914,7 +982,14 @@ class DocxExporter {
     );
   }
 
-  ArchiveFile _createStyles() {
+  ArchiveFile _createStyles(DocxBuiltDocument doc) {
+    if (doc.stylesXml != null) {
+      return ArchiveFile(
+        'word/styles.xml',
+        utf8.encode(doc.stylesXml!).length,
+        utf8.encode(doc.stylesXml!),
+      );
+    }
     final xml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:docDefaults>
@@ -935,7 +1010,14 @@ class DocxExporter {
     );
   }
 
-  ArchiveFile _createFontTable() {
+  ArchiveFile _createFontTable(DocxBuiltDocument doc) {
+    if (doc.fontTableXml != null) {
+      return ArchiveFile(
+        'word/fontTable.xml',
+        utf8.encode(doc.fontTableXml!).length,
+        utf8.encode(doc.fontTableXml!),
+      );
+    }
     final xml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:font w:name="Calibri"><w:panose1 w:val="020F0502020204030204"/></w:font>
@@ -951,7 +1033,14 @@ class DocxExporter {
     );
   }
 
-  ArchiveFile _createNumbering() {
+  ArchiveFile _createNumbering(DocxBuiltDocument doc) {
+    if (doc.numberingXml != null) {
+      return ArchiveFile(
+        'word/numbering.xml',
+        utf8.encode(doc.numberingXml!).length,
+        utf8.encode(doc.numberingXml!),
+      );
+    }
     final buffer = StringBuffer();
     buffer.writeln('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     buffer.writeln(
@@ -1040,5 +1129,73 @@ class DocxExporter {
       utf8.encode(xml).length,
       utf8.encode(xml),
     );
+  }
+
+  List<DocxInlineImage> _collectImages(DocxBuiltDocument doc) {
+    final images = <DocxInlineImage>[];
+    for (var element in doc.elements) {
+      _collectImagesFromNode(element, images);
+    }
+    if (doc.section?.header != null) {
+      for (var child in doc.section!.header!.children) {
+        _collectImagesFromNode(child, images);
+      }
+    }
+    if (doc.section?.footer != null) {
+      for (var child in doc.section!.footer!.children) {
+        _collectImagesFromNode(child, images);
+      }
+    }
+    return images;
+  }
+
+  void _collectImagesFromNode(DocxNode node, List<DocxInlineImage> images) {
+    if (node is DocxImage) {
+      images.add(node.asInline);
+    } else if (node is DocxInlineImage) {
+      images.add(node);
+    } else if (node is DocxParagraph) {
+      for (var child in node.children) {
+        _collectImagesFromNode(child, images);
+      }
+    } else if (node is DocxTable) {
+      for (var row in node.rows) {
+        for (var cell in row.cells) {
+          for (var child in cell.children) {
+            _collectImagesFromNode(child, images);
+          }
+        }
+      }
+    } else if (node is DocxHeader) {
+      for (var child in (node).children) {
+        _collectImagesFromNode(child, images);
+      }
+    } else if (node is DocxFooter) {
+      for (var child in (node).children) {
+        _collectImagesFromNode(child, images);
+      }
+    }
+  }
+
+  List<DocxList> _collectLists(DocxBuiltDocument doc) {
+    final lists = <DocxList>[];
+    for (var element in doc.elements) {
+      _collectListsFromNode(element, lists);
+    }
+    return lists;
+  }
+
+  void _collectListsFromNode(DocxNode node, List<DocxList> lists) {
+    if (node is DocxList) {
+      lists.add(node);
+    } else if (node is DocxTable) {
+      for (var row in node.rows) {
+        for (var cell in row.cells) {
+          for (var child in cell.children) {
+            _collectListsFromNode(child, lists);
+          }
+        }
+      }
+    }
   }
 }

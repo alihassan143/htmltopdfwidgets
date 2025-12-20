@@ -103,6 +103,21 @@ class DocxBackgroundImage {
           'Opacity must be between 0.0 and 1.0',
         );
 
+  /// Returns a copy with the specified modifications.
+  DocxBackgroundImage copyWith({
+    Uint8List? bytes,
+    String? extension,
+    DocxBackgroundFillMode? fillMode,
+    double? opacity,
+  }) {
+    return DocxBackgroundImage(
+      bytes: bytes ?? this.bytes,
+      extension: extension ?? this.extension,
+      fillMode: fillMode ?? this.fillMode,
+      opacity: opacity ?? this.opacity,
+    );
+  }
+
   /// Creates a background image from a URL.
   ///
   /// Automatically detects the image extension from the URL or Content-Type.

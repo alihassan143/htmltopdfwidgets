@@ -1,5 +1,7 @@
 import 'package:xml/xml.dart';
 
+export 'docx_raw_xml.dart';
+
 /// Abstract base class for all nodes in the document AST.
 ///
 /// The AST (Abstract Syntax Tree) represents the document structure
@@ -62,6 +64,8 @@ abstract class DocxVisitor {
   void visitSection(covariant DocxNode section);
   void visitHeader(covariant DocxNode header);
   void visitFooter(covariant DocxNode footer);
+  void visitRawXml(covariant DocxNode rawXml);
+  void visitRawInline(covariant DocxNode rawInline);
 }
 
 /// Base class for inline elements (text, inline images, etc.).

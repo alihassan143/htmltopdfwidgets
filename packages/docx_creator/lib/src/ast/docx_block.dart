@@ -138,11 +138,7 @@ class DocxParagraph extends DocxBlock {
       styleId: level.styleId,
       align: align,
       children: [
-        DocxText(
-          text,
-          fontWeight: DocxFontWeight.bold,
-          fontSize: level.defaultFontSize,
-        ),
+        DocxText(text),
       ],
     );
   }
@@ -151,37 +147,43 @@ class DocxParagraph extends DocxBlock {
   factory DocxParagraph.heading1(
     String text, {
     DocxAlign align = DocxAlign.left,
-  }) => DocxParagraph.heading(DocxHeadingLevel.h1, text, align: align);
+  }) =>
+      DocxParagraph.heading(DocxHeadingLevel.h1, text, align: align);
 
   /// Creates an H2 heading.
   factory DocxParagraph.heading2(
     String text, {
     DocxAlign align = DocxAlign.left,
-  }) => DocxParagraph.heading(DocxHeadingLevel.h2, text, align: align);
+  }) =>
+      DocxParagraph.heading(DocxHeadingLevel.h2, text, align: align);
 
   /// Creates an H3 heading.
   factory DocxParagraph.heading3(
     String text, {
     DocxAlign align = DocxAlign.left,
-  }) => DocxParagraph.heading(DocxHeadingLevel.h3, text, align: align);
+  }) =>
+      DocxParagraph.heading(DocxHeadingLevel.h3, text, align: align);
 
   /// Creates an H4 heading.
   factory DocxParagraph.heading4(
     String text, {
     DocxAlign align = DocxAlign.left,
-  }) => DocxParagraph.heading(DocxHeadingLevel.h4, text, align: align);
+  }) =>
+      DocxParagraph.heading(DocxHeadingLevel.h4, text, align: align);
 
   /// Creates an H5 heading.
   factory DocxParagraph.heading5(
     String text, {
     DocxAlign align = DocxAlign.left,
-  }) => DocxParagraph.heading(DocxHeadingLevel.h5, text, align: align);
+  }) =>
+      DocxParagraph.heading(DocxHeadingLevel.h5, text, align: align);
 
   /// Creates an H6 heading.
   factory DocxParagraph.heading6(
     String text, {
     DocxAlign align = DocxAlign.left,
-  }) => DocxParagraph.heading(DocxHeadingLevel.h6, text, align: align);
+  }) =>
+      DocxParagraph.heading(DocxHeadingLevel.h6, text, align: align);
 
   /// Creates a blockquote paragraph.
   factory DocxParagraph.quote(String text) {

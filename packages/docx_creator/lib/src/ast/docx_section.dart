@@ -55,6 +55,26 @@ class DocxHeadingStyle {
         return const DocxHeadingStyle(fontSize: 11, spacingBefore: 100);
     }
   }
+
+  DocxHeadingStyle copyWith({
+    double? fontSize,
+    DocxColor? color,
+    String? fontFamily,
+    bool? bold,
+    int? spacingBefore,
+    int? spacingAfter,
+    DocxAlign? align,
+  }) {
+    return DocxHeadingStyle(
+      fontSize: fontSize ?? this.fontSize,
+      color: color ?? this.color,
+      fontFamily: fontFamily ?? this.fontFamily,
+      bold: bold ?? this.bold,
+      spacingBefore: spacingBefore ?? this.spacingBefore,
+      spacingAfter: spacingAfter ?? this.spacingAfter,
+      align: align ?? this.align,
+    );
+  }
 }
 
 /// Document section with page layout and headers/footers.
@@ -104,6 +124,40 @@ class DocxSectionDef extends DocxSection {
     this.backgroundImage,
     super.id,
   });
+
+  /// Returns a copy with specified modifications.
+  DocxSectionDef copyWith({
+    DocxPageOrientation? orientation,
+    DocxPageSize? pageSize,
+    int? customWidth,
+    int? customHeight,
+    int? marginTop,
+    int? marginBottom,
+    int? marginLeft,
+    int? marginRight,
+    DocxSectionBreak? breakType,
+    DocxHeader? header,
+    DocxFooter? footer,
+    DocxColor? backgroundColor,
+    DocxBackgroundImage? backgroundImage,
+  }) {
+    return DocxSectionDef(
+      orientation: orientation ?? this.orientation,
+      pageSize: pageSize ?? this.pageSize,
+      customWidth: customWidth ?? this.customWidth,
+      customHeight: customHeight ?? this.customHeight,
+      marginTop: marginTop ?? this.marginTop,
+      marginBottom: marginBottom ?? this.marginBottom,
+      marginLeft: marginLeft ?? this.marginLeft,
+      marginRight: marginRight ?? this.marginRight,
+      breakType: breakType ?? this.breakType,
+      header: header ?? this.header,
+      footer: footer ?? this.footer,
+      backgroundColor: backgroundColor ?? this.backgroundColor,
+      backgroundImage: backgroundImage ?? this.backgroundImage,
+      id: id,
+    );
+  }
 
   int get effectiveWidth {
     if (pageSize == DocxPageSize.custom && customWidth != null) {
@@ -242,6 +296,10 @@ class DocxHeader extends DocxSection {
     );
   }
 
+  DocxHeader copyWith({List<DocxBlock>? children}) {
+    return DocxHeader(children: children ?? this.children, id: id);
+  }
+
   @override
   void accept(DocxVisitor visitor) => visitor.visitHeader(this);
 
@@ -325,6 +383,10 @@ class DocxFooter extends DocxSection {
         ),
       ],
     );
+  }
+
+  DocxFooter copyWith({List<DocxBlock>? children}) {
+    return DocxFooter(children: children ?? this.children, id: id);
   }
 
   @override
