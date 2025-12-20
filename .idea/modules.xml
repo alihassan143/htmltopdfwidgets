@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/packages/docx_creator/melos_docx_creator.iml" filepath="$PROJECT_DIR$/packages/docx_creator/melos_docx_creator.iml" />
+      <module fileurl="file://$PROJECT_DIR$/packages/htmltopdf_syncfusion/melos_htmltopdf_syncfusion.iml" filepath="$PROJECT_DIR$/packages/htmltopdf_syncfusion/melos_htmltopdf_syncfusion.iml" />
+      <module fileurl="file://$PROJECT_DIR$/packages/htmltopdfwidgets/melos_htmltopdfwidgets.iml" filepath="$PROJECT_DIR$/packages/htmltopdfwidgets/melos_htmltopdfwidgets.iml" />
+      <module fileurl="file://$PROJECT_DIR$/melos_htmltopdfwidgets.iml" filepath="$PROJECT_DIR$/melos_htmltopdfwidgets.iml" />
+    </modules>
+  </component>
+</project>

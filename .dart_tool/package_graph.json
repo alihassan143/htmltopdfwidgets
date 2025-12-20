@@ -41,33 +41,13 @@
       ]
     },
     {
-      "name": "pub_updater",
-      "version": "0.5.0",
+      "name": "yaml_edit",
+      "version": "2.2.3",
       "dependencies": [
-        "http",
-        "json_annotation",
-        "process",
-        "pub_semver"
-      ]
-    },
-    {
-      "name": "prompts",
-      "version": "2.0.0",
-      "dependencies": [
-        "charcode",
-        "io"
-      ]
-    },
-    {
-      "name": "ansi_styles",
-      "version": "0.3.2+1",
-      "dependencies": []
-    },
-    {
-      "name": "json_annotation",
-      "version": "4.9.0",
-      "dependencies": [
-        "meta"
+        "collection",
+        "meta",
+        "source_span",
+        "yaml"
       ]
     },
     {
@@ -77,6 +57,13 @@
         "collection",
         "source_span",
         "string_scanner"
+      ]
+    },
+    {
+      "name": "string_scanner",
+      "version": "1.4.1",
+      "dependencies": [
+        "source_span"
       ]
     },
     {
@@ -91,11 +78,66 @@
       ]
     },
     {
+      "name": "pub_updater",
+      "version": "0.5.0",
+      "dependencies": [
+        "http",
+        "json_annotation",
+        "process",
+        "pub_semver"
+      ]
+    },
+    {
+      "name": "pub_semver",
+      "version": "2.2.0",
+      "dependencies": [
+        "collection"
+      ]
+    },
+    {
+      "name": "prompts",
+      "version": "2.0.0",
+      "dependencies": [
+        "charcode",
+        "io"
+      ]
+    },
+    {
       "name": "pool",
       "version": "1.5.2",
       "dependencies": [
         "async",
         "stack_trace"
+      ]
+    },
+    {
+      "name": "platform",
+      "version": "3.1.6",
+      "dependencies": []
+    },
+    {
+      "name": "path",
+      "version": "1.9.1",
+      "dependencies": []
+    },
+    {
+      "name": "mustache_template",
+      "version": "2.0.2",
+      "dependencies": []
+    },
+    {
+      "name": "meta",
+      "version": "1.17.0",
+      "dependencies": []
+    },
+    {
+      "name": "http",
+      "version": "1.6.0",
+      "dependencies": [
+        "async",
+        "http_parser",
+        "meta",
+        "web"
       ]
     },
     {
@@ -125,6 +167,11 @@
       ]
     },
     {
+      "name": "conventional_commit",
+      "version": "0.6.1+1",
+      "dependencies": []
+    },
+    {
       "name": "collection",
       "version": "1.19.1",
       "dependencies": []
@@ -136,33 +183,6 @@
         "meta",
         "path"
       ]
-    },
-    {
-      "name": "pub_semver",
-      "version": "2.2.0",
-      "dependencies": [
-        "collection"
-      ]
-    },
-    {
-      "name": "platform",
-      "version": "3.1.6",
-      "dependencies": []
-    },
-    {
-      "name": "path",
-      "version": "1.9.1",
-      "dependencies": []
-    },
-    {
-      "name": "mustache_template",
-      "version": "2.0.2",
-      "dependencies": []
-    },
-    {
-      "name": "conventional_commit",
-      "version": "0.6.1+1",
-      "dependencies": []
     },
     {
       "name": "cli_launcher",
@@ -181,30 +201,30 @@
       ]
     },
     {
-      "name": "string_scanner",
-      "version": "1.4.1",
-      "dependencies": [
-        "source_span"
-      ]
-    },
-    {
       "name": "args",
       "version": "2.7.0",
       "dependencies": []
     },
     {
-      "name": "process",
-      "version": "5.0.5",
+      "name": "ansi_styles",
+      "version": "0.3.2+1",
+      "dependencies": []
+    },
+    {
+      "name": "source_span",
+      "version": "1.10.1",
       "dependencies": [
-        "file",
+        "collection",
         "path",
-        "platform"
+        "term_glyph"
       ]
     },
     {
-      "name": "charcode",
-      "version": "1.4.0",
-      "dependencies": []
+      "name": "json_annotation",
+      "version": "4.9.0",
+      "dependencies": [
+        "meta"
+      ]
     },
     {
       "name": "checked_yaml",
@@ -216,13 +236,12 @@
       ]
     },
     {
-      "name": "yaml_edit",
-      "version": "2.2.3",
+      "name": "process",
+      "version": "5.0.5",
       "dependencies": [
-        "collection",
-        "meta",
-        "source_span",
-        "yaml"
+        "file",
+        "path",
+        "platform"
       ]
     },
     {
@@ -235,39 +254,15 @@
       ]
     },
     {
+      "name": "charcode",
+      "version": "1.4.0",
+      "dependencies": []
+    },
+    {
       "name": "stack_trace",
       "version": "1.12.1",
       "dependencies": [
         "path"
-      ]
-    },
-    {
-      "name": "source_span",
-      "version": "1.10.1",
-      "dependencies": [
-        "collection",
-        "path",
-        "term_glyph"
-      ]
-    },
-    {
-      "name": "term_glyph",
-      "version": "1.2.2",
-      "dependencies": []
-    },
-    {
-      "name": "meta",
-      "version": "1.17.0",
-      "dependencies": []
-    },
-    {
-      "name": "http",
-      "version": "1.6.0",
-      "dependencies": [
-        "async",
-        "http_parser",
-        "meta",
-        "web"
       ]
     },
     {
@@ -284,6 +279,11 @@
         "string_scanner",
         "typed_data"
       ]
+    },
+    {
+      "name": "term_glyph",
+      "version": "1.2.2",
+      "dependencies": []
     },
     {
       "name": "typed_data",

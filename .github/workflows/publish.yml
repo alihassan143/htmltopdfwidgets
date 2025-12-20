@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: [htmltopdfwidgets, htmltopdf_syncfusion]
+        package: [htmltopdfwidgets, htmltopdf_syncfusion, docx_creator]
     environment:
       name: release
       url: https://pub.dev/packages/${{ matrix.package }}

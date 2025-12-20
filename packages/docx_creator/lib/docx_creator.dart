@@ -1,0 +1,35 @@
+/// docx_creator - A developer-first DOCX generation library
+///
+/// Create professional Word documents with a fluent API:
+/// ```dart
+/// import 'package:docx_creator/docx_creator.dart';
+///
+/// final doc = docx()
+///   .h1('Title')
+///   .p('Content')
+///   .build();
+///
+/// await DocxExporter().exportToFile(doc, 'output.docx');
+/// ```
+library docx_creator;
+
+export 'src/ast/docx_block.dart';
+export 'src/ast/docx_image.dart';
+export 'src/ast/docx_inline.dart';
+export 'src/ast/docx_list.dart';
+// AST
+export 'src/ast/docx_node.dart';
+export 'src/ast/docx_section.dart';
+export 'src/ast/docx_table.dart';
+// Builder
+export 'src/builder/docx_document_builder.dart';
+export 'src/core/defaults.dart';
+// Core
+export 'src/core/enums.dart';
+export 'src/core/exceptions.dart';
+// Exporters
+export 'src/exporters/docx_exporter.dart';
+export 'src/exporters/html_exporter.dart';
+// Parsers
+export 'src/parsers/html_parser.dart';
+export 'src/parsers/markdown_parser.dart';
