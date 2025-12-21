@@ -31,6 +31,7 @@ class _DocxReaderInternal {
   final Archive archive;
   final Map<String, _DocxRelationship> _documentRelationships = {};
   final Map<String, String> _contentTypes = {}; // PartName -> ContentType
+  final Map<String, _DocxStyle> _styles = {}; // StyleId -> Style
 
   _DocxReaderInternal(Uint8List bytes)
       : archive = ZipDecoder().decodeBytes(bytes);
@@ -51,6 +52,11 @@ class _DocxReaderInternal {
     final documentXml =
         XmlDocument.parse(utf8.decode(documentFile.content as List<int>));
 
+    // Read Styles (Before parsing body so we can resolve them)
+    // Note: We also store the raw XML string at the end for the wrapper object
+    final stylesXml = _readXmlContent('word/styles.xml');
+    if (stylesXml != null) _readStyles(stylesXml);
+
     // Parse Body
     final body = documentXml.findAllElements('w:body').first;
     final elements = _parseBody(body);
@@ -70,7 +76,7 @@ class _DocxReaderInternal {
         _parseSectionProperties(body, backgroundColor: backgroundColor);
 
     // Read Styles and Numbering (Raw)
-    final stylesXml = _readXmlContent('word/styles.xml');
+
     final numberingXml = _readXmlContent('word/numbering.xml');
     final settingsXml = _readXmlContent('word/settings.xml');
     final fontTableXml = _readXmlContent('word/fontTable.xml');
@@ -159,6 +165,49 @@ class _DocxReaderInternal {
     return utf8.decode(file.content as List<int>);
   }
 
+  void _readStyles(String xmlContent) {
+    try {
+      final xml = XmlDocument.parse(xmlContent);
+      for (var styleElem in xml.findAllElements('w:style')) {
+        final styleId = styleElem.getAttribute('w:styleId');
+        final type = styleElem.getAttribute('w:type'); // paragraph, character
+        if (styleId != null) {
+          final basedOn =
+              styleElem.getElement('w:basedOn')?.getAttribute('w:val');
+          final pPr = styleElem.getElement('w:pPr');
+          final rPr = styleElem.getElement('w:rPr');
+
+          _styles[styleId] = _DocxStyle.fromXml(
+            styleId,
+            type: type,
+            basedOn: basedOn,
+            pPr: pPr,
+            rPr: rPr,
+          );
+        }
+      }
+    } catch (e) {
+      // Ignore style parsing errors
+    }
+  }
+
+  _DocxStyle _resolveStyle(String? styleId) {
+    if (styleId == null || !_styles.containsKey(styleId)) {
+      // Default to 'Normal' if style not found or null
+      if (styleId != 'Normal' && _styles.containsKey('Normal')) {
+        return _styles['Normal']!;
+      }
+      return _DocxStyle(id: styleId ?? 'manual');
+    }
+
+    final style = _styles[styleId]!;
+    if (style.basedOn != null) {
+      final parentStyle = _resolveStyle(style.basedOn);
+      return parentStyle.merge(style);
+    }
+    return style;
+  }
+
   void _readContentTypes() {
     final file = archive.findFile('[Content_Types].xml');
     if (file != null) {
@@ -193,7 +242,6 @@ class _DocxReaderInternal {
   }
 
   DocxParagraph _parseParagraph(XmlElement xml) {
-    final children = <DocxInline>[];
     String? pStyle;
     DocxAlign align = DocxAlign.left;
     String? shadingFill;
@@ -222,110 +270,38 @@ class _DocxReaderInternal {
       if (pStyleElem != null) {
         pStyle = pStyleElem.getAttribute('w:val');
       }
-
-      // Alignment
-      final jcElem = pPr.getElement('w:jc');
-      if (jcElem != null) {
-        final val = jcElem.getAttribute('w:val');
-        if (val == 'center') align = DocxAlign.center;
-        if (val == 'right' || val == 'end') align = DocxAlign.right;
-        if (val == 'both' || val == 'distribute') align = DocxAlign.justify;
-        if (val == 'left' || val == 'start') align = DocxAlign.left;
-      }
-
-      // Spacing
-      final spacingElem = pPr.getElement('w:spacing');
-      if (spacingElem != null) {
-        final after = spacingElem.getAttribute('w:after');
-        if (after != null) spacingAfter = int.tryParse(after);
-
-        final before = spacingElem.getAttribute('w:before');
-        if (before != null) spacingBefore = int.tryParse(before);
-
-        final line = spacingElem.getAttribute('w:line');
-        if (line != null) lineSpacing = int.tryParse(line);
-      }
-
-      // Indentation
-      final indElem = pPr.getElement('w:ind');
-      if (indElem != null) {
-        final left =
-            indElem.getAttribute('w:left') ?? indElem.getAttribute('w:start');
-        if (left != null) indentLeft = int.tryParse(left);
-
-        final right =
-            indElem.getAttribute('w:right') ?? indElem.getAttribute('w:end');
-        if (right != null) indentRight = int.tryParse(right);
-
-        final firstLine = indElem.getAttribute('w:firstLine');
-        if (firstLine != null) indentFirstLine = int.tryParse(firstLine);
-      }
-
-      // Shading
-      final shdElem = pPr.getElement('w:shd');
-      if (shdElem != null) {
-        shadingFill = shdElem.getAttribute('w:fill');
-        if (shadingFill == 'auto') shadingFill = null;
-      }
-
-      // Numbering/Lists
-      final numPr = pPr.getElement('w:numPr');
-      if (numPr != null) {
-        final numIdElem = numPr.getElement('w:numId');
-        final ilvlElem = numPr.getElement('w:ilvl');
-
-        if (numIdElem != null) {
-          numId = int.tryParse(numIdElem.getAttribute('w:val') ?? '');
-        }
-        if (ilvlElem != null) {
-          ilvl = int.tryParse(ilvlElem.getAttribute('w:val') ?? '');
-        }
-      }
-
-      // Borders
-      final pBdr = pPr.getElement('w:pBdr');
-      if (pBdr != null) {
-        borderTop = _parseBorderSide(pBdr.getElement('w:top'));
-        borderBottomSide = _parseBorderSide(pBdr.getElement('w:bottom'));
-        borderLeft = _parseBorderSide(pBdr.getElement('w:left'));
-        borderRight = _parseBorderSide(pBdr.getElement('w:right'));
-        borderBetween = _parseBorderSide(pBdr.getElement('w:between'));
-
-        // Legacy fallback support for borderBottom if needed?
-        // DocxParagraph prefers borderBottomSide properties.
-      }
     }
+
+    // Resolve Style Properties
+    final effectiveStyle = _resolveStyle(pStyle ?? 'Normal');
+
+    // Parse direct properties (override styles)
+    final parsedProps = _DocxStyle.fromParagraphProperties(pPr);
+
+    // Merge: Style < Direct
+    final finalProps = effectiveStyle.merge(parsedProps);
+
+    // Map to local variables
+    align = finalProps.align ?? DocxAlign.left;
+    shadingFill = finalProps.shadingFill;
+    numId = finalProps.numId;
+    ilvl = finalProps.ilvl;
+    spacingAfter = finalProps.spacingAfter;
+    spacingBefore = finalProps.spacingBefore;
+    lineSpacing = finalProps.lineSpacing;
+    indentLeft = finalProps.indentLeft;
+    indentRight = finalProps.indentRight;
+    indentFirstLine = finalProps.indentFirstLine;
+    borderTop = finalProps.borderTop;
+    borderBottomSide = finalProps.borderBottomSide;
+    borderLeft = finalProps.borderLeft;
+    borderRight = finalProps.borderRight;
+    borderBetween = finalProps.borderBetween;
+    borderBottom = finalProps.borderBottom;
 
     // Parse runs and other inline content
-    for (var child in xml.children) {
-      if (child is XmlElement) {
-        if (child.name.local == 'r') {
-          children.add(_parseRun(child));
-        } else if (child.name.local == 'hyperlink') {
-          // Extract href from relationship
-          final rId = child.getAttribute('r:id');
-          String? href;
-          if (rId != null && _documentRelationships.containsKey(rId)) {
-            href = _documentRelationships[rId]!.target;
-          }
-
-          // Parse all runs within the hyperlink
-          for (var grandChild in child.findAllElements('w:r')) {
-            final run = _parseRun(grandChild);
-            // Apply href to DocxText elements
-            if (run is DocxText && href != null) {
-              children.add(run.copyWith(
-                href: href,
-                decoration: DocxTextDecoration.underline,
-                color: DocxColor.blue,
-              ));
-            } else {
-              children.add(run);
-            }
-          }
-        }
-      }
-    }
+    final children =
+        _parseInlineChildren(xml.children, parentStyle: effectiveStyle);
 
     return DocxParagraph(
       children: children,
@@ -349,7 +325,7 @@ class _DocxReaderInternal {
     );
   }
 
-  DocxInline _parseRun(XmlElement run) {
+  DocxInline _parseRun(XmlElement run, {_DocxStyle? parentStyle}) {
     // Check for drawings (Images or Shapes)
     final drawing = run.findAllElements('w:drawing').firstOrNull ??
         run.findAllElements('w:pict').firstOrNull;
@@ -410,67 +386,53 @@ class _DocxReaderInternal {
     bool isEmboss = false;
     bool isImprint = false;
 
+    // Resolve run style
     final rPr = run.getElement('w:rPr');
+    String? rStyle;
     if (rPr != null) {
-      if (rPr.getElement('w:b') != null) fontWeight = DocxFontWeight.bold;
-      if (rPr.getElement('w:i') != null) fontStyle = DocxFontStyle.italic;
-      if (rPr.getElement('w:u') != null)
-        decoration = DocxTextDecoration.underline;
-      if (rPr.getElement('w:strike') != null)
-        decoration = DocxTextDecoration.strikethrough;
-
-      final colorElem = rPr.getElement('w:color');
-      if (colorElem != null) {
-        final val = colorElem.getAttribute('w:val');
-        if (val != null && val != 'auto') color = DocxColor('#$val');
-      }
-
-      final shdElem = rPr.getElement('w:shd');
-      if (shdElem != null) {
-        shadingFill = shdElem.getAttribute('w:fill');
-        if (shadingFill == 'auto') shadingFill = null;
-      }
-
-      final szElem = rPr.getElement('w:sz');
-      if (szElem != null) {
-        final val = szElem.getAttribute('w:val');
-        if (val != null) {
-          final halfPoints = int.tryParse(val);
-          if (halfPoints != null) fontSize = halfPoints / 2.0;
-        }
-      }
-
-      final rFonts = rPr.getElement('w:rFonts');
-      if (rFonts != null) fontFamily = rFonts.getAttribute('w:ascii');
-
-      final highlightElem = rPr.getElement('w:highlight');
-      if (highlightElem != null) {
-        final val = highlightElem.getAttribute('w:val');
-        if (val != null) {
-          for (var h in DocxHighlight.values) {
-            if (h.name == val) {
-              highlight = h;
-              break;
-            }
-          }
-        }
-      }
-
-      if (rPr.getElement('w:caps') != null) isAllCaps = true;
-      if (rPr.getElement('w:smallCaps') != null) isSmallCaps = true;
-      if (rPr.getElement('w:dstrike') != null) isDoubleStrike = true;
-      if (rPr.getElement('w:outline') != null) isOutline = true;
-      if (rPr.getElement('w:shadow') != null) isShadow = true;
-      if (rPr.getElement('w:emboss') != null) isEmboss = true;
-      if (rPr.getElement('w:imprint') != null) isImprint = true;
-
-      final vertAlignElem = rPr.getElement('w:vertAlign');
-      if (vertAlignElem != null) {
-        final val = vertAlignElem.getAttribute('w:val');
-        if (val == 'superscript') isSuperscript = true;
-        if (val == 'subscript') isSubscript = true;
+      final rStyleElem = rPr.getElement('w:rStyle');
+      if (rStyleElem != null) {
+        rStyle = rStyleElem.getAttribute('w:val');
       }
     }
+
+    // Paragraph Style (affects runs if style type is paragraph)
+    // NOTE: Paragraph styles can define run properties.
+    // However, _DocxReaderInternal._parseParagraph already calls _resolveStyle
+    // but the paragraph style isn't passed down to _parseRun easily here unless we pass it.
+    // Ideally _parseRun is aware of the parent paragraph style, but for now let's just use run styles.
+    // Explicit style application:
+
+    // 1. Base style = Parent Paragraph Style (if any) or Default
+    var baseStyle = parentStyle ?? _resolveStyle('DefaultParagraphFont');
+
+    // 2. Run Style (Character Style) - Overrides paragraph style properties
+    if (rStyle != null) {
+      final cStyle = _resolveStyle(rStyle);
+      baseStyle = baseStyle.merge(cStyle);
+    }
+
+    // 3. Direct Properties - Overrides everything
+    final parsedProps = _DocxStyle.fromRunProperties(rPr);
+    final finalProps = baseStyle.merge(parsedProps);
+
+    fontWeight = finalProps.fontWeight ?? DocxFontWeight.normal;
+    fontStyle = finalProps.fontStyle ?? DocxFontStyle.normal;
+    decoration = finalProps.decoration ?? DocxTextDecoration.none;
+    color = finalProps.color;
+    shadingFill = finalProps.shadingFill;
+    fontSize = finalProps.fontSize;
+    fontFamily = finalProps.fontFamily;
+    highlight = finalProps.highlight ?? DocxHighlight.none;
+    isSuperscript = finalProps.isSuperscript ?? false;
+    isSubscript = finalProps.isSubscript ?? false;
+    isAllCaps = finalProps.isAllCaps ?? false;
+    isSmallCaps = finalProps.isSmallCaps ?? false;
+    isDoubleStrike = finalProps.isDoubleStrike ?? false;
+    isOutline = finalProps.isOutline ?? false;
+    isShadow = finalProps.isShadow ?? false;
+    isEmboss = finalProps.isEmboss ?? false;
+    isImprint = finalProps.isImprint ?? false;
 
     final textElem = run.getElement('w:t');
     if (textElem != null) {
@@ -497,6 +459,51 @@ class _DocxReaderInternal {
     }
 
     return DocxRawInline(run.toXmlString());
+  }
+
+  List<DocxInline> _parseInlineChildren(Iterable<XmlNode> nodes,
+      {_DocxStyle? parentStyle}) {
+    final children = <DocxInline>[];
+    for (var child in nodes) {
+      if (child is XmlElement) {
+        if (child.name.local == 'r') {
+          children.add(_parseRun(child, parentStyle: parentStyle));
+        } else if (child.name.local == 'hyperlink') {
+          // Extract href from relationship
+          final rId = child.getAttribute('r:id');
+          String? href;
+          if (rId != null && _documentRelationships.containsKey(rId)) {
+            href = _documentRelationships[rId]!.target;
+          }
+
+          // Parse all runs within the hyperlink
+          for (var grandChild in child.findAllElements('w:r')) {
+            final run = _parseRun(grandChild, parentStyle: parentStyle);
+            // Apply href to DocxText elements
+            if (run is DocxText && href != null) {
+              children.add(run.copyWith(
+                href: href,
+                decoration: DocxTextDecoration.underline,
+                color: DocxColor.blue,
+              ));
+            } else {
+              children.add(run);
+            }
+          }
+        } else if (['ins', 'del', 'smartTag', 'sdt']
+            .contains(child.name.local)) {
+          // Handle inline containers
+          var contentNodes = child.children;
+          if (child.name.local == 'sdt') {
+            final content = child.findAllElements('w:sdtContent').firstOrNull;
+            if (content != null) contentNodes = content.children;
+          }
+          children.addAll(
+              _parseInlineChildren(contentNodes, parentStyle: parentStyle));
+        }
+      }
+    }
+    return children;
   }
 
   DocxInlineImage _readImage(String rId, XmlElement drawingNode) {
@@ -795,6 +802,16 @@ class _DocxReaderInternal {
           nodes.add(_parseTable(child));
         } else if (child.name.local == 'sectPr') {
           continue;
+        } else if (['ins', 'del', 'smartTag', 'sdt']
+            .contains(child.name.local)) {
+          // Flatten block content from these containers
+          flushPendingList();
+          var contentNodes = child.children;
+          if (child.name.local == 'sdt') {
+            final content = child.findAllElements('w:sdtContent').firstOrNull;
+            if (content != null) contentNodes = content.children;
+          }
+          nodes.addAll(_parseBlocks(contentNodes));
         }
       }
     }
@@ -860,12 +877,14 @@ class _DocxReaderInternal {
 
             if (tcPr != null) {
               final gs = tcPr.getElement('w:gridSpan');
-              if (gs != null)
+              if (gs != null) {
                 gridSpan = int.tryParse(gs.getAttribute('w:val') ?? '1') ?? 1;
+              }
 
               final vm = tcPr.getElement('w:vMerge');
-              if (vm != null)
+              if (vm != null) {
                 vMergeVal = vm.getAttribute('w:val') ?? 'continue';
+              }
 
               final shd = tcPr.getElement('w:shd');
               if (shd != null) {
@@ -1305,8 +1324,9 @@ List<List<_TempCell>> _resolveRowSpans(List<List<_TempCell>> rawRows) {
 DocxBorderSide? _parseBorderSide(XmlElement? borderElem) {
   if (borderElem == null) return null;
   final val = borderElem.getAttribute('w:val');
-  if (val == null || val == 'none' || val == 'nil')
+  if (val == null || val == 'none' || val == 'nil') {
     return const DocxBorderSide.none();
+  }
 
   var style = DocxBorder.single;
   for (var s in DocxBorder.values) {
@@ -1343,4 +1363,434 @@ DocxBorderSide? _parseBorderSide(XmlElement? borderElem) {
     space: space,
     color: color,
   );
+}
+
+class _DocxStyle {
+  final String id;
+  final String? type;
+  final String? basedOn;
+
+  // Paragraph Properties
+  final DocxAlign? align;
+  final String? shadingFill; // shared with run
+  final int? numId;
+  final int? ilvl;
+  final int? spacingAfter;
+  final int? spacingBefore;
+  final int? lineSpacing;
+  final int? indentLeft;
+  final int? indentRight;
+  final int? indentFirstLine;
+  final DocxBorderSide? borderTop;
+  final DocxBorderSide? borderBottomSide;
+  final DocxBorderSide? borderLeft;
+  final DocxBorderSide? borderRight;
+  final DocxBorderSide? borderBetween;
+  final DocxBorder? borderBottom;
+
+  // Run Properties
+  final DocxFontWeight? fontWeight;
+  final DocxFontStyle? fontStyle;
+  final DocxTextDecoration? decoration;
+  final DocxColor? color;
+  final double? fontSize;
+  final String? fontFamily;
+  final DocxHighlight? highlight;
+  final bool? isSuperscript;
+  final bool? isSubscript;
+  final bool? isAllCaps;
+  final bool? isSmallCaps;
+  final bool? isDoubleStrike;
+  final bool? isOutline;
+  final bool? isShadow;
+  final bool? isEmboss;
+  final bool? isImprint;
+
+  // Raw Elements (for lazy parsing if needed, but we parse eagerly now)
+  // ignore: unused_field
+  final XmlElement? _pPr;
+  // ignore: unused_field
+  final XmlElement? _rPr;
+
+  const _DocxStyle({
+    required this.id,
+    this.type,
+    this.basedOn,
+    this.align,
+    this.shadingFill,
+    this.numId,
+    this.ilvl,
+    this.spacingAfter,
+    this.spacingBefore,
+    this.lineSpacing,
+    this.indentLeft,
+    this.indentRight,
+    this.indentFirstLine,
+    this.borderTop,
+    this.borderBottomSide,
+    this.borderLeft,
+    this.borderRight,
+    this.borderBetween,
+    this.borderBottom,
+    this.fontWeight,
+    this.fontStyle,
+    this.decoration,
+    this.color,
+    this.fontSize,
+    this.fontFamily,
+    this.highlight,
+    this.isSuperscript,
+    this.isSubscript,
+    this.isAllCaps,
+    this.isSmallCaps,
+    this.isDoubleStrike,
+    this.isOutline,
+    this.isShadow,
+    this.isEmboss,
+    this.isImprint,
+    XmlElement? pPr,
+    XmlElement? rPr,
+  })  : _pPr = pPr,
+        _rPr = rPr;
+
+  // Create from raw elements by parsing them immediately
+  factory _DocxStyle.fromXml(String id,
+      {String? type, String? basedOn, XmlElement? pPr, XmlElement? rPr}) {
+    final pProps = fromParagraphProperties(pPr);
+    final rProps = fromRunProperties(rPr);
+
+    final style = _DocxStyle(
+      id: id,
+      type: type,
+      basedOn: basedOn,
+      // P props
+      align: pProps.align,
+      shadingFill: pProps.shadingFill ?? rProps.shadingFill,
+      numId: pProps.numId,
+      ilvl: pProps.ilvl,
+      spacingAfter: pProps.spacingAfter,
+      spacingBefore: pProps.spacingBefore,
+      lineSpacing: pProps.lineSpacing,
+      indentLeft: pProps.indentLeft,
+      indentRight: pProps.indentRight,
+      indentFirstLine: pProps.indentFirstLine,
+      borderTop: pProps.borderTop,
+      borderBottomSide: pProps.borderBottomSide,
+      borderLeft: pProps.borderLeft,
+      borderRight: pProps.borderRight,
+      borderBetween: pProps.borderBetween,
+      borderBottom: pProps.borderBottom,
+      // R Props
+      fontWeight: rProps.fontWeight,
+      fontStyle: rProps.fontStyle,
+      decoration: rProps.decoration,
+      color: rProps.color,
+      fontSize: rProps.fontSize,
+      fontFamily: rProps.fontFamily,
+      highlight: rProps.highlight,
+      isSuperscript: rProps.isSuperscript,
+      isSubscript: rProps.isSubscript,
+      isAllCaps: rProps.isAllCaps,
+      isSmallCaps: rProps.isSmallCaps,
+      isDoubleStrike: rProps.isDoubleStrike,
+      isOutline: rProps.isOutline,
+      isShadow: rProps.isShadow,
+      isEmboss: rProps.isEmboss,
+      isImprint: rProps.isImprint,
+    );
+
+    return style;
+  }
+
+  // Parses just paragraph properties block
+  static _DocxStyle fromParagraphProperties(XmlElement? pPr) {
+    if (pPr == null) return const _DocxStyle(id: 'temp');
+
+    DocxAlign? align;
+    String? shadingFill;
+    int? numId;
+    int? ilvl;
+    int? spacingAfter;
+    int? spacingBefore;
+    int? lineSpacing;
+    int? indentLeft;
+    int? indentRight;
+    int? indentFirstLine;
+    DocxBorderSide? borderTop;
+    DocxBorderSide? borderBottomSide;
+    DocxBorderSide? borderLeft;
+    DocxBorderSide? borderRight;
+    DocxBorderSide? borderBetween;
+    DocxBorder? borderBottom; // Legacy fallback
+
+    // Alignment
+    final jcElem = pPr.getElement('w:jc');
+    if (jcElem != null) {
+      final val = jcElem.getAttribute('w:val');
+      if (val == 'center') align = DocxAlign.center;
+      if (val == 'right' || val == 'end') align = DocxAlign.right;
+      if (val == 'both' || val == 'distribute') align = DocxAlign.justify;
+      if (val == 'left' || val == 'start') align = DocxAlign.left;
+    }
+
+    // Spacing
+    final spacingElem = pPr.getElement('w:spacing');
+    if (spacingElem != null) {
+      final after = spacingElem.getAttribute('w:after');
+      if (after != null) spacingAfter = int.tryParse(after);
+
+      final before = spacingElem.getAttribute('w:before');
+      if (before != null) spacingBefore = int.tryParse(before);
+
+      final line = spacingElem.getAttribute('w:line');
+      if (line != null) lineSpacing = int.tryParse(line);
+    }
+
+    // Indentation
+    final indElem = pPr.getElement('w:ind');
+    if (indElem != null) {
+      final left =
+          indElem.getAttribute('w:left') ?? indElem.getAttribute('w:start');
+      if (left != null) indentLeft = int.tryParse(left);
+
+      final right =
+          indElem.getAttribute('w:right') ?? indElem.getAttribute('w:end');
+      if (right != null) indentRight = int.tryParse(right);
+
+      final firstLine = indElem.getAttribute('w:firstLine');
+      if (firstLine != null) indentFirstLine = int.tryParse(firstLine);
+    }
+
+    // Shading
+    final shdElem = pPr.getElement('w:shd');
+    if (shdElem != null) {
+      shadingFill = shdElem.getAttribute('w:fill');
+      if (shadingFill == 'auto') shadingFill = null;
+    }
+
+    // Numbering/Lists
+    final numPr = pPr.getElement('w:numPr');
+    if (numPr != null) {
+      final numIdElem = numPr.getElement('w:numId');
+      final ilvlElem = numPr.getElement('w:ilvl');
+
+      if (numIdElem != null) {
+        numId = int.tryParse(numIdElem.getAttribute('w:val') ?? '');
+      }
+      if (ilvlElem != null) {
+        ilvl = int.tryParse(ilvlElem.getAttribute('w:val') ?? '');
+      }
+    }
+
+    // Borders
+    final pBdr = pPr.getElement('w:pBdr');
+    if (pBdr != null) {
+      // Helper to parse border side
+      DocxBorderSide? parseSide(XmlElement? el) {
+        if (el == null) return null;
+        final val = el.getAttribute('w:val');
+        if (val == null || val == 'none' || val == 'nil') return null;
+
+        // Size
+        int size = 4;
+        final szAttr = el.getAttribute('w:sz');
+        if (szAttr != null) {
+          final s = int.tryParse(szAttr);
+          if (s != null) size = s;
+        }
+
+        // Color
+        var color = DocxColor.black;
+        final colorAttr = el.getAttribute('w:color');
+        if (colorAttr != null && colorAttr != 'auto') {
+          color = DocxColor(colorAttr);
+        }
+
+        // Style
+        var style = DocxBorder.single;
+        for (var b in DocxBorder.values) {
+          if (b.xmlValue == val) {
+            style = b;
+            break;
+          }
+        }
+
+        return DocxBorderSide(style: style, size: size, color: color);
+      }
+
+      borderTop = parseSide(pBdr.getElement('w:top'));
+      borderBottomSide = parseSide(pBdr.getElement('w:bottom'));
+      borderLeft = parseSide(pBdr.getElement('w:left'));
+      borderRight = parseSide(pBdr.getElement('w:right'));
+      borderBetween = parseSide(pBdr.getElement('w:between'));
+    }
+
+    return _DocxStyle(
+      id: 'temp',
+      align: align,
+      shadingFill: shadingFill,
+      numId: numId,
+      ilvl: ilvl,
+      spacingAfter: spacingAfter,
+      spacingBefore: spacingBefore,
+      lineSpacing: lineSpacing,
+      indentLeft: indentLeft,
+      indentRight: indentRight,
+      indentFirstLine: indentFirstLine,
+      borderTop: borderTop,
+      borderBottomSide: borderBottomSide,
+      borderLeft: borderLeft,
+      borderRight: borderRight,
+      borderBetween: borderBetween,
+      borderBottom: borderBottom,
+    );
+  }
+
+  // Parses just run properties block
+  static _DocxStyle fromRunProperties(XmlElement? rPr) {
+    if (rPr == null) return const _DocxStyle(id: 'temp');
+
+    DocxFontWeight? fontWeight;
+    DocxFontStyle? fontStyle;
+    DocxTextDecoration? decoration;
+    DocxColor? color;
+    String? shadingFill;
+    double? fontSize;
+    String? fontFamily;
+    DocxHighlight? highlight;
+    bool? isSuperscript;
+    bool? isSubscript;
+    bool? isAllCaps;
+    bool? isSmallCaps;
+    bool? isDoubleStrike;
+    bool? isOutline;
+    bool? isShadow;
+    bool? isEmboss;
+    bool? isImprint;
+
+    if (rPr.getElement('w:b') != null) fontWeight = DocxFontWeight.bold;
+    if (rPr.getElement('w:i') != null) fontStyle = DocxFontStyle.italic;
+    if (rPr.getElement('w:u') != null) {
+      decoration = DocxTextDecoration.underline;
+    }
+    if (rPr.getElement('w:strike') != null) {
+      decoration = DocxTextDecoration.strikethrough;
+    }
+
+    final colorElem = rPr.getElement('w:color');
+    if (colorElem != null) {
+      final val = colorElem.getAttribute('w:val');
+      if (val != null && val != 'auto') color = DocxColor('#$val');
+    }
+
+    final shdElem = rPr.getElement('w:shd');
+    if (shdElem != null) {
+      shadingFill = shdElem.getAttribute('w:fill');
+      if (shadingFill == 'auto') shadingFill = null;
+    }
+
+    final szElem = rPr.getElement('w:sz');
+    if (szElem != null) {
+      final val = szElem.getAttribute('w:val');
+      if (val != null) {
+        final halfPoints = int.tryParse(val);
+        if (halfPoints != null) fontSize = halfPoints / 2.0;
+      }
+    }
+
+    final rFonts = rPr.getElement('w:rFonts');
+    if (rFonts != null) fontFamily = rFonts.getAttribute('w:ascii');
+
+    final highlightElem = rPr.getElement('w:highlight');
+    if (highlightElem != null) {
+      final val = highlightElem.getAttribute('w:val');
+      if (val != null) {
+        for (var h in DocxHighlight.values) {
+          if (h.name == val) {
+            highlight = h;
+            break;
+          }
+        }
+      }
+    }
+
+    if (rPr.getElement('w:caps') != null) isAllCaps = true;
+    if (rPr.getElement('w:smallCaps') != null) isSmallCaps = true;
+    if (rPr.getElement('w:dstrike') != null) isDoubleStrike = true;
+    if (rPr.getElement('w:outline') != null) isOutline = true;
+    if (rPr.getElement('w:shadow') != null) isShadow = true;
+    if (rPr.getElement('w:emboss') != null) isEmboss = true;
+    if (rPr.getElement('w:imprint') != null) isImprint = true;
+
+    final vertAlignElem = rPr.getElement('w:vertAlign');
+    if (vertAlignElem != null) {
+      final val = vertAlignElem.getAttribute('w:val');
+      if (val == 'superscript') isSuperscript = true;
+      if (val == 'subscript') isSubscript = true;
+    }
+
+    return _DocxStyle(
+      id: 'temp',
+      fontWeight: fontWeight,
+      fontStyle: fontStyle,
+      decoration: decoration,
+      color: color,
+      shadingFill: shadingFill,
+      fontSize: fontSize,
+      fontFamily: fontFamily,
+      highlight: highlight,
+      isSuperscript: isSuperscript,
+      isSubscript: isSubscript,
+      isAllCaps: isAllCaps,
+      isSmallCaps: isSmallCaps,
+      isDoubleStrike: isDoubleStrike,
+      isOutline: isOutline,
+      isShadow: isShadow,
+      isEmboss: isEmboss,
+      isImprint: isImprint,
+    );
+  }
+
+  // Merge this style (as base/effective) with override properties
+  _DocxStyle merge(_DocxStyle other) {
+    return _DocxStyle(
+      id: other.id == 'temp' ? id : other.id,
+      type: type,
+      basedOn: basedOn,
+      // P props
+      align: other.align ?? align,
+      shadingFill: other.shadingFill ?? shadingFill,
+      numId: other.numId ?? numId,
+      ilvl: other.ilvl ?? ilvl,
+      spacingAfter: other.spacingAfter ?? spacingAfter,
+      spacingBefore: other.spacingBefore ?? spacingBefore,
+      lineSpacing: other.lineSpacing ?? lineSpacing,
+      indentLeft: other.indentLeft ?? indentLeft,
+      indentRight: other.indentRight ?? indentRight,
+      indentFirstLine: other.indentFirstLine ?? indentFirstLine,
+      borderTop: other.borderTop ?? borderTop,
+      borderBottomSide: other.borderBottomSide ?? borderBottomSide,
+      borderLeft: other.borderLeft ?? borderLeft,
+      borderRight: other.borderRight ?? borderRight,
+      borderBetween: other.borderBetween ?? borderBetween,
+      borderBottom: other.borderBottom ?? borderBottom,
+      // R props
+      fontWeight: other.fontWeight ?? fontWeight,
+      fontStyle: other.fontStyle ?? fontStyle,
+      decoration: other.decoration ?? decoration,
+      color: other.color ?? color,
+      fontSize: other.fontSize ?? fontSize,
+      fontFamily: other.fontFamily ?? fontFamily,
+      highlight: other.highlight ?? highlight,
+      isSuperscript: other.isSuperscript ?? isSuperscript,
+      isSubscript: other.isSubscript ?? isSubscript,
+      isAllCaps: other.isAllCaps ?? isAllCaps,
+      isSmallCaps: other.isSmallCaps ?? isSmallCaps,
+      isDoubleStrike: other.isDoubleStrike ?? isDoubleStrike,
+      isOutline: other.isOutline ?? isOutline,
+      isShadow: other.isShadow ?? isShadow,
+      isEmboss: other.isEmboss ?? isEmboss,
+      isImprint: other.isImprint ?? isImprint,
+    );
+  }
 }
