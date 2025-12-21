@@ -71,7 +71,7 @@ class ShapeBuilder {
       border: shape.outlineColor != null
           ? Border.all(
               color: _parseHexColor(shape.outlineColor!.hex),
-              width: shape.outlineWidth ?? 1,
+              width: shape.outlineWidth,
             )
           : null,
       borderRadius: borderRadius,
@@ -171,7 +171,7 @@ class _ShapePainter extends CustomPainter {
     final strokePaint = Paint()
       ..color = outlineColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = shape.outlineWidth ?? 1;
+      ..strokeWidth = shape.outlineWidth;
 
     final path = Path();
 

@@ -13,10 +13,11 @@ class ImageBuilder {
   Widget buildBlockImage(DocxImage image) {
     Widget imageWidget = Image.memory(
       image.bytes,
-      width: image.width?.toDouble(),
-      height: image.height?.toDouble(),
+      width: image.width,
+      height: image.height,
       fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(image),
+      errorBuilder: (context, error, stackTrace) =>
+          _buildErrorPlaceholder(image),
     );
 
     // Apply alignment
@@ -43,17 +44,18 @@ class ImageBuilder {
   Widget buildInlineImage(DocxInlineImage image) {
     return Image.memory(
       image.bytes,
-      width: image.width?.toDouble(),
-      height: image.height?.toDouble(),
+      width: image.width,
+      height: image.height,
       fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) => _buildInlineErrorPlaceholder(image),
+      errorBuilder: (context, error, stackTrace) =>
+          _buildInlineErrorPlaceholder(image),
     );
   }
 
   Widget _buildErrorPlaceholder(DocxImage image) {
     return Container(
-      width: image.width?.toDouble() ?? 200,
-      height: image.height?.toDouble() ?? 150,
+      width: image.width,
+      height: image.height,
       color: Colors.grey.shade200,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -71,8 +73,8 @@ class ImageBuilder {
 
   Widget _buildInlineErrorPlaceholder(DocxInlineImage image) {
     return Container(
-      width: image.width?.toDouble() ?? 50,
-      height: image.height?.toDouble() ?? 50,
+      width: image.width,
+      height: image.height,
       color: Colors.grey.shade200,
       child: Icon(Icons.broken_image, size: 24, color: Colors.grey.shade400),
     );

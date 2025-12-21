@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:xml/xml.dart';
 
 import '../core/enums.dart';
+import 'docx_drawing.dart';
 import 'docx_node.dart';
 
 /// An inline image element (can be used inside paragraphs).
@@ -22,6 +23,30 @@ class DocxInlineImage extends DocxInline {
   /// Alternative text for accessibility.
   final String? altText;
 
+  /// Positioning mode (inline or floating).
+  final DocxDrawingPosition positionMode;
+
+  /// Text wrapping mode (only for floating images).
+  final DocxTextWrap textWrap;
+
+  /// Horizontal alignment (for floating images).
+  final DrawingHAlign? hAlign;
+
+  /// Vertical alignment (for floating images).
+  final DrawingVAlign? vAlign;
+
+  /// Horizontal offset in points (for floating images).
+  final double? x;
+
+  /// Vertical offset in points (for floating images).
+  final double? y;
+
+  /// Horizontal position origin (relative from).
+  final DocxHorizontalPositionFrom hPositionFrom;
+
+  /// Vertical position origin (relative from).
+  final DocxVerticalPositionFrom vPositionFrom;
+
   // Internal: Set by the exporter when processing
   String? _relationshipId;
   int? _uniqueId;
@@ -32,6 +57,14 @@ class DocxInlineImage extends DocxInline {
     this.width = 200,
     this.height = 150,
     this.altText,
+    this.positionMode = DocxDrawingPosition.inline,
+    this.textWrap = DocxTextWrap.none,
+    this.x,
+    this.y,
+    this.hAlign,
+    this.vAlign,
+    this.hPositionFrom = DocxHorizontalPositionFrom.column,
+    this.vPositionFrom = DocxVerticalPositionFrom.paragraph,
     super.id,
   });
 
@@ -62,119 +95,239 @@ class DocxInlineImage extends DocxInline {
         builder.element(
           'w:drawing',
           nest: () {
+            if (positionMode == DocxDrawingPosition.floating) {
+              _buildAnchor(builder, cx, cy);
+            } else {
+              _buildInline(builder, cx, cy);
+            }
+          },
+        );
+      },
+    );
+  }
+
+  void _buildInline(XmlBuilder builder, int cx, int cy) {
+    builder.element(
+      'wp:inline',
+      nest: () {
+        builder.element(
+          'wp:extent',
+          nest: () {
+            builder.attribute('cx', cx);
+            builder.attribute('cy', cy);
+          },
+        );
+        _buildDocPr(builder);
+        _buildGraphic(builder, cx, cy);
+      },
+    );
+  }
+
+  void _buildAnchor(XmlBuilder builder, int cx, int cy) {
+    builder.element(
+      'wp:anchor',
+      nest: () {
+        builder.attribute('distT', '0');
+        builder.attribute('distB', '0');
+        builder.attribute('distL', '114300'); // Standard margin
+        builder.attribute('distR', '114300');
+        builder.attribute('simplePos', '0');
+        builder.attribute('relativeHeight', '251658240');
+        builder.attribute(
+            'behindDoc', textWrap == DocxTextWrap.behindText ? '1' : '0');
+        builder.attribute('locked', '0');
+        builder.attribute('layoutInCell', '1');
+        builder.attribute('allowOverlap', '1');
+
+        builder.element('wp:simplePos', nest: () {
+          builder.attribute('x', '0');
+          builder.attribute('y', '0');
+        });
+
+        // Horizontal Position
+        builder.element('wp:positionH', nest: () {
+          builder.attribute('relativeFrom', hPositionFrom.name);
+          if (hAlign != null) {
+            builder.element('wp:align', nest: () {
+              builder.text(hAlign!.name);
+            });
+          } else {
+            builder.element('wp:posOffset', nest: () {
+              final xEmu = ((x ?? 0) * 12700).toInt();
+              builder.text(xEmu.toString());
+            });
+          }
+        });
+
+        // Vertical Position
+        builder.element('wp:positionV', nest: () {
+          builder.attribute('relativeFrom', vPositionFrom.name);
+          if (vAlign != null) {
+            builder.element('wp:align', nest: () {
+              builder.text(vAlign!.name);
+            });
+          } else {
+            builder.element('wp:posOffset', nest: () {
+              final yEmu = ((y ?? 0) * 12700).toInt();
+              builder.text(yEmu.toString());
+            });
+          }
+        });
+
+        builder.element(
+          'wp:extent',
+          nest: () {
+            builder.attribute('cx', cx);
+            builder.attribute('cy', cy);
+          },
+        );
+
+        builder.element(
+          'wp:effectExtent',
+          nest: () {
+            builder.attribute('l', '0');
+            builder.attribute('t', '0');
+            builder.attribute('r', '0');
+            builder.attribute('b', '0');
+          },
+        );
+
+        _buildTextWrap(builder);
+        _buildDocPr(builder);
+        _buildGraphic(builder, cx, cy);
+      },
+    );
+  }
+
+  void _buildTextWrap(XmlBuilder builder) {
+    switch (textWrap) {
+      case DocxTextWrap.square:
+        builder.element('wp:wrapSquare', nest: () {
+          builder.attribute('wrapText', 'bothSides');
+        });
+        break;
+      case DocxTextWrap.tight:
+        builder.element('wp:wrapTight', nest: () {
+          builder.attribute('wrapText', 'bothSides');
+        });
+        break;
+      case DocxTextWrap.through:
+        builder.element('wp:wrapThrough', nest: () {
+          builder.attribute('wrapText', 'bothSides');
+        });
+        break;
+      case DocxTextWrap.topAndBottom:
+        builder.element('wp:wrapTopAndBottom');
+        break;
+      case DocxTextWrap.none:
+      case DocxTextWrap.behindText:
+      case DocxTextWrap.inFrontOfText:
+        builder.element('wp:wrapNone');
+        break;
+    }
+  }
+
+  void _buildDocPr(XmlBuilder builder) {
+    builder.element(
+      'wp:docPr',
+      nest: () {
+        builder.attribute('id', _uniqueId!);
+        builder.attribute('name', 'Picture $_uniqueId');
+        if (altText != null) {
+          builder.attribute('descr', altText!);
+        }
+      },
+    );
+  }
+
+  void _buildGraphic(XmlBuilder builder, int cx, int cy) {
+    builder.element(
+      'a:graphic',
+      nest: () {
+        builder.attribute(
+          'xmlns:a',
+          'http://schemas.openxmlformats.org/drawingml/2006/main',
+        );
+        builder.element(
+          'a:graphicData',
+          nest: () {
+            builder.attribute(
+              'uri',
+              'http://schemas.openxmlformats.org/drawingml/2006/picture',
+            );
             builder.element(
-              'wp:inline',
+              'pic:pic',
               nest: () {
-                builder.element(
-                  'wp:extent',
-                  nest: () {
-                    builder.attribute('cx', cx);
-                    builder.attribute('cy', cy);
-                  },
+                builder.attribute(
+                  'xmlns:pic',
+                  'http://schemas.openxmlformats.org/drawingml/2006/picture',
                 );
+                // Non-Visual Properties
                 builder.element(
-                  'wp:docPr',
+                  'pic:nvPicPr',
                   nest: () {
-                    builder.attribute('id', _uniqueId!);
-                    builder.attribute('name', 'Picture $_uniqueId');
-                    if (altText != null) {
-                      builder.attribute('descr', altText!);
-                    }
-                  },
-                );
-                builder.element(
-                  'a:graphic',
-                  nest: () {
-                    builder.attribute(
-                      'xmlns:a',
-                      'http://schemas.openxmlformats.org/drawingml/2006/main',
-                    );
                     builder.element(
-                      'a:graphicData',
+                      'pic:cNvPr',
+                      nest: () {
+                        builder.attribute('id', _uniqueId!);
+                        builder.attribute(
+                          'name',
+                          'Picture $_uniqueId',
+                        );
+                      },
+                    );
+                    builder.element('pic:cNvPicPr');
+                  },
+                );
+                // Fill
+                builder.element(
+                  'pic:blipFill',
+                  nest: () {
+                    builder.element(
+                      'a:blip',
                       nest: () {
                         builder.attribute(
-                          'uri',
-                          'http://schemas.openxmlformats.org/drawingml/2006/picture',
+                          'r:embed',
+                          _relationshipId!,
                         );
+                      },
+                    );
+                    builder.element(
+                      'a:stretch',
+                      nest: () {
+                        builder.element('a:fillRect');
+                      },
+                    );
+                  },
+                );
+                // Shape Properties
+                builder.element(
+                  'pic:spPr',
+                  nest: () {
+                    builder.element(
+                      'a:xfrm',
+                      nest: () {
                         builder.element(
-                          'pic:pic',
+                          'a:off',
                           nest: () {
-                            builder.attribute(
-                              'xmlns:pic',
-                              'http://schemas.openxmlformats.org/drawingml/2006/picture',
-                            );
-                            // Non-Visual Properties
-                            builder.element(
-                              'pic:nvPicPr',
-                              nest: () {
-                                builder.element(
-                                  'pic:cNvPr',
-                                  nest: () {
-                                    builder.attribute('id', _uniqueId!);
-                                    builder.attribute(
-                                      'name',
-                                      'Picture $_uniqueId',
-                                    );
-                                  },
-                                );
-                                builder.element('pic:cNvPicPr');
-                              },
-                            );
-                            // Fill
-                            builder.element(
-                              'pic:blipFill',
-                              nest: () {
-                                builder.element(
-                                  'a:blip',
-                                  nest: () {
-                                    builder.attribute(
-                                      'r:embed',
-                                      _relationshipId!,
-                                    );
-                                  },
-                                );
-                                builder.element(
-                                  'a:stretch',
-                                  nest: () {
-                                    builder.element('a:fillRect');
-                                  },
-                                );
-                              },
-                            );
-                            // Shape Properties
-                            builder.element(
-                              'pic:spPr',
-                              nest: () {
-                                builder.element(
-                                  'a:xfrm',
-                                  nest: () {
-                                    builder.element(
-                                      'a:off',
-                                      nest: () {
-                                        builder.attribute('x', '0');
-                                        builder.attribute('y', '0');
-                                      },
-                                    );
-                                    builder.element(
-                                      'a:ext',
-                                      nest: () {
-                                        builder.attribute('cx', cx);
-                                        builder.attribute('cy', cy);
-                                      },
-                                    );
-                                  },
-                                );
-                                builder.element(
-                                  'a:prstGeom',
-                                  nest: () {
-                                    builder.attribute('prst', 'rect');
-                                    builder.element('a:avLst');
-                                  },
-                                );
-                              },
-                            );
+                            builder.attribute('x', '0');
+                            builder.attribute('y', '0');
                           },
                         );
+                        builder.element(
+                          'a:ext',
+                          nest: () {
+                            builder.attribute('cx', cx);
+                            builder.attribute('cy', cy);
+                          },
+                        );
+                      },
+                    );
+                    builder.element(
+                      'a:prstGeom',
+                      nest: () {
+                        builder.attribute('prst', 'rect');
+                        builder.element('a:avLst');
                       },
                     );
                   },

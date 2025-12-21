@@ -247,8 +247,12 @@ class _DocxViewState extends State<DocxView> {
       return const Center(child: Text('Empty document'));
     }
 
+    // Use theme's background color, fallback to config, then to white
+    final backgroundColor =
+        widget.config.backgroundColor ?? theme.backgroundColor ?? Colors.white;
+
     Widget content = Container(
-      color: widget.config.backgroundColor ?? Colors.white,
+      color: backgroundColor,
       child: ListView.builder(
         padding: widget.config.padding,
         itemCount: _widgets!.length,

@@ -14,7 +14,7 @@ class BlockParser {
 
   BlockParser(this.context)
       : inlineParser = InlineParser(context),
-        tableParser = TableParser(context);
+        tableParser = TableParser(context, InlineParser(context));
 
   /// Parse body element into list of DocxNodes.
   List<DocxNode> parseBody(XmlElement body) {
@@ -38,17 +38,39 @@ class BlockParser {
     for (var child in children) {
       if (child is XmlElement) {
         if (child.name.local == 'p') {
-          final para = parseParagraph(child);
-          if (para.numId != null) {
-            // List item
-            if (currentNumId != null && currentNumId != para.numId) {
-              flushPendingList();
-            }
-            currentNumId = para.numId;
-            pendingListItems.add(para);
-          } else {
+          // Check for drop cap first
+          final pPr = child.getElement('w:pPr');
+          final framePr = pPr?.getElement('w:framePr');
+          final dropCapAttr = framePr?.getAttribute('w:dropCap');
+
+          if (dropCapAttr != null &&
+              (dropCapAttr == 'drop' || dropCapAttr == 'margin')) {
+            // This is a drop cap paragraph
+            final dropCap = _parseDropCap(child, framePr!, dropCapAttr);
             flushPendingList();
-            result.add(para);
+            result.add(dropCap);
+          } else {
+            final para = parseParagraph(child);
+            if (para.numId != null) {
+              // List item
+              if (currentNumId != null && currentNumId != para.numId) {
+                flushPendingList();
+              }
+              currentNumId = para.numId;
+              pendingListItems.add(para);
+            } else {
+              flushPendingList();
+              result.add(para);
+            }
+          }
+
+          // Check for section break embedded in this paragraph (reuse pPr from above)
+          if (pPr != null) {
+            final sectPr = pPr.getElement('w:sectPr');
+            if (sectPr != null) {
+              final sectionDef = _parseSectionProperties(sectPr);
+              result.add(DocxSectionBreakBlock(sectionDef));
+            }
           }
         } else if (child.name.local == 'tbl') {
           flushPendingList();
@@ -177,5 +199,117 @@ class BlockParser {
     } catch (_) {}
 
     return false;
+  }
+
+  /// Parse section properties from a w:sectPr element.
+  DocxSectionDef _parseSectionProperties(XmlElement sectPr) {
+    DocxPageSize pageSize = DocxPageSize.letter;
+    DocxPageOrientation orientation = DocxPageOrientation.portrait;
+    int? customWidth;
+    int? customHeight;
+    int marginTop = kDefaultMarginTop;
+    int marginBottom = kDefaultMarginBottom;
+    int marginLeft = kDefaultMarginLeft;
+    int marginRight = kDefaultMarginRight;
+
+    // Page Size
+    final pgSz = sectPr.getElement('w:pgSz');
+    if (pgSz != null) {
+      final w = int.tryParse(pgSz.getAttribute('w:w') ?? '12240') ?? 12240;
+      final h = int.tryParse(pgSz.getAttribute('w:h') ?? '15840') ?? 15840;
+      final orient = pgSz.getAttribute('w:orient');
+
+      if (orient == 'landscape') {
+        orientation = DocxPageOrientation.landscape;
+      }
+
+      if ((w == 12240 && h == 15840) || (w == 15840 && h == 12240)) {
+        pageSize = DocxPageSize.letter;
+      } else if ((w == 11906 && h == 16838) || (w == 16838 && h == 11906)) {
+        pageSize = DocxPageSize.a4;
+      } else {
+        pageSize = DocxPageSize.custom;
+        customWidth = w;
+        customHeight = h;
+      }
+    }
+
+    // Margins
+    final pgMar = sectPr.getElement('w:pgMar');
+    if (pgMar != null) {
+      marginTop = int.tryParse(pgMar.getAttribute('w:top') ?? '') ?? marginTop;
+      marginBottom =
+          int.tryParse(pgMar.getAttribute('w:bottom') ?? '') ?? marginBottom;
+      marginLeft =
+          int.tryParse(pgMar.getAttribute('w:left') ?? '') ?? marginLeft;
+      marginRight =
+          int.tryParse(pgMar.getAttribute('w:right') ?? '') ?? marginRight;
+    }
+
+    return DocxSectionDef(
+      pageSize: pageSize,
+      orientation: orientation,
+      customWidth: customWidth,
+      customHeight: customHeight,
+      marginTop: marginTop,
+      marginBottom: marginBottom,
+      marginLeft: marginLeft,
+      marginRight: marginRight,
+    );
+  }
+
+  /// Parse a drop cap paragraph from w:framePr with w:dropCap.
+  DocxDropCap _parseDropCap(
+      XmlElement xml, XmlElement framePr, String dropCapAttr) {
+    // Get drop cap style
+    final style = dropCapAttr == 'margin'
+        ? DocxDropCapStyle.margin
+        : DocxDropCapStyle.drop;
+
+    // Get number of lines
+    final linesAttr = framePr.getAttribute('w:lines');
+    final lines = int.tryParse(linesAttr ?? '3') ?? 3;
+
+    // Get horizontal space
+    final hSpaceAttr = framePr.getAttribute('w:hSpace');
+    final hSpace = int.tryParse(hSpaceAttr ?? '0') ?? 0;
+
+    // Extract the drop cap letter from the first run
+    String letter = '';
+    String? fontFamily;
+    double? fontSize;
+
+    final runs = xml.findAllElements('w:r');
+    if (runs.isNotEmpty) {
+      final firstRun = runs.first;
+      final textElem = firstRun.getElement('w:t');
+      if (textElem != null) {
+        letter = textElem.innerText;
+      }
+
+      // Get font properties
+      final rPr = firstRun.getElement('w:rPr');
+      if (rPr != null) {
+        final szElem = rPr.getElement('w:sz');
+        if (szElem != null) {
+          final szVal = int.tryParse(szElem.getAttribute('w:val') ?? '');
+          if (szVal != null) fontSize = szVal / 2.0;
+        }
+        final rFonts = rPr.getElement('w:rFonts');
+        if (rFonts != null) {
+          fontFamily = rFonts.getAttribute('w:ascii');
+        }
+      }
+    }
+
+    return DocxDropCap(
+      letter: letter,
+      lines: lines,
+      style: style,
+      hSpace: hSpace,
+      fontFamily: fontFamily,
+      fontSize: fontSize,
+      restOfParagraph: const [], // Rest of paragraph is typically in following paragraph
+    );
   }
 }

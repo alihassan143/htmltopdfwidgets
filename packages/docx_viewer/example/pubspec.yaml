@@ -1,7 +1,7 @@
 name: docx_viewer_example
 description: Example app for docx_viewer package.
 
-publish_to: 'none'
+publish_to: "none"
 
 environment:
   sdk: ^3.0.0
@@ -11,9 +11,9 @@ dependencies:
     sdk: flutter
   docx_viewer:
     path: ../
-  file_picker: ^8.1.6
+  file_picker: ^10.3.8
 dependency_overrides:
- meta:   
+  meta:
 dev_dependencies:
   flutter_test:
     sdk: flutter

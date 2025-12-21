@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 /// Theme configuration for DocxView.
 class DocxViewTheme {
+  /// Background color for the document viewer.
+  final Color? backgroundColor;
+
   /// Default text style for paragraphs.
   final TextStyle defaultTextStyle;
 
@@ -33,6 +36,7 @@ class DocxViewTheme {
   final Color bulletColor;
 
   const DocxViewTheme({
+    this.backgroundColor,
     this.defaultTextStyle = const TextStyle(
       fontSize: 14,
       color: Colors.black87,
@@ -59,18 +63,25 @@ class DocxViewTheme {
   /// Light theme preset.
   factory DocxViewTheme.light() {
     return DocxViewTheme(
+      backgroundColor: Colors.white,
       defaultTextStyle: const TextStyle(
         fontSize: 14,
         color: Colors.black87,
         height: 1.5,
       ),
       headingStyles: {
-        1: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
-        2: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
-        3: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.black87),
-        4: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
-        5: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
-        6: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87),
+        1: const TextStyle(
+            fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
+        2: const TextStyle(
+            fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+        3: const TextStyle(
+            fontSize: 20, fontWeight: FontWeight.w600, color: Colors.black87),
+        4: const TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
+        5: const TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
+        6: const TextStyle(
+            fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black87),
       },
     );
   }
@@ -78,18 +89,25 @@ class DocxViewTheme {
   /// Dark theme preset.
   factory DocxViewTheme.dark() {
     return DocxViewTheme(
+      backgroundColor: const Color(0xFF1E1E1E),
       defaultTextStyle: const TextStyle(
         fontSize: 14,
         color: Colors.white70,
         height: 1.5,
       ),
       headingStyles: {
-        1: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
-        2: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white70),
-        3: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white70),
-        4: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white70),
-        5: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white70),
-        6: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white70),
+        1: const TextStyle(
+            fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+        2: const TextStyle(
+            fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white70),
+        3: const TextStyle(
+            fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white70),
+        4: const TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white70),
+        5: const TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w500, color: Colors.white70),
+        6: const TextStyle(
+            fontSize: 14, fontWeight: FontWeight.w500, color: Colors.white70),
       },
       codeBlockBackground: const Color(0xFF2D2D2D),
       codeTextStyle: const TextStyle(

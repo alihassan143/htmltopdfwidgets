@@ -46,6 +46,7 @@ class DocxStyle {
   final bool? isShadow;
   final bool? isEmboss;
   final bool? isImprint;
+  final DocxBorderSide? textBorder; // w:bdr element - border around text
 
   const DocxStyle({
     required this.id,
@@ -83,6 +84,7 @@ class DocxStyle {
     this.isShadow,
     this.isEmboss,
     this.isImprint,
+    this.textBorder,
   });
 
   /// Creates an empty style with no properties set.
@@ -132,6 +134,7 @@ class DocxStyle {
       isShadow: rProps.isShadow,
       isEmboss: rProps.isEmboss,
       isImprint: rProps.isImprint,
+      textBorder: rProps.textBorder,
     );
   }
 
@@ -175,6 +178,7 @@ class DocxStyle {
       isShadow: other.isShadow ?? isShadow,
       isEmboss: other.isEmboss ?? isEmboss,
       isImprint: other.isImprint ?? isImprint,
+      textBorder: other.textBorder ?? textBorder,
     );
   }
 
@@ -376,6 +380,13 @@ class DocxStyle {
       if (val == 'subscript') isSubscript = true;
     }
 
+    // Parse text border (w:bdr) - box around text
+    DocxBorderSide? textBorder;
+    final bdrElem = rPr.getElement('w:bdr');
+    if (bdrElem != null) {
+      textBorder = _parseBorderSide(bdrElem);
+    }
+
     return DocxStyle(
       id: 'temp',
       fontWeight: fontWeight,
@@ -395,6 +406,7 @@ class DocxStyle {
       isShadow: isShadow,
       isEmboss: isEmboss,
       isImprint: isImprint,
+      textBorder: textBorder,
     );
   }
 

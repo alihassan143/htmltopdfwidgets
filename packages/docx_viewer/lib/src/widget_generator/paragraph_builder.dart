@@ -4,14 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../docx_view_config.dart';
-import '../theme/docx_view_theme.dart';
 import '../search/docx_search_controller.dart';
+import '../theme/docx_view_theme.dart';
 
 /// Builds Flutter widgets from [DocxParagraph] elements.
 class ParagraphBuilder {
   final DocxViewTheme theme;
   final DocxViewConfig config;
   final DocxSearchController? searchController;
+  // Used for search highlighting - currently reserved for future use
+  // ignore: unused_field
   int _blockIndex = 0;
 
   ParagraphBuilder({
@@ -29,7 +31,13 @@ class ParagraphBuilder {
   Widget build(DocxParagraph paragraph, {int? blockIndex}) {
     if (blockIndex != null) _blockIndex = blockIndex;
 
-    final spans = _buildTextSpans(paragraph.children);
+    // Calculate line height from lineSpacing (240 = single line, 360 = 1.5, 480 = double)
+    double? lineHeight;
+    if (paragraph.lineSpacing != null) {
+      lineHeight = paragraph.lineSpacing! / 240.0;
+    }
+
+    final spans = _buildTextSpans(paragraph.children, lineHeight: lineHeight);
     final textAlign = _convertAlign(paragraph.align);
 
     Widget content;
@@ -45,44 +53,64 @@ class ParagraphBuilder {
       );
     }
 
-    // Apply paragraph styling
-    double leftPadding = 0;
-    double topPadding = 4;
-    double bottomPadding = 4;
+    // Apply paragraph styling from DocxParagraph properties
+    // Convert twips to pixels (20 twips = 1 point, 1 point ≈ 1.33 pixels)
+    const double twipsToPixels = 1 / 15.0;
+
+    double leftPadding = (paragraph.indentLeft ?? 0) * twipsToPixels;
+    double rightPadding = (paragraph.indentRight ?? 0) * twipsToPixels;
+    double topPadding = (paragraph.spacingBefore ?? 80) * twipsToPixels;
+    double bottomPadding = (paragraph.spacingAfter ?? 80) * twipsToPixels;
+
+    // Handle first line indent
+    if (paragraph.indentFirstLine != null && paragraph.indentFirstLine! > 0) {
+      // Apply first line indent by wrapping content
+      content = Padding(
+        padding:
+            EdgeInsets.only(left: paragraph.indentFirstLine! * twipsToPixels),
+        child: content,
+      );
+    }
 
     // Heading detection - use larger spacing
     if (paragraph.children.isNotEmpty) {
       final first = paragraph.children.first;
-      if (first is DocxText && first.fontSize != null && first.fontSize! >= 20) {
-        topPadding = 16;
-        bottomPadding = 8;
+      if (first is DocxText &&
+          first.fontSize != null &&
+          first.fontSize! >= 20) {
+        topPadding = topPadding.clamp(16, double.infinity);
+        bottomPadding = bottomPadding.clamp(8, double.infinity);
       }
     }
 
-    // Handle shading/background
-    BoxDecoration? decoration;
-    if (paragraph.shadingFill != null) {
-      decoration = BoxDecoration(
-        color: _parseHexColor(paragraph.shadingFill!),
-      );
-    }
+    // Build decoration with shading and borders
+    BoxDecoration? decoration = _buildParagraphDecoration(paragraph);
 
-    // Handle bottom border (for hr elements)
-    if (paragraph.borderBottom != null && paragraph.borderBottom != DocxBorder.none) {
-      decoration = BoxDecoration(
-        color: decoration?.color,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey.shade400,
-            width: 1,
+    // Handle page break before
+    if (paragraph.pageBreakBefore) {
+      // Add a visual separator for page breaks
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 32, thickness: 2),
+          Container(
+            padding: EdgeInsets.only(
+              left: leftPadding,
+              right: rightPadding,
+              top: topPadding,
+              bottom: bottomPadding,
+            ),
+            decoration: decoration,
+            child: content,
           ),
-        ),
+        ],
       );
     }
 
     return Container(
       padding: EdgeInsets.only(
         left: leftPadding,
+        right: rightPadding,
         top: topPadding,
         bottom: bottomPadding,
       ),
@@ -91,27 +119,113 @@ class ParagraphBuilder {
     );
   }
 
+  /// Build box decoration for paragraph with shading and borders.
+  BoxDecoration? _buildParagraphDecoration(DocxParagraph paragraph) {
+    Color? backgroundColor;
+    if (paragraph.shadingFill != null) {
+      backgroundColor = _parseHexColor(paragraph.shadingFill!);
+    }
+
+    // Build borders from DocxBorderSide properties
+    BorderSide? topBorder;
+    BorderSide? bottomBorder;
+    BorderSide? leftBorder;
+    BorderSide? rightBorder;
+
+    if (paragraph.borderTop != null) {
+      topBorder = _buildBorderSide(paragraph.borderTop!);
+    }
+    if (paragraph.borderBottomSide != null) {
+      bottomBorder = _buildBorderSide(paragraph.borderBottomSide!);
+    } else if (paragraph.borderBottom != null &&
+        paragraph.borderBottom != DocxBorder.none) {
+      // Legacy support for deprecated borderBottom
+      bottomBorder = BorderSide(color: Colors.grey.shade400, width: 1);
+    }
+    if (paragraph.borderLeft != null) {
+      leftBorder = _buildBorderSide(paragraph.borderLeft!);
+    }
+    if (paragraph.borderRight != null) {
+      rightBorder = _buildBorderSide(paragraph.borderRight!);
+    }
+
+    final hasBorder = topBorder != null ||
+        bottomBorder != null ||
+        leftBorder != null ||
+        rightBorder != null;
+
+    if (backgroundColor == null && !hasBorder) {
+      return null;
+    }
+
+    return BoxDecoration(
+      color: backgroundColor,
+      border: hasBorder
+          ? Border(
+              top: topBorder ?? BorderSide.none,
+              bottom: bottomBorder ?? BorderSide.none,
+              left: leftBorder ?? BorderSide.none,
+              right: rightBorder ?? BorderSide.none,
+            )
+          : null,
+    );
+  }
+
+  /// Convert DocxBorderSide to Flutter BorderSide.
+  BorderSide _buildBorderSide(DocxBorderSide side) {
+    if (side.style == DocxBorder.none) {
+      return BorderSide.none;
+    }
+
+    // Convert size from eighths of a point to pixels
+    final width = side.size / 8.0;
+    final color = _parseHexColor(side.color.hex);
+
+    return BorderSide(
+      color: color,
+      width: width.clamp(0.5, 10.0),
+      style: side.style == DocxBorder.dotted
+          ? BorderStyle.none // Flutter doesn't support dotted natively
+          : BorderStyle.solid,
+    );
+  }
+
   /// Build TextSpans from inline elements.
-  List<InlineSpan> _buildTextSpans(List<DocxInline> inlines) {
+  List<InlineSpan> _buildTextSpans(List<DocxInline> inlines,
+      {double? lineHeight}) {
     final spans = <InlineSpan>[];
 
     for (final inline in inlines) {
       if (inline is DocxText) {
-        spans.add(_buildTextSpan(inline));
+        spans.add(_buildTextSpan(inline, lineHeight: lineHeight));
       } else if (inline is DocxLineBreak) {
         spans.add(const TextSpan(text: '\n'));
       } else if (inline is DocxTab) {
-        spans.add(const TextSpan(text: '\t'));
+        // Better tab rendering - use 4 spaces worth of fixed width
+        spans.add(const TextSpan(text: '    '));
+      } else if (inline is DocxCheckbox) {
+        // Render checkbox as unicode character with styling
+        spans.add(_buildCheckboxSpan(inline, lineHeight: lineHeight));
       } else if (inline is DocxInlineImage) {
+        // Inline images with proper vertical alignment (like microsoft_viewer)
         spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
           child: Image.memory(
             inline.bytes,
-            width: inline.width?.toDouble(),
-            height: inline.height?.toDouble(),
+            width: inline.width,
+            height: inline.height,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Container(
+              width: inline.width,
+              height: inline.height,
+              color: Colors.grey.shade200,
+              child: const Icon(Icons.broken_image, size: 24),
+            ),
           ),
         ));
       } else if (inline is DocxShape) {
         spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
           child: _buildInlineShape(inline),
         ));
       }
@@ -120,8 +234,47 @@ class ParagraphBuilder {
     return spans;
   }
 
+  /// Build a TextSpan for a DocxCheckbox.
+  TextSpan _buildCheckboxSpan(DocxCheckbox checkbox, {double? lineHeight}) {
+    final content = checkbox.isChecked ? '☒ ' : '☐ ';
+
+    FontWeight fontWeight = checkbox.fontWeight == DocxFontWeight.bold
+        ? FontWeight.bold
+        : FontWeight.normal;
+
+    FontStyle fontStyle = checkbox.fontStyle == DocxFontStyle.italic
+        ? FontStyle.italic
+        : FontStyle.normal;
+
+    Color? textColor;
+    if (checkbox.color != null) {
+      textColor = _parseHexColor(checkbox.color!.hex);
+    }
+
+    return TextSpan(
+      text: content,
+      style: TextStyle(
+        fontWeight: fontWeight,
+        fontStyle: fontStyle,
+        color: textColor ?? theme.defaultTextStyle.color,
+        fontSize: checkbox.fontSize ?? theme.defaultTextStyle.fontSize,
+        height: lineHeight ?? theme.defaultTextStyle.height,
+      ),
+    );
+  }
+
   /// Build a TextSpan from a [DocxText] element.
-  TextSpan _buildTextSpan(DocxText text) {
+  TextSpan _buildTextSpan(DocxText text, {double? lineHeight}) {
+    // Transform content based on text effects
+    String content = text.content;
+    if (text.isAllCaps) {
+      content = content.toUpperCase();
+    } else if (text.isSmallCaps) {
+      // Simulate small caps by using uppercase at smaller font size
+      // The actual styling will be handled later, just transform text here
+      content = content.toUpperCase();
+    }
+
     // Determine text style
     FontWeight fontWeight = text.fontWeight == DocxFontWeight.bold
         ? FontWeight.bold
@@ -131,11 +284,20 @@ class ParagraphBuilder {
         ? FontStyle.italic
         : FontStyle.normal;
 
+    // Handle multiple text decorations
     TextDecoration decoration = TextDecoration.none;
+    final decorations = <TextDecoration>[];
+
     if (text.decoration == DocxTextDecoration.underline) {
-      decoration = TextDecoration.underline;
-    } else if (text.decoration == DocxTextDecoration.strikethrough) {
-      decoration = TextDecoration.lineThrough;
+      decorations.add(TextDecoration.underline);
+    }
+    if (text.decoration == DocxTextDecoration.strikethrough ||
+        text.isDoubleStrike) {
+      decorations.add(TextDecoration.lineThrough);
+    }
+
+    if (decorations.isNotEmpty) {
+      decoration = TextDecoration.combine(decorations);
     }
 
     Color? textColor;
@@ -146,8 +308,8 @@ class ParagraphBuilder {
     Color? backgroundColor;
     if (text.shadingFill != null) {
       backgroundColor = _parseHexColor(text.shadingFill!);
-    } else if (text.highlight != null && text.highlight != DocxHighlight.none) {
-      backgroundColor = _highlightToColor(text.highlight!);
+    } else if (text.highlight != DocxHighlight.none) {
+      backgroundColor = _highlightToColor(text.highlight);
     }
 
     double? fontSize = text.fontSize ?? theme.defaultTextStyle.fontSize;
@@ -163,25 +325,87 @@ class ParagraphBuilder {
       fontSize = (fontSize ?? 14) * 0.7;
     }
 
+    // Handle small caps sizing
+    if (text.isSmallCaps && !text.isAllCaps) {
+      fontSize = (fontSize ?? 14) * 0.85;
+    }
+
+    // Build text shadows for shadow, emboss, and imprint effects
+    List<Shadow>? shadows;
+    if (text.isShadow) {
+      shadows = [
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.3),
+          offset: const Offset(1, 1),
+          blurRadius: 2,
+        ),
+      ];
+    } else if (text.isEmboss) {
+      shadows = [
+        Shadow(
+          color: Colors.white.withValues(alpha: 0.7),
+          offset: const Offset(-1, -1),
+          blurRadius: 1,
+        ),
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.3),
+          offset: const Offset(1, 1),
+          blurRadius: 1,
+        ),
+      ];
+    } else if (text.isImprint) {
+      shadows = [
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.3),
+          offset: const Offset(-1, -1),
+          blurRadius: 1,
+        ),
+        Shadow(
+          color: Colors.white.withValues(alpha: 0.5),
+          offset: const Offset(1, 1),
+          blurRadius: 1,
+        ),
+      ];
+    }
+
+    // Handle outline effect by using text foreground
+    Paint? foreground;
+    if (text.isOutline) {
+      foreground = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.5
+        ..color = textColor ?? Colors.black;
+      textColor = null; // Can't use both color and foreground
+    }
+
     final style = TextStyle(
       fontWeight: fontWeight,
       fontStyle: fontStyle,
       decoration: decoration,
-      color: textColor ?? theme.defaultTextStyle.color,
+      decorationStyle: text.isDoubleStrike
+          ? TextDecorationStyle.double
+          : TextDecorationStyle.solid,
+      color: foreground == null
+          ? (textColor ?? theme.defaultTextStyle.color)
+          : null,
+      foreground: foreground,
       backgroundColor: backgroundColor,
       fontSize: fontSize,
       fontFamily: fontFamily,
       fontFamilyFallback: config.customFontFallbacks,
-      height: theme.defaultTextStyle.height,
+      height: lineHeight ?? theme.defaultTextStyle.height,
+      letterSpacing: text.characterSpacing,
+      shadows: shadows,
     );
 
     // Handle hyperlinks
     if (text.href != null && text.href!.isNotEmpty) {
       return TextSpan(
-        text: text.content,
+        text: content,
         style: style.copyWith(
           color: theme.linkStyle.color,
           decoration: TextDecoration.underline,
+          foreground: null,
         ),
         recognizer: TapGestureRecognizer()
           ..onTap = () {
@@ -191,7 +415,7 @@ class ParagraphBuilder {
     }
 
     return TextSpan(
-      text: text.content,
+      text: content,
       style: style,
     );
   }
@@ -207,7 +431,7 @@ class ParagraphBuilder {
         border: shape.outlineColor != null
             ? Border.all(
                 color: _parseHexColor(shape.outlineColor!.hex),
-                width: shape.outlineWidth ?? 1,
+                width: shape.outlineWidth,
               )
             : null,
         borderRadius: shape.preset == DocxShapePreset.ellipse ||

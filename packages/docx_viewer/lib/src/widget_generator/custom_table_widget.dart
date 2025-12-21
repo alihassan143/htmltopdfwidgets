@@ -23,6 +23,12 @@ class TableCellData {
   /// Vertical alignment within the cell.
   final TableCellVerticalAlignment verticalAlign;
 
+  /// Individual cell borders (optional - falls back to table defaults if null).
+  final BorderSide? borderTop;
+  final BorderSide? borderBottom;
+  final BorderSide? borderLeft;
+  final BorderSide? borderRight;
+
   const TableCellData({
     required this.child,
     required this.row,
@@ -31,6 +37,10 @@ class TableCellData {
     this.colSpan = 1,
     this.backgroundColor,
     this.verticalAlign = TableCellVerticalAlignment.middle,
+    this.borderTop,
+    this.borderBottom,
+    this.borderLeft,
+    this.borderRight,
   });
 }
 

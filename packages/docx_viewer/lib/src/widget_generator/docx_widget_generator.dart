@@ -2,13 +2,13 @@ import 'package:docx_creator/docx_creator.dart';
 import 'package:flutter/material.dart';
 
 import '../docx_view_config.dart';
-import '../theme/docx_view_theme.dart';
 import '../search/docx_search_controller.dart';
-import 'paragraph_builder.dart';
-import 'table_builder.dart';
-import 'list_builder.dart';
+import '../theme/docx_view_theme.dart';
 import 'image_builder.dart';
+import 'list_builder.dart';
+import 'paragraph_builder.dart';
 import 'shape_builder.dart';
+import 'table_builder.dart';
 
 /// Generates Flutter widgets from [DocxNode] elements.
 ///
@@ -83,6 +83,31 @@ class DocxWidgetGenerator {
       return _imageBuilder.buildBlockImage(node);
     } else if (node is DocxShapeBlock) {
       return _shapeBuilder.buildBlockShape(node);
+    } else if (node is DocxSectionBreakBlock) {
+      // Render section breaks as horizontal dividers
+      return const Divider(height: 24, thickness: 1);
+    } else if (node is DocxRawXml) {
+      // Fallback for unrecognized block elements - render as debug placeholder
+      // In production, you might want to hide these or log them
+      return config.showDebugInfo
+          ? Container(
+              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '[Unsupported element]',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            )
+          : const SizedBox.shrink();
     }
     return null;
   }
@@ -101,16 +126,11 @@ class DocxWidgetGenerator {
 
   String _extractText(DocxNode node) {
     if (node is DocxParagraph) {
-      return node.children
-          .whereType<DocxText>()
-          .map((t) => t.content)
-          .join();
+      return node.children.whereType<DocxText>().map((t) => t.content).join();
     } else if (node is DocxList) {
       return node.items
-          .map((item) => item.children
-              .whereType<DocxText>()
-              .map((t) => t.content)
-              .join())
+          .map((item) =>
+              item.children.whereType<DocxText>().map((t) => t.content).join())
           .join(' ');
     } else if (node is DocxTable) {
       return node.rows

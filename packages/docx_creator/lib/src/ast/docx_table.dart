@@ -74,6 +74,71 @@ class DocxTableStyle {
   );
 }
 
+/// Horizontal anchor position for floating tables.
+enum DocxTableHAnchor {
+  text,
+  margin,
+  page,
+}
+
+/// Vertical anchor position for floating tables.
+enum DocxTableVAnchor {
+  text,
+  margin,
+  page,
+}
+
+/// Floating table position properties.
+///
+/// Used to position a table relative to the page, margin, or text.
+class DocxTablePosition {
+  /// Horizontal anchor (what the X position is relative to).
+  final DocxTableHAnchor hAnchor;
+
+  /// Vertical anchor (what the Y position is relative to).
+  final DocxTableVAnchor vAnchor;
+
+  /// X position in twips (from the horizontal anchor).
+  final int? tblpX;
+
+  /// Y position in twips (from the vertical anchor).
+  final int? tblpY;
+
+  /// Left margin from surrounding text in twips.
+  final int leftFromText;
+
+  /// Right margin from surrounding text in twips.
+  final int rightFromText;
+
+  /// Top margin from surrounding text in twips.
+  final int topFromText;
+
+  /// Bottom margin from surrounding text in twips.
+  final int bottomFromText;
+
+  const DocxTablePosition({
+    this.hAnchor = DocxTableHAnchor.margin,
+    this.vAnchor = DocxTableVAnchor.text,
+    this.tblpX,
+    this.tblpY,
+    this.leftFromText = 180,
+    this.rightFromText = 180,
+    this.topFromText = 0,
+    this.bottomFromText = 0,
+  });
+
+  /// Center the table horizontally.
+  static const centered = DocxTablePosition(
+    hAnchor: DocxTableHAnchor.margin,
+    tblpX: 0,
+  );
+
+  /// Align table to right margin.
+  static const right = DocxTablePosition(
+    hAnchor: DocxTableHAnchor.margin,
+  );
+}
+
 /// A table element in the document.
 class DocxTable extends DocxBlock {
   /// Table rows.
@@ -91,12 +156,24 @@ class DocxTable extends DocxBlock {
   /// Whether first row is a header.
   final bool hasHeader;
 
+  /// Table horizontal alignment (left, center, right).
+  final DocxAlign? alignment;
+
+  /// Floating table position properties.
+  final DocxTablePosition? position;
+
+  /// Table style ID (e.g., "TableGrid", "MediumShading1-Accent1").
+  final String? styleId;
+
   const DocxTable({
     required this.rows,
     this.style = const DocxTableStyle(),
     this.width,
     this.widthType = DocxWidthType.auto,
     this.hasHeader = true,
+    this.alignment,
+    this.position,
+    this.styleId,
     super.id,
   });
 
@@ -105,6 +182,7 @@ class DocxTable extends DocxBlock {
     List<List<String>> data, {
     bool hasHeader = true,
     DocxTableStyle style = const DocxTableStyle(),
+    String? styleId,
   }) {
     final rows = <DocxTableRow>[];
     for (int i = 0; i < data.length; i++) {
@@ -129,7 +207,8 @@ class DocxTable extends DocxBlock {
           .toList();
       rows.add(DocxTableRow(cells: cells));
     }
-    return DocxTable(rows: rows, style: style, hasHeader: hasHeader);
+    return DocxTable(
+        rows: rows, style: style, hasHeader: hasHeader, styleId: styleId);
   }
 
   DocxTable copyWith({
@@ -138,6 +217,9 @@ class DocxTable extends DocxBlock {
     int? width,
     DocxWidthType? widthType,
     bool? hasHeader,
+    DocxAlign? alignment,
+    DocxTablePosition? position,
+    String? styleId,
   }) {
     return DocxTable(
       rows: rows ?? this.rows,
@@ -145,6 +227,9 @@ class DocxTable extends DocxBlock {
       width: width ?? this.width,
       widthType: widthType ?? this.widthType,
       hasHeader: hasHeader ?? this.hasHeader,
+      alignment: alignment ?? this.alignment,
+      position: position ?? this.position,
+      styleId: styleId ?? this.styleId,
       id: id,
     );
   }
@@ -166,7 +251,7 @@ class DocxTable extends DocxBlock {
             builder.element(
               'w:tblStyle',
               nest: () {
-                builder.attribute('w:val', 'TableGrid');
+                builder.attribute('w:val', styleId ?? 'TableGrid');
               },
             );
             builder.element(
@@ -176,6 +261,39 @@ class DocxTable extends DocxBlock {
                 builder.attribute('w:type', widthType.name);
               },
             );
+            // Table alignment (justification)
+            if (alignment != null) {
+              builder.element(
+                'w:jc',
+                nest: () {
+                  builder.attribute('w:val', alignment!.name);
+                },
+              );
+            }
+            // Floating table position
+            if (position != null) {
+              builder.element(
+                'w:tblpPr',
+                nest: () {
+                  builder.attribute(
+                      'w:leftFromText', position!.leftFromText.toString());
+                  builder.attribute(
+                      'w:rightFromText', position!.rightFromText.toString());
+                  builder.attribute(
+                      'w:topFromText', position!.topFromText.toString());
+                  builder.attribute(
+                      'w:bottomFromText', position!.bottomFromText.toString());
+                  builder.attribute('w:vertAnchor', position!.vAnchor.name);
+                  builder.attribute('w:horzAnchor', position!.hAnchor.name);
+                  if (position!.tblpX != null) {
+                    builder.attribute('w:tblpX', position!.tblpX.toString());
+                  }
+                  if (position!.tblpY != null) {
+                    builder.attribute('w:tblpY', position!.tblpY.toString());
+                  }
+                },
+              );
+            }
             // Borders
             builder.element(
               'w:tblBorders',
@@ -277,15 +395,25 @@ class DocxTableRow extends DocxNode {
   /// Row height in twips (null = auto).
   final int? height;
 
-  const DocxTableRow({required this.cells, this.height, super.id});
+  /// Whether this row is a header row (repeats on new pages).
+  final bool isHeader;
+
+  const DocxTableRow({
+    required this.cells,
+    this.height,
+    this.isHeader = false,
+    super.id,
+  });
 
   DocxTableRow copyWith({
     List<DocxTableCell>? cells,
     int? height,
+    bool? isHeader,
   }) {
     return DocxTableRow(
       cells: cells ?? this.cells,
       height: height ?? this.height,
+      isHeader: isHeader ?? this.isHeader,
       id: id,
     );
   }
@@ -300,7 +428,7 @@ class DocxTableRow extends DocxNode {
     buildXmlWithStyle(
       builder,
       const DocxTableStyle(),
-      isHeader: false,
+      isHeader: isHeader,
       isEven: false,
     );
   }
@@ -314,16 +442,23 @@ class DocxTableRow extends DocxNode {
     builder.element(
       'w:tr',
       nest: () {
-        if (height != null) {
+        // Row properties
+        if (height != null || isHeader || this.isHeader) {
           builder.element(
             'w:trPr',
             nest: () {
-              builder.element(
-                'w:trHeight',
-                nest: () {
-                  builder.attribute('w:val', height.toString());
-                },
-              );
+              if (height != null) {
+                builder.element(
+                  'w:trHeight',
+                  nest: () {
+                    builder.attribute('w:val', height.toString());
+                  },
+                );
+              }
+              // Mark as header row (repeats on each page)
+              if (isHeader || this.isHeader) {
+                builder.element('w:tblHeader');
+              }
             },
           );
         }
@@ -503,14 +638,18 @@ class DocxTableCell extends DocxNode {
                 borderLeft != null ||
                 borderRight != null) {
               builder.element('w:tcBorders', nest: () {
-                if (borderTop != null)
+                if (borderTop != null) {
                   _buildBorder(builder, 'w:top', borderTop!);
-                if (borderBottom != null)
+                }
+                if (borderBottom != null) {
                   _buildBorder(builder, 'w:bottom', borderBottom!);
-                if (borderLeft != null)
+                }
+                if (borderLeft != null) {
                   _buildBorder(builder, 'w:left', borderLeft!);
-                if (borderRight != null)
+                }
+                if (borderRight != null) {
                   _buildBorder(builder, 'w:right', borderRight!);
+                }
               });
             }
           },

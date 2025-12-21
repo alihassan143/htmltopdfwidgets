@@ -103,6 +103,22 @@ class DocxExporter {
       archive.addFile(_createBackgroundHeaderRels(doc));
     }
 
+    // Footnotes and Endnotes (for round-tripping)
+    if (doc.footnotesXml != null) {
+      archive.addFile(ArchiveFile(
+        'word/footnotes.xml',
+        utf8.encode(doc.footnotesXml!).length,
+        utf8.encode(doc.footnotesXml!),
+      ));
+    }
+    if (doc.endnotesXml != null) {
+      archive.addFile(ArchiveFile(
+        'word/endnotes.xml',
+        utf8.encode(doc.endnotesXml!).length,
+        utf8.encode(doc.endnotesXml!),
+      ));
+    }
+
     // Images
     for (var entry in _images.entries) {
       archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
@@ -965,6 +981,53 @@ class DocxExporter {
             },
           );
         }
+        // CORE RELATIONSHIPS (Styles, Settings, Numbering, etc.)
+        builder.element('Relationship', nest: () {
+          builder.attribute('Id', 'rIdStyles');
+          builder.attribute('Type',
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles');
+          builder.attribute('Target', 'styles.xml');
+        });
+
+        builder.element('Relationship', nest: () {
+          builder.attribute('Id', 'rIdSettings');
+          builder.attribute('Type',
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings');
+          builder.attribute('Target', 'settings.xml');
+        });
+
+        builder.element('Relationship', nest: () {
+          builder.attribute('Id', 'rIdNumbering');
+          builder.attribute('Type',
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering');
+          builder.attribute('Target', 'numbering.xml');
+        });
+
+        builder.element('Relationship', nest: () {
+          builder.attribute('Id', 'rIdFontTable');
+          builder.attribute('Type',
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable');
+          builder.attribute('Target', 'fontTable.xml');
+        });
+
+        if (doc.footnotesXml != null) {
+          builder.element('Relationship', nest: () {
+            builder.attribute('Id', 'rIdFootnotes');
+            builder.attribute('Type',
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes');
+            builder.attribute('Target', 'footnotes.xml');
+          });
+        }
+
+        if (doc.endnotesXml != null) {
+          builder.element('Relationship', nest: () {
+            builder.attribute('Id', 'rIdEndnotes');
+            builder.attribute('Type',
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes');
+            builder.attribute('Target', 'endnotes.xml');
+          });
+        }
+
         // Images
         int rIdOffset = 10;
         for (int i = 0; i < _images.length; i++) {

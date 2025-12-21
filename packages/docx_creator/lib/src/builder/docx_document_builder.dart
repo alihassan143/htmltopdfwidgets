@@ -233,6 +233,8 @@ class DocxBuiltDocument {
   final String? rootRelsXml;
   final String? headerBgXml;
   final String? headerBgRelsXml;
+  final String? footnotesXml;
+  final String? endnotesXml;
 
   const DocxBuiltDocument({
     required this.elements,
@@ -245,6 +247,8 @@ class DocxBuiltDocument {
     this.rootRelsXml,
     this.headerBgXml,
     this.headerBgRelsXml,
+    this.footnotesXml,
+    this.endnotesXml,
     this.fonts = const [],
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'theme/docx_view_theme.dart';
 
 /// Configuration for [DocxView] widget.
@@ -33,6 +34,9 @@ class DocxViewConfig {
   /// Show page breaks as visual separators.
   final bool showPageBreaks;
 
+  /// Show debug info for unsupported elements (development mode).
+  final bool showDebugInfo;
+
   /// Highlight color for search matches.
   final Color searchHighlightColor;
 
@@ -50,6 +54,7 @@ class DocxViewConfig {
     this.padding = const EdgeInsets.all(16.0),
     this.backgroundColor,
     this.showPageBreaks = true,
+    this.showDebugInfo = false,
     this.searchHighlightColor = const Color(0xFFFFEB3B),
     this.currentSearchHighlightColor = const Color(0xFFFF9800),
   });
@@ -65,6 +70,7 @@ class DocxViewConfig {
     EdgeInsets? padding,
     Color? backgroundColor,
     bool? showPageBreaks,
+    bool? showDebugInfo,
     Color? searchHighlightColor,
     Color? currentSearchHighlightColor,
   }) {
@@ -79,8 +85,10 @@ class DocxViewConfig {
       padding: padding ?? this.padding,
       backgroundColor: backgroundColor ?? this.backgroundColor,
       showPageBreaks: showPageBreaks ?? this.showPageBreaks,
+      showDebugInfo: showDebugInfo ?? this.showDebugInfo,
       searchHighlightColor: searchHighlightColor ?? this.searchHighlightColor,
-      currentSearchHighlightColor: currentSearchHighlightColor ?? this.currentSearchHighlightColor,
+      currentSearchHighlightColor:
+          currentSearchHighlightColor ?? this.currentSearchHighlightColor,
     );
   }
 }

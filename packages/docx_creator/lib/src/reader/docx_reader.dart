@@ -112,6 +112,10 @@ class _DocxReaderOrchestrator {
     final headerBgRelsXml =
         context.readContent('word/_rels/header_bg.xml.rels');
 
+    // 9. Read footnotes and endnotes
+    final footnotesXml = context.readContent('word/footnotes.xml');
+    final endnotesXml = context.readContent('word/endnotes.xml');
+
     return DocxBuiltDocument(
       elements: elements,
       section: section,
@@ -123,6 +127,8 @@ class _DocxReaderOrchestrator {
       rootRelsXml: rootRelsXml,
       headerBgXml: headerBgXml,
       headerBgRelsXml: headerBgRelsXml,
+      footnotesXml: footnotesXml,
+      endnotesXml: endnotesXml,
       fonts: fonts,
     );
   }

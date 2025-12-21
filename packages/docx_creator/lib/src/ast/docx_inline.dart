@@ -40,6 +40,9 @@ class DocxText extends DocxInline {
   final bool isEmboss;
   final bool isImprint;
 
+  /// Text border (box around text), from w:bdr element
+  final DocxBorderSide? textBorder;
+
   const DocxText(
     this.content, {
     this.fontWeight = DocxFontWeight.normal,
@@ -61,6 +64,7 @@ class DocxText extends DocxInline {
     this.isShadow = false,
     this.isEmboss = false,
     this.isImprint = false,
+    this.textBorder,
     super.id,
   });
 
@@ -90,7 +94,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Italic text.
   const DocxText.italic(
@@ -114,7 +119,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Bold and italic text.
   const DocxText.boldItalic(
@@ -138,7 +144,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Underlined text.
   const DocxText.underline(
@@ -162,7 +169,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Strikethrough text.
   const DocxText.strike(
@@ -186,7 +194,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Hyperlink text.
   const DocxText.link(
@@ -210,7 +219,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Inline code text.
   const DocxText.code(this.content,
@@ -230,7 +240,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Highlighted text.
   const DocxText.highlighted(
@@ -254,7 +265,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Superscript text (e.g., x²).
   const DocxText.superscript(this.content,
@@ -275,7 +287,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Subscript text (e.g., H₂O).
   const DocxText.subscript(this.content,
@@ -296,7 +309,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// ALL CAPS text.
   const DocxText.allCaps(
@@ -320,7 +334,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   /// Small Caps text.
   const DocxText.smallCaps(
@@ -344,7 +359,8 @@ class DocxText extends DocxInline {
         isOutline = false,
         isShadow = false,
         isEmboss = false,
-        isImprint = false;
+        isImprint = false,
+        textBorder = null;
 
   // ============================================================
   // COPYWITH
@@ -371,6 +387,7 @@ class DocxText extends DocxInline {
     bool? isShadow,
     bool? isEmboss,
     bool? isImprint,
+    DocxBorderSide? textBorder,
   }) {
     return DocxText(
       content ?? this.content,
@@ -393,6 +410,7 @@ class DocxText extends DocxInline {
       isShadow: isShadow ?? this.isShadow,
       isEmboss: isEmboss ?? this.isEmboss,
       isImprint: isImprint ?? this.isImprint,
+      textBorder: textBorder ?? this.textBorder,
       id: id,
     );
   }
@@ -520,6 +538,18 @@ class DocxText extends DocxInline {
                   },
                 );
               }
+              // Text border (box around text)
+              if (textBorder != null) {
+                builder.element(
+                  'w:bdr',
+                  nest: () {
+                    builder.attribute('w:val', textBorder!.style.xmlValue);
+                    builder.attribute('w:sz', textBorder!.size.toString());
+                    builder.attribute('w:space', textBorder!.space.toString());
+                    builder.attribute('w:color', textBorder!.color.hex);
+                  },
+                );
+              }
             },
           );
         }
@@ -555,7 +585,8 @@ class DocxText extends DocxInline {
       fontSize != null ||
       fontFamily != null ||
       highlight != DocxHighlight.none ||
-      characterSpacing != null;
+      characterSpacing != null ||
+      textBorder != null;
 }
 
 /// A line break.

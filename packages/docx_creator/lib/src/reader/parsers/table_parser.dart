@@ -2,12 +2,14 @@ import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
 import '../reader_context.dart';
+import 'inline_parser.dart';
 
 /// Parses table elements (w:tbl).
 class TableParser {
   final ReaderContext context;
+  final InlineParser inlineParser;
 
-  TableParser(this.context);
+  TableParser(this.context, this.inlineParser);
 
   /// Parse a table element into DocxTable.
   DocxTable parse(XmlElement node) {
@@ -17,6 +19,10 @@ class TableParser {
     DocxWidthType widthType = DocxWidthType.auto;
 
     final tblPr = node.getElement('w:tblPr');
+    DocxAlign? alignment;
+    DocxTablePosition? position;
+    String? styleId;
+
     if (tblPr != null) {
       final tblBorders = tblPr.getElement('w:tblBorders');
       if (tblBorders != null) {
@@ -39,28 +45,88 @@ class TableParser {
         if (type == 'pct') widthType = DocxWidthType.pct;
         if (type == 'auto') widthType = DocxWidthType.auto;
       }
+
+      // Parse table style
+      final tblStyle = tblPr.getElement('w:tblStyle');
+      if (tblStyle != null) {
+        styleId = tblStyle.getAttribute('w:val');
+      }
+
+      // Parse table alignment (justification)
+      final jc = tblPr.getElement('w:jc');
+      if (jc != null) {
+        final val = jc.getAttribute('w:val');
+        if (val == 'left') alignment = DocxAlign.left;
+        if (val == 'center') alignment = DocxAlign.center;
+        if (val == 'right') alignment = DocxAlign.right;
+      }
+
+      // Parse floating table position
+      final tblpPr = tblPr.getElement('w:tblpPr');
+      if (tblpPr != null) {
+        DocxTableHAnchor hAnchor = DocxTableHAnchor.margin;
+        DocxTableVAnchor vAnchor = DocxTableVAnchor.text;
+
+        final hAnchorVal = tblpPr.getAttribute('w:horzAnchor');
+        if (hAnchorVal == 'text') hAnchor = DocxTableHAnchor.text;
+        if (hAnchorVal == 'margin') hAnchor = DocxTableHAnchor.margin;
+        if (hAnchorVal == 'page') hAnchor = DocxTableHAnchor.page;
+
+        final vAnchorVal = tblpPr.getAttribute('w:vertAnchor');
+        if (vAnchorVal == 'text') vAnchor = DocxTableVAnchor.text;
+        if (vAnchorVal == 'margin') vAnchor = DocxTableVAnchor.margin;
+        if (vAnchorVal == 'page') vAnchor = DocxTableVAnchor.page;
+
+        position = DocxTablePosition(
+          hAnchor: hAnchor,
+          vAnchor: vAnchor,
+          tblpX: int.tryParse(tblpPr.getAttribute('w:tblpX') ?? ''),
+          tblpY: int.tryParse(tblpPr.getAttribute('w:tblpY') ?? ''),
+          leftFromText:
+              int.tryParse(tblpPr.getAttribute('w:leftFromText') ?? '') ?? 180,
+          rightFromText:
+              int.tryParse(tblpPr.getAttribute('w:rightFromText') ?? '') ?? 180,
+          topFromText:
+              int.tryParse(tblpPr.getAttribute('w:topFromText') ?? '') ?? 0,
+          bottomFromText:
+              int.tryParse(tblpPr.getAttribute('w:bottomFromText') ?? '') ?? 0,
+        );
+      }
     }
 
     // 2. Parse Rows and Cells
-    final rawRows = <List<_TempCell>>[];
+    final rawRows = <_TempRow>[];
 
     for (var child in node.children) {
       if (child is XmlElement && child.name.local == 'tr') {
-        final row = <_TempCell>[];
-        for (var cellNode in child.children) {
-          if (cellNode is XmlElement && cellNode.name.local == 'tc') {
-            row.add(_parseCell(cellNode));
+        final cells = <_TempCell>[];
+        bool isHeader = false;
+
+        // Check for header row property
+        final trPr = child.getElement('w:trPr');
+        if (trPr != null) {
+          if (trPr.getElement('w:tblHeader') != null) {
+            isHeader = true;
           }
         }
-        if (row.isNotEmpty) rawRows.add(row);
+
+        for (var cellNode in child.children) {
+          if (cellNode is XmlElement && cellNode.name.local == 'tc') {
+            cells.add(_parseCell(cellNode));
+          }
+        }
+        if (cells.isNotEmpty)
+          rawRows.add(_TempRow(cells: cells, isHeader: isHeader));
       }
     }
 
     // 3. Resolve row spans
-    final grid = _resolveRowSpans(rawRows);
+    final grid = _resolveRowSpans(rawRows.map((r) => r.cells).toList());
     final finalRows = <DocxTableRow>[];
 
-    for (var r in grid) {
+    for (int i = 0; i < grid.length; i++) {
+      final r = grid[i];
+      final isHeaderRow = i < rawRows.length ? rawRows[i].isHeader : false;
       final cells = r
           .map((c) => DocxTableCell(
                 children: c.children,
@@ -72,16 +138,24 @@ class TableParser {
                 borderBottom: c.borderBottom,
                 borderLeft: c.borderLeft,
                 borderRight: c.borderRight,
+                verticalAlign: c.verticalAlign ?? DocxVerticalAlign.top,
               ))
           .toList();
-      finalRows.add(DocxTableRow(cells: cells));
+      finalRows.add(DocxTableRow(cells: cells, isHeader: isHeaderRow));
     }
+
+    // Determine if table has any header rows
+    final hasHeader = finalRows.any((row) => row.isHeader);
 
     return DocxTable(
       rows: finalRows,
       style: style,
       width: tableWidth,
       widthType: widthType,
+      hasHeader: hasHeader,
+      alignment: alignment,
+      position: position,
+      styleId: styleId,
     );
   }
 
@@ -95,6 +169,7 @@ class TableParser {
     DocxBorderSide? borderBottom;
     DocxBorderSide? borderLeft;
     DocxBorderSide? borderRight;
+    DocxVerticalAlign? verticalAlign;
 
     if (tcPr != null) {
       final gs = tcPr.getElement('w:gridSpan');
@@ -110,7 +185,24 @@ class TableParser {
       final shd = tcPr.getElement('w:shd');
       if (shd != null) {
         shadingFill = shd.getAttribute('w:fill');
-        if (shadingFill == 'auto') shadingFill = null;
+        if (shadingFill == 'auto' || shadingFill == null) {
+          shadingFill = null;
+        } else {
+          // Normalize to include # prefix if it's a hex color
+          if (shadingFill.length == 6 &&
+              RegExp(r'^[0-9A-Fa-f]{6}$').hasMatch(shadingFill)) {
+            shadingFill = '#$shadingFill';
+          }
+        }
+      }
+
+      // Parse vertical alignment
+      final vAlignElem = tcPr.getElement('w:vAlign');
+      if (vAlignElem != null) {
+        final val = vAlignElem.getAttribute('w:val');
+        if (val == 'top') verticalAlign = DocxVerticalAlign.top;
+        if (val == 'center') verticalAlign = DocxVerticalAlign.center;
+        if (val == 'bottom') verticalAlign = DocxVerticalAlign.bottom;
       }
 
       final tcW = tcPr.getElement('w:tcW');
@@ -131,7 +223,7 @@ class TableParser {
     final children = <DocxBlock>[];
     for (var c in cellNode.children) {
       if (c is XmlElement && c.name.local == 'p') {
-        children.add(_parseSimpleParagraph(c));
+        children.add(_parseFullParagraph(c));
       } else if (c is XmlElement && c.name.local == 'tbl') {
         children.add(parse(c)); // Recursive for nested tables
       }
@@ -147,21 +239,56 @@ class TableParser {
       borderBottom: borderBottom,
       borderLeft: borderLeft,
       borderRight: borderRight,
+      verticalAlign: verticalAlign,
     );
   }
 
-  /// Simplified paragraph parser for table cells.
-  DocxParagraph _parseSimpleParagraph(XmlElement xml) {
-    final children = <DocxInline>[];
-    for (var child in xml.children) {
-      if (child is XmlElement && child.name.local == 'r') {
-        final textElem = child.getElement('w:t');
-        if (textElem != null) {
-          children.add(DocxText(textElem.innerText));
-        }
+  /// Full paragraph parser for table cells - preserves all text formatting.
+  DocxParagraph _parseFullParagraph(XmlElement xml) {
+    String? pStyle;
+    DocxAlign? align;
+    String? shadingFill;
+
+    // Parse paragraph properties
+    final pPr = xml.getElement('w:pPr');
+    if (pPr != null) {
+      // Style reference
+      final pStyleElem = pPr.getElement('w:pStyle');
+      if (pStyleElem != null) {
+        pStyle = pStyleElem.getAttribute('w:val');
+      }
+
+      // Alignment
+      final jcElem = pPr.getElement('w:jc');
+      if (jcElem != null) {
+        final val = jcElem.getAttribute('w:val');
+        if (val == 'center') align = DocxAlign.center;
+        if (val == 'right' || val == 'end') align = DocxAlign.right;
+        if (val == 'both' || val == 'distribute') align = DocxAlign.justify;
+        if (val == 'left' || val == 'start') align = DocxAlign.left;
+      }
+
+      // Shading
+      final shdElem = pPr.getElement('w:shd');
+      if (shdElem != null) {
+        shadingFill = shdElem.getAttribute('w:fill');
+        if (shadingFill == 'auto') shadingFill = null;
       }
     }
-    return DocxParagraph(children: children);
+
+    // Resolve style for inheritance
+    final effectiveStyle = context.resolveStyle(pStyle ?? 'Normal');
+
+    // Parse inline children with full formatting
+    final children =
+        inlineParser.parseChildren(xml.children, parentStyle: effectiveStyle);
+
+    return DocxParagraph(
+      children: children,
+      styleId: pStyle,
+      align: align ?? effectiveStyle.align ?? DocxAlign.left,
+      shadingFill: shadingFill ?? effectiveStyle.shadingFill,
+    );
   }
 
   DocxBorderSide? _parseBorderSide(XmlElement? borderElem) {
@@ -247,6 +374,7 @@ class _TempCell {
   final DocxBorderSide? borderBottom;
   final DocxBorderSide? borderLeft;
   final DocxBorderSide? borderRight;
+  final DocxVerticalAlign? verticalAlign;
   final int finalRowSpan;
 
   _TempCell({
@@ -259,6 +387,7 @@ class _TempCell {
     this.borderBottom,
     this.borderLeft,
     this.borderRight,
+    this.verticalAlign,
     this.finalRowSpan = 1,
   });
 
@@ -273,7 +402,16 @@ class _TempCell {
       borderBottom: borderBottom,
       borderLeft: borderLeft,
       borderRight: borderRight,
+      verticalAlign: verticalAlign,
       finalRowSpan: finalRowSpan ?? this.finalRowSpan,
     );
   }
+}
+
+/// Temporary row structure for header detection.
+class _TempRow {
+  final List<_TempCell> cells;
+  final bool isHeader;
+
+  _TempRow({required this.cells, this.isHeader = false});
 }

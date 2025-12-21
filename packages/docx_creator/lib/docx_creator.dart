@@ -16,6 +16,8 @@ library;
 export 'src/ast/docx_background_image.dart';
 export 'src/ast/docx_block.dart';
 export 'src/ast/docx_drawing.dart';
+export 'src/ast/docx_drop_cap.dart';
+export 'src/ast/docx_footnote.dart';
 export 'src/ast/docx_image.dart';
 export 'src/ast/docx_inline.dart';
 export 'src/ast/docx_list.dart';
