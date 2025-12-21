@@ -1,3 +1,33 @@
+## 1.0.3
+
+### Improved
+- **Modular DocxReader Architecture**: Refactored 1797-line monolithic `docx_reader.dart` into 11 focused modules:
+  - `reader_context.dart` - Shared state manager
+  - `parsers/style_parser.dart` - Style resolution
+  - `parsers/block_parser.dart` - Paragraph/list parsing
+  - `parsers/inline_parser.dart` - Text/image/shape parsing
+  - `parsers/table_parser.dart` - Table/rowspan handling
+  - `parsers/section_parser.dart` - Headers/footers/sections
+  - `handlers/relationship_manager.dart` - OOXML relationships
+  - `handlers/font_reader.dart` - Embedded font extraction
+- **Modular HTML Parser Architecture**: Refactored 1259-line `html_parser.dart` into 8 modules:
+  - `html/parser_context.dart` - CSS class map & shared state
+  - `html/style_context.dart` - Style inheritance context
+  - `html/color_utils.dart` - 141 CSS named colors
+  - `html/block_parser.dart` - Block elements
+  - `html/inline_parser.dart` - Inline elements
+  - `html/table_parser.dart` - Tables with nested support
+  - `html/list_parser.dart` - Ordered/unordered lists
+  - `html/image_parser.dart` - Image elements
+
+### Fixed
+- **UTF-8 Encoding**: Fixed XML content parsing to use proper UTF-8 decoding in DocxReader
+- **Shape Parsing**: Restored full shape dimension/color/preset parsing in refactored reader
+- **Nested Table Support**: HTML parser now correctly handles tables inside table cells
+- **Background Inheritance**: Fixed `resetBackground()` to properly clear nullable `shadingFill` values
+
+---
+
 ## 1.0.2
 
 ### Added
