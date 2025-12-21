@@ -737,70 +737,183 @@ class DocxParser {
       }
     }
 
-    // Handle named colors
-    switch (trimmed) {
-      case 'red':
-        return 'FF0000';
-      case 'green':
-        return '008000';
-      case 'blue':
-        return '0000FF';
-      case 'black':
-        return '000000';
-      case 'white':
-        return 'FFFFFF';
-      case 'grey':
-      case 'gray':
-        return '808080';
-      case 'yellow':
-        return 'FFFF00';
-      case 'cyan':
-        return '00FFFF';
-      case 'magenta':
-      case 'purple':
-        return '800080';
-      case 'orange':
-        return 'FFA500';
-      case 'pink':
-        return 'FFC0CB';
-      case 'brown':
-        return 'A52A2A';
-      case 'lime':
-        return '00FF00';
-      case 'teal':
-        return '008080';
-      case 'indigo':
-        return '4B0082';
-      case 'navy':
-        return '000080';
-      case 'maroon':
-        return '800000';
-      case 'olive':
-        return '808000';
-      case 'aqua':
-        return '00FFFF';
-      case 'fuchsia':
-        return 'FF00FF';
-      case 'silver':
-        return 'C0C0C0';
-      case 'lightgray':
-      case 'lightgrey':
-        return 'D3D3D3';
-      case 'darkgray':
-      case 'darkgrey':
-        return 'A9A9A9';
+    // W3C CSS3 Extended Color Keywords (all 141 named colors)
+    // Case-insensitive lookup with grey/gray spelling support
+    const cssColors = <String, String>{
+      // Basic colors
+      'black': '000000',
+      'white': 'FFFFFF',
+      'red': 'FF0000',
+      'green': '008000',
+      'blue': '0000FF',
+      'yellow': 'FFFF00',
+      'cyan': '00FFFF',
+      'magenta': 'FF00FF',
+      'aqua': '00FFFF',
+      'fuchsia': 'FF00FF',
+      'lime': '00FF00',
+      'maroon': '800000',
+      'navy': '000080',
+      'olive': '808000',
+      'purple': '800080',
+      'silver': 'C0C0C0',
+      'teal': '008080',
+      // Gray/Grey variations
+      'gray': '808080',
+      'grey': '808080',
+      'darkgray': 'A9A9A9',
+      'darkgrey': 'A9A9A9',
+      'dimgray': '696969',
+      'dimgrey': '696969',
+      'lightgray': 'D3D3D3',
+      'lightgrey': 'D3D3D3',
+      'gainsboro': 'DCDCDC',
+      'slategray': '708090',
+      'slategrey': '708090',
+      'lightslategray': '778899',
+      'lightslategrey': '778899',
+      'darkslategray': '2F4F4F',
+      'darkslategrey': '2F4F4F',
+      // Reds and Pinks
+      'indianred': 'CD5C5C',
+      'lightcoral': 'F08080',
+      'salmon': 'FA8072',
+      'darksalmon': 'E9967A',
+      'lightsalmon': 'FFA07A',
+      'crimson': 'DC143C',
+      'firebrick': 'B22222',
+      'darkred': '8B0000',
+      'pink': 'FFC0CB',
+      'lightpink': 'FFB6C1',
+      'hotpink': 'FF69B4',
+      'deeppink': 'FF1493',
+      'mediumvioletred': 'C71585',
+      'palevioletred': 'DB7093',
+      // Oranges
+      'orange': 'FFA500',
+      'darkorange': 'FF8C00',
+      'orangered': 'FF4500',
+      'tomato': 'FF6347',
+      'coral': 'FF7F50',
+      // Yellows
+      'gold': 'FFD700',
+      'lightyellow': 'FFFFE0',
+      'lemonchiffon': 'FFFACD',
+      'lightgoldenrodyellow': 'FAFAD2',
+      'papayawhip': 'FFEFD5',
+      'moccasin': 'FFE4B5',
+      'peachpuff': 'FFDAB9',
+      'palegoldenrod': 'EEE8AA',
+      'khaki': 'F0E68C',
+      'darkkhaki': 'BDB76B',
+      // Browns
+      'brown': 'A52A2A',
+      'cornsilk': 'FFF8DC',
+      'blanchedalmond': 'FFEBCD',
+      'bisque': 'FFE4C4',
+      'navajowhite': 'FFDEAD',
+      'wheat': 'F5DEB3',
+      'burlywood': 'DEB887',
+      'tan': 'D2B48C',
+      'rosybrown': 'BC8F8F',
+      'sandybrown': 'F4A460',
+      'goldenrod': 'DAA520',
+      'darkgoldenrod': 'B8860B',
+      'peru': 'CD853F',
+      'chocolate': 'D2691E',
+      'saddlebrown': '8B4513',
+      'sienna': 'A0522D',
+      // Greens
+      'darkgreen': '006400',
+      'darkolivegreen': '556B2F',
+      'forestgreen': '228B22',
+      'seagreen': '2E8B57',
+      'olivedrab': '6B8E23',
+      'mediumseagreen': '3CB371',
+      'limegreen': '32CD32',
+      'springgreen': '00FF7F',
+      'mediumspringgreen': '00FA9A',
+      'darkseagreen': '8FBC8F',
+      'mediumaquamarine': '66CDAA',
+      'yellowgreen': '9ACD32',
+      'lawngreen': '7CFC00',
+      'chartreuse': '7FFF00',
+      'lightgreen': '90EE90',
+      'greenyellow': 'ADFF2F',
+      'palegreen': '98FB98',
+      // Cyan/Aqua
+      'aquamarine': '7FFFD4',
+      'turquoise': '40E0D0',
+      'mediumturquoise': '48D1CC',
+      'darkturquoise': '00CED1',
+      'lightseagreen': '20B2AA',
+      'cadetblue': '5F9EA0',
+      'darkcyan': '008B8B',
+      'paleturquoise': 'AFEEEE',
+      'lightcyan': 'E0FFFF',
+      // Blues
+      'powderblue': 'B0E0E6',
+      'lightblue': 'ADD8E6',
+      'lightskyblue': '87CEFA',
+      'skyblue': '87CEEB',
+      'deepskyblue': '00BFFF',
+      'lightsteelblue': 'B0C4DE',
+      'dodgerblue': '1E90FF',
+      'cornflowerblue': '6495ED',
+      'steelblue': '4682B4',
+      'royalblue': '4169E1',
+      'mediumblue': '0000CD',
+      'darkblue': '00008B',
+      'midnightblue': '191970',
+      // Purples/Violets
+      'lavender': 'E6E6FA',
+      'thistle': 'D8BFD8',
+      'plum': 'DDA0DD',
+      'violet': 'EE82EE',
+      'orchid': 'DA70D6',
+      'mediumorchid': 'BA55D3',
+      'mediumpurple': '9370DB',
+      'rebeccapurple': '663399',
+      'blueviolet': '8A2BE2',
+      'darkviolet': '9400D3',
+      'darkorchid': '9932CC',
+      'darkmagenta': '8B008B',
+      'indigo': '4B0082',
+      'slateblue': '6A5ACD',
+      'darkslateblue': '483D8B',
+      'mediumslateblue': '7B68EE',
+      // Whites
+      'snow': 'FFFAFA',
+      'honeydew': 'F0FFF0',
+      'mintcream': 'F5FFFA',
+      'azure': 'F0FFFF',
+      'aliceblue': 'F0F8FF',
+      'ghostwhite': 'F8F8FF',
+      'whitesmoke': 'F5F5F5',
+      'seashell': 'FFF5EE',
+      'beige': 'F5F5DC',
+      'oldlace': 'FDF5E6',
+      'floralwhite': 'FFFAF0',
+      'ivory': 'FFFFF0',
+      'antiquewhite': 'FAEBD7',
+      'linen': 'FAF0E6',
+      'lavenderblush': 'FFF0F5',
+      'mistyrose': 'FFE4E1',
+      // Transparent
+      'transparent': '',
+    };
 
-      case 'transparent':
-        return null;
-      default:
-        // Try to see if it is a valid hex without #?
-        // But CSS usually requires # for hex.
-        // Some users might pass raw hex.
-        if (RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(trimmed)) {
-          return trimmed.toUpperCase();
-        }
-        return null;
+    // Case-insensitive lookup
+    final hex = cssColors[trimmed];
+    if (hex != null) {
+      return hex.isEmpty ? null : hex; // 'transparent' maps to null
     }
+
+    // Try to see if it is a valid hex without #
+    if (RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(trimmed)) {
+      return trimmed.toUpperCase();
+    }
+    return null;
   }
 
   static String _toHex(int val) {
