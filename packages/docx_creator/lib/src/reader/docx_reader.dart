@@ -323,10 +323,17 @@ class _DocxReaderInternal {
   }
 
   DocxInline _parseRun(XmlElement run) {
-    // Check for drawings (Images)
+    // Check for drawings (Images or Shapes)
     final drawing = run.findAllElements('w:drawing').firstOrNull ??
         run.findAllElements('w:pict').firstOrNull;
     if (drawing != null) {
+      // Check for shape (wsp:wsp) first
+      final wsp = drawing.findAllElements('wsp:wsp').firstOrNull;
+      if (wsp != null) {
+        return _readShape(drawing, wsp);
+      }
+
+      // Check for image (a:blip)
       final blip = drawing.findAllElements('a:blip').firstOrNull ??
           drawing.findAllElements('v:imagedata').firstOrNull;
       if (blip != null) {
@@ -518,6 +525,213 @@ class _DocxReaderInternal {
       width: width,
       height: height,
       // align: ... derived from paragraph or defaults
+    );
+  }
+
+  DocxShape _readShape(XmlElement drawingNode, XmlElement wsp) {
+    // Determine position mode (inline vs floating)
+    final isInline = drawingNode.findAllElements('wp:inline').isNotEmpty;
+    final position =
+        isInline ? DocxDrawingPosition.inline : DocxDrawingPosition.floating;
+
+    // Read dimensions from extent
+    double width = 100;
+    double height = 100;
+    final extent = drawingNode.findAllElements('wp:extent').firstOrNull;
+    if (extent != null) {
+      final cx = int.tryParse(extent.getAttribute('cx') ?? '');
+      final cy = int.tryParse(extent.getAttribute('cy') ?? '');
+      if (cx != null && cy != null) {
+        width = cx / 12700.0;
+        height = cy / 12700.0;
+      }
+    }
+
+    // Read preset geometry
+    var preset = DocxShapePreset.rect;
+    final prstGeom = wsp.findAllElements('a:prstGeom').firstOrNull;
+    if (prstGeom != null) {
+      final prstName = prstGeom.getAttribute('prst');
+      if (prstName != null) {
+        for (var p in DocxShapePreset.values) {
+          if (p.name == prstName) {
+            preset = p;
+            break;
+          }
+        }
+      }
+    }
+
+    // Read fill color
+    DocxColor? fillColor;
+    final solidFill = wsp.findAllElements('a:solidFill').firstOrNull;
+    if (solidFill != null) {
+      final srgbClr = solidFill.findAllElements('a:srgbClr').firstOrNull;
+      if (srgbClr != null) {
+        final val = srgbClr.getAttribute('val');
+        if (val != null) {
+          fillColor = DocxColor(val);
+        }
+      }
+    }
+
+    // Read outline color and width
+    DocxColor? outlineColor;
+    double outlineWidth = 1;
+    final ln = wsp.findAllElements('a:ln').firstOrNull;
+    if (ln != null) {
+      final wAttr = ln.getAttribute('w');
+      if (wAttr != null) {
+        final wEmu = int.tryParse(wAttr);
+        if (wEmu != null) {
+          outlineWidth = wEmu / 12700.0;
+        }
+      }
+      final lnFill = ln.findAllElements('a:solidFill').firstOrNull;
+      if (lnFill != null) {
+        final srgbClr = lnFill.findAllElements('a:srgbClr').firstOrNull;
+        if (srgbClr != null) {
+          final val = srgbClr.getAttribute('val');
+          if (val != null) {
+            outlineColor = DocxColor(val);
+          }
+        }
+      }
+    }
+
+    // Read text content
+    String? text;
+    final txbx = wsp.findAllElements('wsp:txbx').firstOrNull;
+    if (txbx != null) {
+      final textContent =
+          txbx.findAllElements('w:t').map((t) => t.innerText).join();
+      if (textContent.isNotEmpty) {
+        text = textContent;
+      }
+    }
+
+    // Read rotation
+    double rotation = 0;
+    final xfrm = wsp.findAllElements('a:xfrm').firstOrNull;
+    if (xfrm != null) {
+      final rot = xfrm.getAttribute('rot');
+      if (rot != null) {
+        final rotVal = int.tryParse(rot);
+        if (rotVal != null) {
+          rotation = rotVal / 60000.0;
+        }
+      }
+    }
+
+    // Read floating-specific properties
+    var horizontalFrom = DocxHorizontalPositionFrom.column;
+    var verticalFrom = DocxVerticalPositionFrom.paragraph;
+    DrawingHAlign? horizontalAlign;
+    DrawingVAlign? verticalAlign;
+    double? horizontalOffset;
+    double? verticalOffset;
+    var textWrap = DocxTextWrap.square;
+    bool behindDocument = false;
+
+    if (position == DocxDrawingPosition.floating) {
+      final anchor = drawingNode.findAllElements('wp:anchor').firstOrNull;
+      if (anchor != null) {
+        final behindAttr = anchor.getAttribute('behindDoc');
+        behindDocument = behindAttr == '1';
+
+        // Horizontal position
+        final posH = anchor.findAllElements('wp:positionH').firstOrNull;
+        if (posH != null) {
+          final relFrom = posH.getAttribute('relativeFrom');
+          if (relFrom != null) {
+            for (var h in DocxHorizontalPositionFrom.values) {
+              if (h.name == relFrom) {
+                horizontalFrom = h;
+                break;
+              }
+            }
+          }
+          final alignElem = posH.findAllElements('wp:align').firstOrNull;
+          if (alignElem != null) {
+            for (var a in DrawingHAlign.values) {
+              if (a.name == alignElem.innerText) {
+                horizontalAlign = a;
+                break;
+              }
+            }
+          }
+          final offsetElem = posH.findAllElements('wp:posOffset').firstOrNull;
+          if (offsetElem != null) {
+            final off = int.tryParse(offsetElem.innerText);
+            if (off != null) {
+              horizontalOffset = off / 12700.0;
+            }
+          }
+        }
+
+        // Vertical position
+        final posV = anchor.findAllElements('wp:positionV').firstOrNull;
+        if (posV != null) {
+          final relFrom = posV.getAttribute('relativeFrom');
+          if (relFrom != null) {
+            for (var v in DocxVerticalPositionFrom.values) {
+              if (v.name == relFrom) {
+                verticalFrom = v;
+                break;
+              }
+            }
+          }
+          final alignElem = posV.findAllElements('wp:align').firstOrNull;
+          if (alignElem != null) {
+            for (var a in DrawingVAlign.values) {
+              if (a.name == alignElem.innerText) {
+                verticalAlign = a;
+                break;
+              }
+            }
+          }
+          final offsetElem = posV.findAllElements('wp:posOffset').firstOrNull;
+          if (offsetElem != null) {
+            final off = int.tryParse(offsetElem.innerText);
+            if (off != null) {
+              verticalOffset = off / 12700.0;
+            }
+          }
+        }
+
+        // Text wrapping
+        if (anchor.findAllElements('wp:wrapNone').isNotEmpty) {
+          textWrap = DocxTextWrap.none;
+        } else if (anchor.findAllElements('wp:wrapSquare').isNotEmpty) {
+          textWrap = DocxTextWrap.square;
+        } else if (anchor.findAllElements('wp:wrapTight').isNotEmpty) {
+          textWrap = DocxTextWrap.tight;
+        } else if (anchor.findAllElements('wp:wrapThrough').isNotEmpty) {
+          textWrap = DocxTextWrap.through;
+        } else if (anchor.findAllElements('wp:wrapTopAndBottom').isNotEmpty) {
+          textWrap = DocxTextWrap.topAndBottom;
+        }
+      }
+    }
+
+    return DocxShape(
+      width: width,
+      height: height,
+      preset: preset,
+      position: position,
+      fillColor: fillColor,
+      outlineColor: outlineColor,
+      outlineWidth: outlineWidth,
+      text: text,
+      horizontalFrom: horizontalFrom,
+      verticalFrom: verticalFrom,
+      horizontalAlign: horizontalAlign,
+      verticalAlign: verticalAlign,
+      horizontalOffset: horizontalOffset,
+      verticalOffset: verticalOffset,
+      textWrap: textWrap,
+      behindDocument: behindDocument,
+      rotation: rotation,
     );
   }
 

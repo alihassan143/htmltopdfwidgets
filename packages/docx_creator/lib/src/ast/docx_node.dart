@@ -66,6 +66,8 @@ abstract class DocxVisitor {
   void visitFooter(covariant DocxNode footer);
   void visitRawXml(covariant DocxNode rawXml);
   void visitRawInline(covariant DocxNode rawInline);
+  void visitShape(covariant DocxInline shape);
+  void visitShapeBlock(covariant DocxBlock shapeBlock);
 }
 
 /// Base class for inline elements (text, inline images, etc.).
