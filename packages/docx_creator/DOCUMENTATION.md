@@ -12,9 +12,10 @@ This document provides in-depth technical documentation for all features of the 
 4. [Markdown Parser - Complete Guide](#markdown-parser---complete-guide)
 5. [DOCX Reader & Editor - Complete Guide](#docx-reader--editor---complete-guide)
 6. [Drawing & Shapes - Complete Guide](#drawing--shapes---complete-guide)
-7. [OpenXML Internals](#openxml-internals)
-8. [Advanced Examples](#advanced-examples)
-9. [Troubleshooting](#troubleshooting)
+7. [Advanced Features](#advanced-features)
+8. [OpenXML Internals](#openxml-internals)
+9. [Advanced Examples](#advanced-examples)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -66,17 +67,20 @@ DocxNode (abstract)
 │   ├── DocxList - Ordered/unordered lists
 │   ├── DocxImage - Block-level images
 │   ├── DocxShapeBlock - Block-level shapes
-│   └── DocxSectionBreakBlock - Section breaks
+│   ├── DocxSectionBreakBlock - Section breaks
+│   └── DocxDropCap - Drop cap paragraph
 │
 ├── DocxInline (abstract) - Inline elements
 │   ├── DocxText - Formatted text runs
 │   ├── DocxInlineImage - Inline images
-│   ├── DocxShape - Inline shapes
-│   ├── DocxLineBreak - <br> equivalent
 │   ├── DocxTab - Tab character
+│   ├── DocxFootnoteRef - Footnote reference
+│   ├── DocxEndnoteRef - Endnote reference
 │   └── DocxRawInline - Raw XML passthrough
 │
 └── DocxListItem - List item wrapper
+└── DocxFootnote - Footnote definition
+└── DocxEndnote - Endnote definition
 ```
 
 ### DocxText Properties
@@ -102,6 +106,7 @@ DocxNode (abstract)
 | `isShadow` | `bool` | Shadow effect |
 | `isEmboss` | `bool` | Emboss effect |
 | `isImprint` | `bool` | Imprint effect |
+| `textBorder` | `DocxBorderSide?` | Text border |
 
 ### DocxParagraph Properties
 
@@ -111,7 +116,6 @@ DocxNode (abstract)
 | `align` | `DocxAlign` | `left`, `center`, `right`, `justify` |
 | `spacing` | `DocxSpacing?` | Before/after spacing |
 | `pageBreakBefore` | `bool` | Page break before paragraph |
-| `borderBottom` | `DocxBorder?` | Bottom border |
 | `shadingFill` | `String?` | Background shading |
 
 ---
@@ -711,6 +715,80 @@ DocxShape(
   behindDocument: false,
 )
 ```
+
+---
+
+---
+
+## Advanced Features
+
+### Drop Caps
+
+Create a paragraph with a large initial letter:
+
+```dart
+DocxDropCap(
+  letter: 'O',
+  lines: 3,  // Drop over 3 lines
+  fontFamily: 'Algerian',
+  restOfParagraph: [DocxText('nce upon a time...')],
+)
+```
+
+### Floating Images
+
+Position images anywhere on the page:
+
+```dart
+DocxParagraph(
+  children: [
+    DocxText('Text wrapping around...'),
+    DocxInlineImage(
+       bytes: imageBytes,
+       extension: 'png',
+       positionMode: DocxDrawingPosition.floating,
+       x: 100, // Points from left column
+       y: 50,  // Points from paragraph top
+       textWrap: DocxTextWrap.square,
+    ),
+  ]
+)
+```
+
+### Footnotes & Endnotes
+
+Footnotes and endnotes from existing documents are fully preserved during read/edit operations.
+Programmatic creation of new footnotes via the Builder API is currently not supported.
+
+### Text Borders
+
+Apply borders to specific text runs:
+
+```dart
+DocxText(
+  'Boxed Text',
+  textBorder: DocxBorderSide(style: DocxBorder.single, color: DocxColor.red),
+)
+```
+
+### Table Styles & Conditionals
+
+Apply named styles and conditional formatting:
+
+```dart
+DocxTable(
+  rows: [...],
+  styleId: 'GridTable4-Accent1',
+  look: DocxTableLook(
+    firstRow: true,
+    lastRow: true,
+    firstColumn: true,
+    noHBand: false,
+  ),
+)
+```
+
+The parser correctly interprets these properties, resolving shading and borders for every cell, preserving them during read/edit operations.
 
 ---
 

@@ -15,11 +15,13 @@ A **developer-first DOCX generation library** for Dart. Create, parse, read, and
 | 📝**Markdown Parser**    | Parse Markdown including tables and nested lists    |
 | 📖**DOCX Reader**        | Load and edit existing .docx files                  |
 | 🎨**Drawing Shapes**     | 70+ preset shapes (rectangles, arrows, stars, etc.) |
-| 🖼️**Images**           | Embed local, remote, or base64 images               |
-| 📊**Tables**             | Styled tables with merged cells and borders         |
+| 🖼️**Images**           | Embed local, remote, or base64 images (Inline & Floating) |
+| 📊**Tables**             | Styled tables, merged cells, borders, & conditional styles  |
 | 📋**Lists**              | Bullet, numbered, and nested lists (9 levels)       |
 | 🔤**Fonts**              | Embed custom fonts with OOXML obfuscation           |
 | 📄**Sections**           | Headers, footers, page orientation, backgrounds     |
+| 📌**Footnotes**          | Full support for footnotes and endnotes             |
+| 🧢**Drop Caps**          | Stylized drop caps for paragraph beginnings         |
 
 ---
 
@@ -29,7 +31,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  docx_creator: ^1.0.3
+  docx_creator: ^1.0.4
 ```
 
 Then run:

@@ -1,3 +1,23 @@
+## 1.0.4
+
+### Added
+- **Table Style Resolver**: Added full support for Named Table Styles (`w:tblStylePr`) and Conditional Formatting (`w:tblLook`).
+  - Supports 'First Row', 'Last Row', 'First Column', 'Last Column', and 'Banded Rows/Columns' formatting.
+  - Automatically resolves and "bakes" effective styles (shading, borders, fonts) into table cells for visual fidelity.
+- **Floating Images**: Added parser support for floating images with precise positioning.
+  - Supports `wp:anchor` parsing.
+  - Handles `relativeFrom` (margin, page, column) and alignment attributes.
+- **Drop Caps**: Added support for Drop Caps (`w:dropCap`) in paragraphs.
+- **Footnotes & Endnotes**: Added comprehensive support for parsing and exporting Footnotes and Endnotes.
+- **Text Borders**: Added support for parsing text borders (`w:bdr`).
+
+### Fixed
+- **Table Styles**: Fixed issue where table styles were not correctly applied to cells during parsing.
+- **Attribute Export**: Fixed invalid hex color format (removed `#` prefix) in `w:fill` attribute generation to ensure compatibility with Microsoft Word.
+- **Cell Copying**: Fixed `DocxTableCell.copyWith` bug that caused style properties to be lost when modifying table cells.
+
+---
+
 ## 1.0.3
 
 ### Improved
