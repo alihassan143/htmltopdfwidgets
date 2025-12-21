@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 import '../../docx_creator.dart';
+import '../core/font_manager.dart';
 
 /// Exports [DocxBuiltDocument] to .docx format.
 class DocxExporter {
@@ -15,6 +16,7 @@ class DocxExporter {
   int _numIdCounter = 1;
   final List<bool> _listTypes = []; // true = ordered, false = bullet
   DocxBackgroundImage? _backgroundImage;
+  final FontManager fontManager = FontManager();
 
   /// Exports the document to a file.
   Future<void> exportToFile(DocxBuiltDocument doc, String filePath) async {
@@ -39,6 +41,11 @@ class DocxExporter {
     _numIdCounter = 1;
     _listTypes.clear();
     _backgroundImage = null;
+
+    // Register document fonts
+    for (var font in doc.fonts) {
+      fontManager.registerFont(font);
+    }
 
     // Process background image
     if (doc.section?.backgroundImage != null) {
@@ -73,7 +80,15 @@ class DocxExporter {
     archive.addFile(_createSettings(doc));
     archive.addFile(_createStyles(doc));
     archive.addFile(_createFontTable(doc));
+    archive.addFile(_createFontTableRels(doc)); // Add Font Table Rels
     archive.addFile(_createNumbering(doc));
+
+    // Process fonts
+    for (var font in fontManager.fonts) {
+      final filename = 'word/fonts/${font.obfuscationKey}.odttf';
+      archive.addFile(ArchiveFile(
+          filename, font.obfuscatedBytes.length, font.obfuscatedBytes));
+    }
 
     // Headers and Footers
     if (doc.section?.header != null) {
@@ -179,6 +194,16 @@ class DocxExporter {
           nest: () {
             builder.attribute('Extension', 'tiff');
             builder.attribute('ContentType', 'image/tiff');
+          },
+        );
+        builder.element(
+          'Default',
+          nest: () {
+            builder.attribute('Extension', 'odttf');
+            builder.attribute(
+              'ContentType',
+              'application/vnd.openxmlformats-package.obfuscated-font',
+            );
           },
         );
         builder.element(
@@ -1022,16 +1047,91 @@ class DocxExporter {
         utf8.encode(doc.fontTableXml!),
       );
     }
-    final xml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:font w:name="Calibri"><w:panose1 w:val="020F0502020204030204"/></w:font>
-  <w:font w:name="Calibri Light"><w:panose1 w:val="020F0302020204030204"/></w:font>
-  <w:font w:name="Times New Roman"><w:panose1 w:val="02020603050405020304"/></w:font>
-  <w:font w:name="Courier New"><w:panose1 w:val="02070309020205020404"/></w:font>
-  <w:font w:name="Symbol"><w:panose1 w:val="05050102010706020507"/></w:font>
-</w:fonts>''';
+    final builder = XmlBuilder();
+    builder.processing(
+        'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
+    builder.element(
+      'w:fonts',
+      nest: () {
+        builder.attribute('xmlns:w',
+            'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+        builder.attribute('xmlns:r',
+            'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+
+        // Standard fonts
+        builder.element('w:font', nest: () {
+          builder.attribute('w:name', 'Calibri');
+          builder.element('w:panose1', nest: () {
+            builder.attribute('w:val', '020F0502020204030204');
+          });
+        });
+        builder.element('w:font', nest: () {
+          builder.attribute('w:name', 'Calibri Light');
+          builder.element('w:panose1', nest: () {
+            builder.attribute('w:val', '020F0302020204030204');
+          });
+        });
+        builder.element('w:font', nest: () {
+          builder.attribute('w:name', 'Times New Roman');
+          builder.element('w:panose1', nest: () {
+            builder.attribute('w:val', '02020603050405020304');
+          });
+        });
+
+        // Embedded fonts
+        int i = 0;
+        for (var font in fontManager.fonts) {
+          builder.element('w:font', nest: () {
+            builder.attribute('w:name', font.familyName);
+            builder.element('w:embedRegular', nest: () {
+              builder.attribute('r:id', 'rIdFont$i');
+              builder.attribute('w:fontKey', '{${font.obfuscationKey}}');
+            });
+          });
+          i++;
+        }
+      },
+    );
+    final xml = builder.buildDocument().toXmlString();
     return ArchiveFile(
       'word/fontTable.xml',
+      utf8.encode(xml).length,
+      utf8.encode(xml),
+    );
+  }
+
+  ArchiveFile _createFontTableRels(DocxBuiltDocument doc) {
+    final builder = XmlBuilder();
+    builder.processing(
+        'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
+    builder.element(
+      'Relationships',
+      nest: () {
+        builder.attribute(
+          'xmlns',
+          'http://schemas.openxmlformats.org/package/2006/relationships',
+        );
+
+        int i = 0;
+        for (var font in fontManager.fonts) {
+          builder.element(
+            'Relationship',
+            nest: () {
+              builder.attribute('Id', 'rIdFont$i');
+              builder.attribute(
+                'Type',
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/font',
+              );
+              builder.attribute('Target', 'fonts/${font.obfuscationKey}.odttf');
+            },
+          );
+          i++;
+        }
+      },
+    );
+    final xml = builder.buildDocument().toXmlString();
+    return ArchiveFile(
+      'word/_rels/fontTable.xml.rels',
       utf8.encode(xml).length,
       utf8.encode(xml),
     );
@@ -1051,83 +1151,85 @@ class DocxExporter {
       '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
     );
 
-    // Abstract numbering for bullets (abstractNumId=0) - multi-level
-    buffer.writeln('''
-  <w:abstractNum w:abstractNumId="0">
-    <w:nsid w:val="FFFFFF89"/>
-    <w:multiLevelType w:val="hybridMultilevel"/>
-    <w:tmpl w:val="29761A62"/>
-    <w:lvl w:ilvl="0">
-      <w:start w:val="1"/>
-      <w:numFmt w:val="bullet"/>
-      <w:lvlText w:val="•"/>
-      <w:lvlJc w:val="left"/>
-      <w:pPr>
-        <w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs>
-        <w:ind w:left="720" w:hanging="360"/>
-      </w:pPr>
-    </w:lvl>
-    <w:lvl w:ilvl="1">
-      <w:start w:val="1"/>
-      <w:numFmt w:val="bullet"/>
-      <w:lvlText w:val="○"/>
-      <w:lvlJc w:val="left"/>
-      <w:pPr>
-        <w:tabs><w:tab w:val="num" w:pos="1440"/></w:tabs>
-        <w:ind w:left="1440" w:hanging="360"/>
-      </w:pPr>
-    </w:lvl>
-    <w:lvl w:ilvl="2">
-      <w:start w:val="1"/>
-      <w:numFmt w:val="bullet"/>
-      <w:lvlText w:val="▪"/>
-      <w:lvlJc w:val="left"/>
-      <w:pPr>
-        <w:tabs><w:tab w:val="num" w:pos="2160"/></w:tabs>
-        <w:ind w:left="2160" w:hanging="360"/>
-      </w:pPr>
-    </w:lvl>
-  </w:abstractNum>''');
+    // Bullet characters for each level
+    const bulletChars = ['•', '○', '▪', '•', '○', '▪', '•', '○', '▪'];
 
-    // Abstract numbering for decimals (abstractNumId=1) - multi-level
-    buffer.writeln('''
-  <w:abstractNum w:abstractNumId="1">
-    <w:nsid w:val="FFFFFF88"/>
-    <w:multiLevelType w:val="hybridMultilevel"/>
-    <w:tmpl w:val="D0A62B40"/>
-    <w:lvl w:ilvl="0">
+    // Abstract numbering for bullets (abstractNumId=0) - 9 levels
+    buffer.writeln('  <w:abstractNum w:abstractNumId="0">');
+    buffer.writeln('    <w:nsid w:val="FFFFFF89"/>');
+    buffer.writeln('    <w:multiLevelType w:val="hybridMultilevel"/>');
+    buffer.writeln('    <w:tmpl w:val="29761A62"/>');
+
+    for (int lvl = 0; lvl < 9; lvl++) {
+      final indent = (lvl + 1) * 720;
+      final bullet = bulletChars[lvl];
+      buffer.writeln('''
+    <w:lvl w:ilvl="$lvl">
       <w:start w:val="1"/>
-      <w:numFmt w:val="decimal"/>
-      <w:lvlText w:val="%1."/>
+      <w:numFmt w:val="bullet"/>
+      <w:lvlText w:val="$bullet"/>
       <w:lvlJc w:val="left"/>
       <w:pPr>
-        <w:tabs><w:tab w:val="num" w:pos="720"/></w:tabs>
-        <w:ind w:left="720" w:hanging="360"/>
+        <w:tabs><w:tab w:val="num" w:pos="$indent"/></w:tabs>
+        <w:ind w:left="$indent" w:hanging="360"/>
       </w:pPr>
-    </w:lvl>
-    <w:lvl w:ilvl="1">
+      <w:rPr>
+        <w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>
+      </w:rPr>
+    </w:lvl>''');
+    }
+    buffer.writeln('  </w:abstractNum>');
+
+    // Number formats for each level of ordered lists
+    const numFormats = [
+      'decimal', // 1, 2, 3
+      'lowerLetter', // a, b, c
+      'lowerRoman', // i, ii, iii
+      'decimal', // 1, 2, 3
+      'lowerLetter', // a, b, c
+      'lowerRoman', // i, ii, iii
+      'decimal', // 1, 2, 3
+      'lowerLetter', // a, b, c
+      'lowerRoman', // i, ii, iii
+    ];
+    const lvlTextFormats = [
+      '%1.',
+      '%2.',
+      '%3.',
+      '%4.',
+      '%5.',
+      '%6.',
+      '%7.',
+      '%8.',
+      '%9.'
+    ];
+
+    // Abstract numbering for decimals (abstractNumId=1) - 9 levels
+    buffer.writeln('  <w:abstractNum w:abstractNumId="1">');
+    buffer.writeln('    <w:nsid w:val="FFFFFF88"/>');
+    buffer.writeln('    <w:multiLevelType w:val="hybridMultilevel"/>');
+    buffer.writeln('    <w:tmpl w:val="D0A62B40"/>');
+
+    for (int lvl = 0; lvl < 9; lvl++) {
+      final indent = (lvl + 1) * 720;
+      final numFmt = numFormats[lvl];
+      final lvlText = lvlTextFormats[lvl];
+      buffer.writeln('''
+    <w:lvl w:ilvl="$lvl">
       <w:start w:val="1"/>
-      <w:numFmt w:val="lowerLetter"/>
-      <w:lvlText w:val="%2."/>
+      <w:numFmt w:val="$numFmt"/>
+      <w:lvlText w:val="$lvlText"/>
       <w:lvlJc w:val="left"/>
       <w:pPr>
-        <w:tabs><w:tab w:val="num" w:pos="1440"/></w:tabs>
-        <w:ind w:left="1440" w:hanging="360"/>
+        <w:tabs><w:tab w:val="num" w:pos="$indent"/></w:tabs>
+        <w:ind w:left="$indent" w:hanging="360"/>
       </w:pPr>
-    </w:lvl>
-    <w:lvl w:ilvl="2">
-      <w:start w:val="1"/>
-      <w:numFmt w:val="lowerRoman"/>
-      <w:lvlText w:val="%3."/>
-      <w:lvlJc w:val="left"/>
-      <w:pPr>
-        <w:tabs><w:tab w:val="num" w:pos="2160"/></w:tabs>
-        <w:ind w:left="2160" w:hanging="360"/>
-      </w:pPr>
-    </w:lvl>
-  </w:abstractNum>''');
+    </w:lvl>''');
+    }
+    buffer.writeln('  </w:abstractNum>');
 
     // Generate num instances linking to correct abstractNumId
+    // Each list instance gets its own numId, ensuring proper restart
     for (int i = 0; i < _listTypes.length; i++) {
       final numId = i + 1;
       final abstractNumId = _listTypes[i] ? 1 : 0; // ordered = 1, bullet = 0
@@ -1250,6 +1352,12 @@ class DocxExporter {
   void _collectListsFromNode(DocxNode node, List<DocxList> lists) {
     if (node is DocxList) {
       lists.add(node);
+      // Also collect nested lists within list items
+      for (var item in node.items) {
+        for (var child in item.children) {
+          _collectListsFromNode(child, lists);
+        }
+      }
     } else if (node is DocxTable) {
       for (var row in node.rows) {
         for (var cell in row.cells) {
@@ -1257,6 +1365,11 @@ class DocxExporter {
             _collectListsFromNode(child, lists);
           }
         }
+      }
+    } else if (node is DocxParagraph) {
+      // Paragraphs might contain inline elements with nested content
+      for (var child in node.children) {
+        _collectListsFromNode(child, lists);
       }
     }
   }

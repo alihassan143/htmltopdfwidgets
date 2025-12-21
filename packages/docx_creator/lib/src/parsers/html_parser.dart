@@ -32,15 +32,38 @@ class DocxParser {
   static Future<List<DocxNode>> fromHtml(String html) async {
     try {
       final document = html_parser.parse(html);
+
+      // Extract CSS classes from <style> tags
+      final cssMap = _parseCssClasses(document);
+
       final body = document.body;
       if (body == null) return [];
-      return _parseChildren(body.nodes);
+      return _parseChildren(body.nodes, cssMap: cssMap);
     } catch (e) {
       throw DocxParserException(
         'Failed to parse HTML: $e',
         sourceFormat: 'HTML',
       );
     }
+  }
+
+  static Map<String, String> _parseCssClasses(dom.Document document) {
+    final cssMap = <String, String>{};
+    final styles = document.querySelectorAll('style');
+    for (var style in styles) {
+      final text = style.text;
+      // Simple regex for .className { ... }
+      final matches =
+          RegExp(r'\.([a-zA-Z0-9_-]+)\s*\{([^}]+)\}').allMatches(text);
+      for (var match in matches) {
+        final className = match.group(1);
+        final styleBody = match.group(2);
+        if (className != null && styleBody != null) {
+          cssMap[className] = styleBody.trim();
+        }
+      }
+    }
+    return cssMap;
   }
 
   /// Parses Markdown string into DocxNode elements.
@@ -59,16 +82,18 @@ class DocxParser {
   // PARSING LOGIC
   // ============================================================
 
-  static Future<List<DocxNode>> _parseChildren(List<dom.Node> nodes) async {
+  static Future<List<DocxNode>> _parseChildren(List<dom.Node> nodes,
+      {Map<String, String>? cssMap}) async {
     final results = <DocxNode>[];
     for (var node in nodes) {
-      final parsed = await _parseNode(node);
+      final parsed = await _parseNode(node, cssMap: cssMap);
       if (parsed != null) results.add(parsed);
     }
     return results;
   }
 
-  static Future<DocxNode?> _parseNode(dom.Node node) async {
+  static Future<DocxNode?> _parseNode(dom.Node node,
+      {Map<String, String>? cssMap}) async {
     if (node is dom.Text) {
       final text = node.text.trim();
       if (text.isEmpty) return null;
@@ -77,16 +102,31 @@ class DocxParser {
         children: [DocxText(text)],
       );
     }
-    if (node is dom.Element) return _parseElement(node);
+    if (node is dom.Element) return _parseElement(node, cssMap: cssMap);
     return null;
   }
 
-  static Future<DocxNode?> _parseElement(dom.Element element) async {
+  static Future<DocxNode?> _parseElement(dom.Element element,
+      {Map<String, String>? cssMap}) async {
     final tag = element.localName?.toLowerCase();
     if (tag == null) return null;
 
+    // Extract block styles early
+    final styleStr =
+        _mergeStyles(element.attributes['style'], element.classes, cssMap);
+
+    // Create context for this block (inheritance)
+    final initialContext = const DocxStyleContext().mergeWith(tag, styleStr);
+
+    // Background color (shading) is NOT inherited in CSS.
+    // We remove it from the context passed to children so they don't get 'run shading'.
+    // The block itself will still have shading applied via _parseBlockStyles below.
+    final blockContext = initialContext.resetBackground();
+
     // 1. Try Shared Builder for standard blocks
-    final children = await _parseInlines(element.nodes);
+    final children = await _parseInlines(element.nodes,
+        context: blockContext, cssMap: cssMap);
+
     final built = DocumentBuilder.buildBlockElement(
       tag: tag,
       children: [], // Pass empty, we'll manually handle children if needed or pass them
@@ -98,59 +138,32 @@ class DocxParser {
         tag != 'div' &&
         tag != 'pre' &&
         !tag.startsWith('h')) {
-      // For headings, quotes, etc where text content is enough (as per current impl)
-      // or simplistic mapping.
-      // However, DocumentBuilder logic for headings takes text string.
-      // If we want rich text headings, we might need to adjust DocumentBuilder or DocxParser.
-      // Current DocxParagraph.headingX takes String.
+      // For simple standard blocks
       return built;
     }
 
-    // Extract block styles early for override
-    final blockStyles = _parseBlockStyles(element.attributes['style'] ?? '');
+    // Still parse block styles for DocxParagraph properties (align, shading)
+    // which are not part of DocxStyleContext (which focuses on text/inline properties)
+    final blockStyles = _parseBlockStyles(styleStr);
 
     switch (tag) {
       case 'p':
       case 'div':
         if (children.isEmpty) return null;
 
-        // Propagate text color to children if present
-        var finalChildren = children;
-        if (blockStyles.colorHex != null) {
-          finalChildren = children.map((child) {
-            if (child is DocxText) {
-              if (child.color == DocxColor.black || child.color == null) {
-                return child.copyWith(color: DocxColor(blockStyles.colorHex!));
-              }
-            } else if (child is DocxCheckbox) {
-              if (child.color == null) {
-                return DocxCheckbox(
-                  isChecked: child.isChecked,
-                  fontSize: child.fontSize,
-                  fontWeight: child.fontWeight,
-                  fontStyle: child.fontStyle,
-                  color: DocxColor(blockStyles.colorHex!),
-                  id: child.id,
-                );
-              }
-            }
-            return child;
-          }).toList();
-        }
-
         return DocxParagraph(
-          children: finalChildren,
+          children: children,
           shadingFill: blockStyles.shadingFill,
           align: blockStyles.align,
         );
 
       case 'ul':
-        return _parseList(element, ordered: false);
+        return _parseList(element, ordered: false, cssMap: cssMap);
       case 'ol':
-        return _parseList(element, ordered: true);
+        return _parseList(element, ordered: true, cssMap: cssMap);
 
       case 'table':
-        return _parseTable(element);
+        return _parseTable(element, cssMap: cssMap);
 
       case 'img':
         return _parseImage(element);
@@ -162,7 +175,7 @@ class DocxParser {
         final codeChildren = <DocxInline>[];
 
         for (var i = 0; i < lines.length; i++) {
-          codeChildren.add(DocxText.code(lines[i]));
+          codeChildren.add(DocxText.code(lines[i], color: DocxColor.black));
           if (i < lines.length - 1) {
             codeChildren.add(DocxLineBreak());
           }
@@ -181,7 +194,7 @@ class DocxParser {
         final codeChildren = <DocxInline>[];
 
         for (var i = 0; i < lines.length; i++) {
-          codeChildren.add(DocxText.code(lines[i]));
+          codeChildren.add(DocxText.code(lines[i], color: DocxColor.black));
           if (i < lines.length - 1) {
             codeChildren.add(DocxLineBreak());
           }
@@ -221,20 +234,24 @@ class DocxParser {
     }
   }
 
-  static Future<List<DocxInline>> _parseInlines(List<dom.Node> nodes) async {
+  static Future<List<DocxInline>> _parseInlines(List<dom.Node> nodes,
+      {DocxStyleContext? context, Map<String, String>? cssMap}) async {
     final results = <DocxInline>[];
     for (var node in nodes) {
       if (node is dom.Element && node.localName?.toLowerCase() == 'img') {
         final img = await _parseInlineImage(node);
         if (img != null) results.add(img);
       } else {
-        results.addAll(_parseInline(node));
+        results.addAll(_parseInline(node, context: context, cssMap: cssMap));
       }
     }
     return results;
   }
 
-  static List<DocxInline> _parseInline(dom.Node node) {
+  static List<DocxInline> _parseInline(dom.Node node,
+      {DocxStyleContext? context, Map<String, String>? cssMap}) {
+    final ctx = context ?? const DocxStyleContext();
+
     if (node is dom.Text) {
       final text = node.text;
       if (text.isEmpty) return [];
@@ -242,213 +259,138 @@ class DocxParser {
       // Check for [ ] and [x] patterns at the start of text
       if (text.startsWith('[ ] ')) {
         return [
-          DocumentBuilder.buildCheckbox(isChecked: false),
-          DocxText(text.substring(4))
+          DocumentBuilder.buildCheckbox(
+            isChecked: false,
+            fontSize: ctx.fontSize,
+            fontWeight: ctx.fontWeight,
+            fontStyle: ctx.fontStyle,
+            color: ctx.colorHex != null ? DocxColor(ctx.colorHex!) : null,
+          ),
+          _createText(text.substring(4), ctx)
         ];
       } else if (text.startsWith('[x] ') || text.startsWith('[X] ')) {
         return [
-          DocumentBuilder.buildCheckbox(isChecked: true),
-          DocxText(text.substring(4))
+          DocumentBuilder.buildCheckbox(
+            isChecked: true,
+            fontSize: ctx.fontSize,
+            fontWeight: ctx.fontWeight,
+            fontStyle: ctx.fontStyle,
+            color: ctx.colorHex != null ? DocxColor(ctx.colorHex!) : null,
+          ),
+          _createText(text.substring(4), ctx)
         ];
       }
 
-      return [DocxText(text)];
+      return [_createText(text, ctx)];
     }
 
     if (node is dom.Element) {
       final tag = node.localName?.toLowerCase();
-      final text = _getText(node);
-      final style = node.attributes['style'] ?? '';
+      // Update context based on tag and style
+      final combinedStyle =
+          _mergeStyles(node.attributes['style'], node.classes, cssMap);
+      final newCtx = ctx.mergeWith(tag, combinedStyle);
 
       switch (tag) {
-        case 'strong':
-        case 'b':
-          return [DocxText.bold(text)];
-        case 'em':
-        case 'i':
-          return [DocxText.italic(text)];
-        case 'u':
-          return [DocxText.underline(text)];
-        case 's':
-        case 'del':
-        case 'strike':
-          return [DocxText.strike(text)];
+        // Tag-specific handling that produces non-text inlines
+        case 'br':
+          return [DocxLineBreak()];
         case 'a':
           final href = node.attributes['href'];
-          return [DocxText.link(text, href: href ?? '#')];
+          return [
+            _createText(_getText(node),
+                newCtx.copyWith(href: href ?? '#', isLink: true))
+          ];
+        case 'input':
+          final type = node.attributes['type']?.toLowerCase();
+          if (type == 'checkbox') {
+            return [
+              DocumentBuilder.buildCheckbox(
+                isChecked: node.attributes.containsKey('checked'),
+                fontSize: newCtx.fontSize,
+                fontWeight: newCtx.fontWeight,
+                fontStyle: newCtx.fontStyle,
+                color: newCtx.colorHex != null
+                    ? DocxColor(newCtx.colorHex!)
+                    : null,
+              )
+            ];
+          }
+          return [];
         case 'code':
+          // Preserving existing logic for code splitting lines
+          final text = _getText(node);
           final lines = text.split('\n');
           final results = <DocxInline>[];
+          // Code typically monospaced, maybe gray bg?
+          // Using existing DocxText.code behavior but with inheritance?
+          // DocxText.code hardcodes font family.
           for (var i = 0; i < lines.length; i++) {
-            results.add(DocxText.code(lines[i]));
+            // Pass color from context, default to black if not set
+            results.add(DocxText.code(lines[i],
+                fontSize: newCtx.fontSize,
+                shadingFill: newCtx.shadingFill,
+                color: newCtx.colorHex != null
+                    ? DocxColor(newCtx.colorHex!)
+                    : DocxColor.black));
             if (i < lines.length - 1) {
               results.add(DocxLineBreak());
             }
           }
           return results;
-        case 'br':
-          return [DocxLineBreak()];
-        case 'sup':
-          return [DocxText.superscript(text)];
-        case 'sub':
-          return [DocxText.subscript(text)];
-        case 'mark':
-          return [DocxText.highlighted(text)];
-        case 'span':
-          return [_parseStyledText(text, style)];
-        case 'input':
-          final type = node.attributes['type']?.toLowerCase();
-          if (type == 'checkbox') {
-            final styles = _parseStyledText('', node.attributes['style'] ?? '');
-            return [
-              DocumentBuilder.buildCheckbox(
-                isChecked: node.attributes.containsKey('checked'),
-                fontSize: styles.fontSize,
-                fontWeight: styles.fontWeight,
-                fontStyle: styles.fontStyle,
-                color: styles.color,
-              )
-            ];
-          }
-          return [];
-        case 'label':
-          // Pass style to children if label has it?
-          // For now, recursively parse nodes
-          return _parseInlinesSync(node.nodes);
+
         default:
-          return _parseInlinesSync(node.nodes);
+          return _parseInlinesSync(node.nodes, context: newCtx, cssMap: cssMap);
       }
     }
     return [];
   }
 
   // Helper for recursive synchronous inline parsing
-  static List<DocxInline> _parseInlinesSync(List<dom.Node> nodes) {
+  static List<DocxInline> _parseInlinesSync(List<dom.Node> nodes,
+      {DocxStyleContext? context, Map<String, String>? cssMap}) {
     final results = <DocxInline>[];
     for (var node in nodes) {
-      results.addAll(_parseInline(node));
+      results.addAll(_parseInline(node, context: context, cssMap: cssMap));
     }
     return results;
   }
 
-  static DocxText _parseStyledText(String text, String style) {
-    bool isBold = style.contains('font-weight') &&
-        (style.contains('bold') || style.contains('700'));
-    bool isItalic = style.contains('font-style') && style.contains('italic');
-    String? colorHex;
-    double? fontSize;
-
-    // Matches #RGB, #RRGGBB, or names (quoted or unquoted)
-    // Using standard string regex to ensure proper escaping of quotes
-    final colorMatch =
-        RegExp("color:\\s*['\"]?(#[A-Fa-f0-9]{3,6}|[a-zA-Z]+)['\"]?")
-            .firstMatch(style);
-
-    if (colorMatch != null) {
-      final val = colorMatch.group(1);
-      if (val != null) colorHex = _parseColor(val);
-    }
-
-    final sizeMatch = RegExp(r"font-size:\s*(\d+)").firstMatch(style);
-    if (sizeMatch != null) fontSize = double.tryParse(sizeMatch.group(1)!);
-
-    // Highlight support (background-color)
-    DocxHighlight highlight = DocxHighlight.none;
-    final bgMatch =
-        RegExp("background-color:\\s*['\"]?(#[A-Fa-f0-9]{3,6}|[a-zA-Z]+)['\"]?")
-            .firstMatch(style);
-
-    if (bgMatch != null) {
-      final bgVal = bgMatch.group(1)?.toLowerCase();
-      if (bgVal != null) {
-        highlight = _mapColorToHighlight(bgVal);
-      }
-    }
-
+  static DocxText _createText(String text, DocxStyleContext ctx) {
     return DocxText(
       text,
-      fontWeight: isBold ? DocxFontWeight.bold : DocxFontWeight.normal,
-      fontStyle: isItalic ? DocxFontStyle.italic : DocxFontStyle.normal,
-      color: colorHex != null ? DocxColor(colorHex) : DocxColor.black,
-      fontSize: fontSize,
-      highlight: highlight,
+      fontWeight: ctx.fontWeight,
+      fontStyle: ctx.fontStyle,
+      decoration: ctx.decoration,
+      color: ctx.colorHex != null ? DocxColor(ctx.colorHex!) : DocxColor.black,
+      fontSize: ctx.fontSize,
+      highlight: ctx.highlight,
+      shadingFill: ctx.shadingFill,
+      href: ctx.href,
+      isSuperscript: ctx.isSuperscript,
+      isSubscript: ctx.isSubscript,
+      isAllCaps: ctx.isAllCaps,
+      isSmallCaps: ctx.isSmallCaps,
+      isDoubleStrike: ctx.isDoubleStrike,
+      isOutline: ctx.isOutline,
+      isShadow: ctx.isShadow,
+      isEmboss: ctx.isEmboss,
+      isImprint: ctx.isImprint,
     );
-  }
-
-  static DocxHighlight _mapColorToHighlight(String color) {
-    var c = color.toLowerCase();
-
-    // Standardize hex
-    if (c.startsWith('#') && c.length == 4) {
-      c = '#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}';
-    }
-
-    if (c.startsWith('#')) {
-      if (c == '#ffff00') return DocxHighlight.yellow;
-      if (c == '#00ff00') return DocxHighlight.green;
-      if (c == '#00ffff') return DocxHighlight.cyan;
-      if (c == '#ff00ff') return DocxHighlight.magenta;
-      if (c == '#0000ff') return DocxHighlight.blue;
-      if (c == '#ff0000') return DocxHighlight.red;
-      if (c == '#000080') return DocxHighlight.darkBlue;
-      if (c == '#008080') return DocxHighlight.darkCyan;
-      if (c == '#008000') return DocxHighlight.darkGreen;
-      if (c == '#800080') return DocxHighlight.darkMagenta;
-      if (c == '#800000') return DocxHighlight.darkRed;
-      if (c == '#808000') return DocxHighlight.darkYellow;
-      if (c == '#808080') return DocxHighlight.darkGray;
-      if (c == '#c0c0c0' || c == '#d3d3d3') return DocxHighlight.lightGray;
-      if (c == '#000000') return DocxHighlight.black;
-      return DocxHighlight.none;
-    }
-
-    // Named colors
-    switch (c) {
-      case 'yellow':
-        return DocxHighlight.yellow;
-      case 'green':
-        return DocxHighlight.green;
-      case 'cyan':
-        return DocxHighlight.cyan;
-      case 'magenta':
-        return DocxHighlight.magenta;
-      case 'blue':
-        return DocxHighlight.blue;
-      case 'red':
-        return DocxHighlight.red;
-      case 'darkblue':
-        return DocxHighlight.darkBlue;
-      case 'darkcyan':
-        return DocxHighlight.darkCyan;
-      case 'darkgreen':
-        return DocxHighlight.darkGreen;
-      case 'darkmagenta':
-        return DocxHighlight.darkMagenta;
-      case 'darkred':
-        return DocxHighlight.darkRed;
-      case 'darkyellow':
-        return DocxHighlight.darkYellow;
-      case 'darkgray':
-      case 'darkgrey':
-        return DocxHighlight.darkGray;
-      case 'lightgray':
-      case 'lightgrey':
-        return DocxHighlight.lightGray;
-      case 'black':
-        return DocxHighlight.black;
-      default:
-        return DocxHighlight.none;
-    }
   }
 
   static _BlockStyles _parseBlockStyles(String style) {
     String? shadingFill;
     DocxAlign align = DocxAlign.left;
 
-    final bgMatch =
-        RegExp(r'background-color:\s*#?([A-Fa-f0-9]{6})').firstMatch(style);
+    final bgMatch = RegExp(
+            r"background-color:\s*['\x22]?(#[A-Fa-f0-9]{3,6}|rgb\([0-9,\s]+\)|rgba\([0-9.,\s]+\)|[a-zA-Z]+)['\x22]?")
+        .firstMatch(style);
     if (bgMatch != null) {
-      shadingFill = bgMatch.group(1);
+      final val = bgMatch.group(1);
+      if (val != null) {
+        shadingFill = _parseColor(val);
+      }
     }
 
     if (style.contains('text-align: center')) {
@@ -460,8 +402,14 @@ class DocxParser {
     }
 
     String? colorHex;
-    final colorMatch = RegExp(r'color:\s*#([A-Fa-f0-9]{6})').firstMatch(style);
-    if (colorMatch != null) colorHex = colorMatch.group(1);
+    final colorMatch = RegExp(
+            r"color:\s*['\x22]?(#[A-Fa-f0-9]{3,6}|rgb\([0-9,\s]+\)|rgba\([0-9.,\s]+\)|[a-zA-Z]+)['\x22]?")
+        .firstMatch(style);
+
+    if (colorMatch != null) {
+      final val = colorMatch.group(1);
+      if (val != null) colorHex = _parseColor(val);
+    }
 
     return _BlockStyles(
         shadingFill: shadingFill, align: align, colorHex: colorHex);
@@ -471,6 +419,7 @@ class DocxParser {
     dom.Element element, {
     required bool ordered,
     int level = 0,
+    Map<String, String>? cssMap,
   }) async {
     final items = <DocxListItem>[];
 
@@ -483,17 +432,17 @@ class DocxParser {
         for (var node in child.nodes) {
           if (node is dom.Element) {
             if (node.localName == 'ul') {
-              nestedLists.add(
-                  await _parseList(node, ordered: false, level: level + 1));
+              nestedLists.add(await _parseList(node,
+                  ordered: false, level: level + 1, cssMap: cssMap));
               continue;
             } else if (node.localName == 'ol') {
-              nestedLists
-                  .add(await _parseList(node, ordered: true, level: level + 1));
+              nestedLists.add(await _parseList(node,
+                  ordered: true, level: level + 1, cssMap: cssMap));
               continue;
             }
           }
           // Use async inline parser
-          inlines.addAll(_parseInline(node));
+          inlines.addAll(_parseInline(node, cssMap: cssMap));
         }
 
         // Add current item
@@ -518,7 +467,8 @@ class DocxParser {
     return DocxList(items: items, isOrdered: ordered);
   }
 
-  static Future<DocxTable> _parseTable(dom.Element element) async {
+  static Future<DocxTable> _parseTable(dom.Element element,
+      {Map<String, String>? cssMap}) async {
     final rows = <DocxTableRow>[];
 
     for (var child in element.children) {
@@ -527,26 +477,47 @@ class DocxParser {
       if (childTag == 'tbody' || childTag == 'thead' || childTag == 'tfoot') {
         for (var tr in child.children) {
           if (tr.localName?.toLowerCase() == 'tr') {
-            final row = await _parseTableRow(tr);
+            final row = await _parseTableRow(tr, cssMap: cssMap);
             if (row != null) rows.add(row);
           }
         }
       } else if (childTag == 'tr') {
-        final row = await _parseTableRow(child);
+        final row = await _parseTableRow(child, cssMap: cssMap);
         if (row != null) rows.add(row);
       }
     }
 
-    return DocxTable(rows: rows, style: DocxTableStyle.headerHighlight);
+    // Parse table style (borders)
+    final styleStr =
+        _mergeStyles(element.attributes['style'], element.classes, cssMap);
+
+    DocxBorder border = DocxBorder.none;
+    if (styleStr.contains('border')) {
+      // Simple check
+      // TODO: robust parsing of border: 1px solid black
+      if (styleStr.contains('solid')) border = DocxBorder.single;
+    }
+    if (element.attributes.containsKey('border')) {
+      if (element.attributes['border'] != '0') border = DocxBorder.single;
+    }
+
+    return DocxTable(
+      rows: rows,
+      style: border != DocxBorder.none
+          ? DocxTableStyle(border: border)
+          : DocxTableStyle.headerHighlight,
+    );
   }
 
-  static Future<DocxTableRow?> _parseTableRow(dom.Element tr) async {
+  static Future<DocxTableRow?> _parseTableRow(dom.Element tr,
+      {Map<String, String>? cssMap}) async {
     final cells = <DocxTableCell>[];
 
     for (var child in tr.children) {
       final tag = child.localName?.toLowerCase();
       if (tag == 'td' || tag == 'th') {
-        final cell = await _parseTableCell(child, isHeader: tag == 'th');
+        final cell =
+            await _parseTableCell(child, isHeader: tag == 'th', cssMap: cssMap);
         cells.add(cell);
       }
     }
@@ -556,8 +527,9 @@ class DocxParser {
   }
 
   static Future<DocxTableCell> _parseTableCell(dom.Element td,
-      {bool isHeader = false}) async {
-    final style = td.attributes['style'] ?? '';
+      {bool isHeader = false, Map<String, String>? cssMap}) async {
+    final style = _mergeStyles(td.attributes['style'], td.classes, cssMap);
+
     String? shadingFill;
 
     final bgMatch =
@@ -571,7 +543,8 @@ class DocxParser {
     final colSpan = int.tryParse(td.attributes['colspan'] ?? '1') ?? 1;
     final rowSpan = int.tryParse(td.attributes['rowspan'] ?? '1') ?? 1;
 
-    final content = await _parseCellContent(td.nodes, isHeader: isHeader);
+    final content =
+        await _parseCellContent(td.nodes, isHeader: isHeader, cssMap: cssMap);
 
     return DocxTableCell(
       children: content,
@@ -584,6 +557,7 @@ class DocxParser {
   static Future<List<DocxBlock>> _parseCellContent(
     List<dom.Node> nodes, {
     bool isHeader = false,
+    Map<String, String>? cssMap,
   }) async {
     final blocks = <DocxBlock>[];
     final inlines = <DocxInline>[];
@@ -607,12 +581,12 @@ class DocxParser {
         if (_isBlockTag(tag)) {
           flushInlines();
           // Recursive async parse for nested blocks
-          final block = await _parseElement(node);
+          final block = await _parseElement(node, cssMap: cssMap);
           if (block is DocxBlock) {
             blocks.add(block);
           }
         } else {
-          inlines.addAll(_parseInline(node));
+          inlines.addAll(_parseInline(node, cssMap: cssMap));
         }
       }
     }
@@ -749,9 +723,10 @@ class DocxParser {
     }
 
     // Handle rgb/rgba
+    // Support spaces in regex more flexibly
     if (trimmed.startsWith('rgb')) {
       final match = RegExp(
-              r'rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)')
+              r'rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[\d.]+)?\s*\)')
           .firstMatch(trimmed);
       if (match != null) {
         final r = int.tryParse(match.group(1) ?? '0') ?? 0;
@@ -808,15 +783,51 @@ class DocxParser {
         return 'FF00FF';
       case 'silver':
         return 'C0C0C0';
+      case 'lightgray':
+      case 'lightgrey':
+        return 'D3D3D3';
+      case 'darkgray':
+      case 'darkgrey':
+        return 'A9A9A9';
+
       case 'transparent':
         return null;
       default:
+        // Try to see if it is a valid hex without #?
+        // But CSS usually requires # for hex.
+        // Some users might pass raw hex.
+        if (RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(trimmed)) {
+          return trimmed.toUpperCase();
+        }
         return null;
     }
   }
 
   static String _toHex(int val) {
     return val.toRadixString(16).padLeft(2, '0').toUpperCase();
+  }
+
+  static String _mergeStyles(String? inlineStyle, Iterable<String> classes,
+      Map<String, String>? cssMap) {
+    var combined = inlineStyle ?? '';
+    // Append class styles AFTER inline styles so that 'firstMatch' logic
+    // (which assumes simple parsing) works if we want Inline to have priority?
+    // WAIT. If we look for the FIRST "color:"...
+    // String: "color: blue; color: red;"
+    // firstMatch finds "color: blue".
+    // If Inline is Blue and Class is Red.
+    // If we want Inline to Win, Inline must be First.
+    // So "Inline; Class" is correct.
+
+    if (cssMap != null && classes.isNotEmpty) {
+      for (var cls in classes) {
+        if (cssMap.containsKey(cls)) {
+          // Append class style
+          combined = '$combined;${cssMap[cls]}';
+        }
+      }
+    }
+    return combined;
   }
 }
 
@@ -825,4 +836,201 @@ class _BlockStyles {
   final String? colorHex;
   final DocxAlign align;
   _BlockStyles({this.shadingFill, this.colorHex, this.align = DocxAlign.left});
+}
+
+class DocxStyleContext {
+  final String? colorHex;
+  final double? fontSize;
+  final DocxFontWeight fontWeight;
+  final DocxFontStyle fontStyle;
+  final DocxTextDecoration decoration;
+  final DocxHighlight highlight;
+  final String? shadingFill;
+  final String? href;
+  final bool isLink;
+  final bool isSuperscript;
+  final bool isSubscript;
+  final bool isAllCaps;
+  final bool isSmallCaps;
+  final bool isDoubleStrike;
+  final bool isOutline;
+  final bool isShadow;
+  final bool isEmboss;
+  final bool isImprint;
+
+  const DocxStyleContext({
+    this.colorHex,
+    this.fontSize,
+    this.fontWeight = DocxFontWeight.normal,
+    this.fontStyle = DocxFontStyle.normal,
+    this.decoration = DocxTextDecoration.none,
+    this.highlight = DocxHighlight.none,
+    this.shadingFill,
+    this.href,
+    this.isLink = false,
+    this.isSuperscript = false,
+    this.isSubscript = false,
+    this.isAllCaps = false,
+    this.isSmallCaps = false,
+    this.isDoubleStrike = false,
+    this.isOutline = false,
+    this.isShadow = false,
+    this.isEmboss = false,
+    this.isImprint = false,
+  });
+
+  DocxStyleContext copyWith({
+    String? colorHex,
+    double? fontSize,
+    DocxFontWeight? fontWeight,
+    DocxFontStyle? fontStyle,
+    DocxTextDecoration? decoration,
+    DocxHighlight? highlight,
+    String? shadingFill,
+    String? href,
+    bool? isLink,
+    bool? isSuperscript,
+    bool? isSubscript,
+    bool? isAllCaps,
+    bool? isSmallCaps,
+    bool? isDoubleStrike,
+    bool? isOutline,
+    bool? isShadow,
+    bool? isEmboss,
+    bool? isImprint,
+  }) {
+    return DocxStyleContext(
+      colorHex: colorHex ?? this.colorHex,
+      fontSize: fontSize ?? this.fontSize,
+      fontWeight: fontWeight ?? this.fontWeight,
+      fontStyle: fontStyle ?? this.fontStyle,
+      decoration: decoration ?? this.decoration,
+      highlight: highlight ?? this.highlight,
+      shadingFill: shadingFill ?? this.shadingFill,
+      href: href ?? this.href,
+      isLink: isLink ?? this.isLink,
+      isSuperscript: isSuperscript ?? this.isSuperscript,
+      isSubscript: isSubscript ?? this.isSubscript,
+      isAllCaps: isAllCaps ?? this.isAllCaps,
+      isSmallCaps: isSmallCaps ?? this.isSmallCaps,
+      isDoubleStrike: isDoubleStrike ?? this.isDoubleStrike,
+      isOutline: isOutline ?? this.isOutline,
+      isShadow: isShadow ?? this.isShadow,
+      isEmboss: isEmboss ?? this.isEmboss,
+      isImprint: isImprint ?? this.isImprint,
+    );
+  }
+
+  DocxStyleContext mergeWith(String? tag, String style) {
+    if ((tag == null || tag.isEmpty) && style.isEmpty) return this;
+
+    var ctx = this;
+
+    // Tag based updates
+    if (tag != null) {
+      switch (tag) {
+        case 'b':
+        case 'strong':
+          ctx = ctx.copyWith(fontWeight: DocxFontWeight.bold);
+          break;
+        case 'i':
+        case 'em':
+          ctx = ctx.copyWith(fontStyle: DocxFontStyle.italic);
+          break;
+        case 'u':
+          ctx = ctx.copyWith(decoration: DocxTextDecoration.underline);
+          break;
+        case 's':
+        case 'del':
+        case 'strike':
+          ctx = ctx.copyWith(decoration: DocxTextDecoration.strikethrough);
+          break;
+        case 'sup':
+          ctx = ctx.copyWith(isSuperscript: true);
+          break;
+        case 'sub':
+          ctx = ctx.copyWith(isSubscript: true);
+          break;
+        case 'mark':
+          ctx = ctx.copyWith(highlight: DocxHighlight.yellow);
+          break;
+      }
+    }
+
+    // Style attribute based updates
+    if (style.isNotEmpty) {
+      if (style.contains('font-weight') &&
+          (style.contains('bold') || style.contains('700'))) {
+        ctx = ctx.copyWith(fontWeight: DocxFontWeight.bold);
+      }
+
+      if (style.contains('font-style') && style.contains('italic')) {
+        ctx = ctx.copyWith(fontStyle: DocxFontStyle.italic);
+      }
+
+      if (style.contains('text-decoration') && style.contains('underline')) {
+        ctx = ctx.copyWith(decoration: DocxTextDecoration.underline);
+      }
+
+      if (style.contains('text-decoration') && style.contains('line-through')) {
+        ctx = ctx.copyWith(decoration: DocxTextDecoration.strikethrough);
+      }
+
+      final sizeMatch = RegExp(r"font-size:\s*(\d+)").firstMatch(style);
+      if (sizeMatch != null) {
+        final fs = double.tryParse(sizeMatch.group(1)!);
+        if (fs != null) ctx = ctx.copyWith(fontSize: fs);
+      }
+
+      // Color parsing and normalization
+      // Use negative lookbehind (?<!-) to prevent matching 'color:' inside 'background-color:'
+      final colorMatch = RegExp(
+              r"(?<!-)color:\s*['\x22]?(#[A-Fa-f0-9]{3,6}|rgb\([0-9,\s]+\)|rgba\([0-9.,\s]+\)|[a-zA-Z]+)['\x22]?")
+          .firstMatch(style);
+      if (colorMatch != null) {
+        final val = colorMatch.group(1);
+        if (val != null) {
+          final hex = DocxParser._parseColor(val);
+          if (hex != null) ctx = ctx.copyWith(colorHex: hex);
+        }
+      }
+
+      // Background Color (Shading)
+      final bgMatch = RegExp(
+              r"background-color:\s*['\x22]?(#[A-Fa-f0-9]{3,6}|rgb\([0-9,\s]+\)|rgba\([0-9.,\s]+\)|[a-zA-Z]+)['\x22]?")
+          .firstMatch(style);
+      if (bgMatch != null) {
+        final bgVal = bgMatch.group(1)?.toLowerCase();
+        if (bgVal != null) {
+          final hex = DocxParser._parseColor(bgVal);
+          if (hex != null) ctx = ctx.copyWith(shadingFill: hex);
+        }
+      }
+    }
+
+    return ctx;
+  }
+
+  DocxStyleContext resetBackground() {
+    return DocxStyleContext(
+      colorHex: colorHex,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      fontStyle: fontStyle,
+      decoration: decoration,
+      highlight: highlight,
+      shadingFill: null, // Reset
+      href: href,
+      isLink: isLink,
+      isSuperscript: isSuperscript,
+      isSubscript: isSubscript,
+      isAllCaps: isAllCaps,
+      isSmallCaps: isSmallCaps,
+      isDoubleStrike: isDoubleStrike,
+      isOutline: isOutline,
+      isShadow: isShadow,
+      isEmboss: isEmboss,
+      isImprint: isImprint,
+    );
+  }
 }

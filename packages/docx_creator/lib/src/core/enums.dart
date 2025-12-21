@@ -29,40 +29,43 @@ class DocxColor {
   /// The hex color value (without #).
   final String hex;
 
+  /// Private const constructor for predefined colors.
+  const DocxColor._(this.hex);
+
   /// Creates a color from a hex string.
   ///
   /// Accepts formats: 'RRGGBB', '#RRGGBB', '0xRRGGBB'
-  const DocxColor(String value) : hex = value;
-
-  /// Creates a color from a hex string, removing # or 0x prefix.
-  factory DocxColor.fromHex(String value) {
+  factory DocxColor(String value) {
     String hex = value.toUpperCase();
     if (hex.startsWith('#')) hex = hex.substring(1);
     if (hex.startsWith('0X')) hex = hex.substring(2);
-    return DocxColor(hex);
+    return DocxColor._(hex);
   }
 
+  /// Creates a color from a hex string, removing # or 0x prefix.
+  factory DocxColor.fromHex(String value) => DocxColor(value);
+
   // Predefined colors
-  static const black = DocxColor('000000');
-  static const white = DocxColor('FFFFFF');
-  static const red = DocxColor('FF0000');
-  static const blue = DocxColor('0000FF');
-  static const green = DocxColor('00FF00');
-  static const yellow = DocxColor('FFFF00');
-  static const orange = DocxColor('FFA500');
-  static const purple = DocxColor('800080');
-  static const gray = DocxColor('808080');
-  static const lightGray = DocxColor('D3D3D3');
-  static const darkGray = DocxColor('404040');
-  static const cyan = DocxColor('00FFFF');
-  static const magenta = DocxColor('FF00FF');
-  static const pink = DocxColor('FFC0CB');
-  static const brown = DocxColor('8B4513');
-  static const navy = DocxColor('000080');
-  static const teal = DocxColor('008080');
-  static const lime = DocxColor('32CD32');
-  static const gold = DocxColor('FFD700');
-  static const silver = DocxColor('C0C0C0');
+  static const black = DocxColor._('000000');
+  static const white = DocxColor._('FFFFFF');
+  static const red = DocxColor._('FF0000');
+  static const blue = DocxColor._('0000FF');
+  static const green = DocxColor._('00FF00');
+  static const yellow = DocxColor._('FFFF00');
+  static const orange = DocxColor._('FFA500');
+  static const purple = DocxColor._('800080');
+  static const gray = DocxColor._('808080');
+  static const lightGray = DocxColor._('D3D3D3');
+  static const darkGray = DocxColor._('404040');
+  static const cyan = DocxColor._('00FFFF');
+  static const magenta = DocxColor._('FF00FF');
+  static const pink = DocxColor._('FFC0CB');
+  static const brown = DocxColor._('8B4513');
+  static const navy = DocxColor._('000080');
+  static const teal = DocxColor._('008080');
+  static const lime = DocxColor._('32CD32');
+  static const gold = DocxColor._('FFD700');
+  static const silver = DocxColor._('C0C0C0');
 
   @override
   bool operator ==(Object other) =>

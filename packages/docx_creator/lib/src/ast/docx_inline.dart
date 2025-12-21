@@ -213,12 +213,12 @@ class DocxText extends DocxInline {
         isImprint = false;
 
   /// Inline code text.
-  const DocxText.code(this.content, {this.fontSize, this.shadingFill, super.id})
+  const DocxText.code(this.content,
+      {this.fontSize, this.shadingFill, this.color, super.id})
       : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
-        color = null,
-        highlight = DocxHighlight.lightGray,
+        highlight = DocxHighlight.none,
         fontFamily = 'Courier New',
         characterSpacing = null,
         href = null,
@@ -239,11 +239,11 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.color = DocxColor.black,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
-        color = null,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -496,6 +496,16 @@ class DocxText extends DocxInline {
                   'w:highlight',
                   nest: () {
                     builder.attribute('w:val', highlight.name);
+                  },
+                );
+              }
+              if (shadingFill != null) {
+                builder.element(
+                  'w:shd',
+                  nest: () {
+                    builder.attribute('w:val', 'clear');
+                    builder.attribute('w:color', 'auto');
+                    builder.attribute('w:fill', shadingFill!);
                   },
                 );
               }

@@ -9,7 +9,6 @@ void main() {
     text.buildXml(builder);
     final xml = builder.buildDocument().toXmlString();
 
-    print('Generated DocxText XML:\n$xml');
     // Check if space is preserved
     expect(xml, contains('xml:space="preserve"'));
     expect(xml, contains('>Red <'));
@@ -22,7 +21,7 @@ void main() {
       builder.text('Red ');
     });
     final xml = builder.buildDocument().toXmlString();
-    print('Raw XmlBuilder:\n$xml');
+
     expect(xml, contains('xml:space="preserve"'));
     expect(xml, contains('>Red <'));
   });
@@ -38,7 +37,6 @@ void main() {
     p.buildXml(builder);
     final xml = builder.buildDocument().toXmlString();
 
-    print('Generated Paragraph XML:\n$xml');
     expect(xml, contains('>Red <'));
     expect(xml, contains('>Blue <'));
   });

@@ -1,11 +1,9 @@
-import '../ast/docx_background_image.dart';
-import '../ast/docx_block.dart';
-import '../ast/docx_image.dart';
-import '../ast/docx_list.dart';
-import '../ast/docx_node.dart';
-import '../ast/docx_section.dart';
-import '../ast/docx_table.dart';
-import '../core/enums.dart';
+import 'dart:typed_data';
+
+import 'package:uuid/uuid.dart'; // Add
+
+import '../../docx_creator.dart';
+import '../core/font_manager.dart'; // Add
 
 /// Fluent builder for creating DOCX documents.
 ///
@@ -22,6 +20,7 @@ import '../core/enums.dart';
 /// ```
 class DocxDocumentBuilder {
   final List<DocxNode> _elements = [];
+  final List<EmbeddedFont> _fonts = [];
   DocxSectionDef? _currentSection;
 
   /// Sets section properties (headers, footers, page layout, background).
@@ -100,6 +99,18 @@ class DocxDocumentBuilder {
   /// Adds a divider (alias for hr).
   DocxDocumentBuilder divider() => hr();
 
+  /// Adds a section break, defining properties for the *preceding* section.
+  ///
+  /// ```dart
+  /// .addParagraph('Page 1 Content (Portrait)')
+  /// .addSectionBreak(DocxSectionDef(orientation: DocxPageOrientation.portrait))
+  /// .addParagraph('Page 2 Content (Landscape)')
+  /// ```
+  DocxDocumentBuilder addSectionBreak(DocxSectionDef section) {
+    _elements.add(DocxSectionBreakBlock(section));
+    return this;
+  }
+
   /// Adds a blockquote.
   DocxDocumentBuilder quote(String text) {
     _elements.add(DocxParagraph.quote(text));
@@ -176,11 +187,25 @@ class DocxDocumentBuilder {
     return this;
   }
 
+  /// Adds a custom font to the document.
+  DocxDocumentBuilder addFont(String familyName, Uint8List bytes) {
+    // Check if duplicate?
+    if (!_fonts.any((f) => f.familyName == familyName)) {
+      _fonts.add(EmbeddedFont(
+        familyName: familyName,
+        bytes: bytes,
+        obfuscationKey: const Uuid().v4(),
+      ));
+    }
+    return this;
+  }
+
   /// Builds the final document.
   DocxBuiltDocument build() {
     return DocxBuiltDocument(
       elements: List.unmodifiable(_elements),
       section: _currentSection,
+      fonts: List.unmodifiable(_fonts),
     );
   }
 }
@@ -189,6 +214,7 @@ class DocxDocumentBuilder {
 class DocxBuiltDocument {
   final List<DocxNode> elements;
   final DocxSectionDef? section;
+  final List<EmbeddedFont> fonts;
 
   // Raw XML content preserved from original document (for round-tripping)
   final String? stylesXml;
@@ -211,6 +237,7 @@ class DocxBuiltDocument {
     this.rootRelsXml,
     this.headerBgXml,
     this.headerBgRelsXml,
+    this.fonts = const [],
   });
 }
 

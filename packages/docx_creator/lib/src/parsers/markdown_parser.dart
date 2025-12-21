@@ -46,7 +46,7 @@ class MarkdownParser {
     // 1. Try Shared Builder
     final built = DocumentBuilder.buildBlockElement(
       tag: tag,
-      children: [],
+      children: inlines, // Pass parsed inlines!
       textContent: await _extractText(element),
     );
 

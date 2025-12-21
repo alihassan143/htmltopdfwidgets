@@ -21,6 +21,7 @@ export 'src/ast/docx_list.dart';
 // AST
 export 'src/ast/docx_node.dart';
 export 'src/ast/docx_section.dart';
+export 'src/ast/docx_section_break.dart';
 export 'src/ast/docx_table.dart';
 // Builder
 export 'src/builder/docx_document_builder.dart';

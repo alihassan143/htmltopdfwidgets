@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 import '../../docx_creator.dart';
+import '../core/font_manager.dart'; // Add import
 
 /// Reads and edits existing .docx files.
 class DocxReader {
@@ -77,6 +78,9 @@ class _DocxReaderInternal {
     final rootRelsXml = _readXmlContent('_rels/.rels');
     final headerBgXml = _readXmlContent('word/header_bg.xml');
     final headerBgRelsXml = _readXmlContent('word/_rels/header_bg.xml.rels');
+    final fontTableRelsXml = _readXmlContent('word/_rels/fontTable.xml.rels');
+
+    final fonts = _readFonts(fontTableXml, fontTableRelsXml);
 
     return DocxBuiltDocument(
       elements: elements,
@@ -89,7 +93,64 @@ class _DocxReaderInternal {
       rootRelsXml: rootRelsXml,
       headerBgXml: headerBgXml,
       headerBgRelsXml: headerBgRelsXml,
+      fonts: fonts,
     );
+  }
+
+  List<EmbeddedFont> _readFonts(
+      String? fontTableXml, String? fontTableRelsXml) {
+    if (fontTableXml == null || fontTableRelsXml == null) return [];
+
+    final fonts = <EmbeddedFont>[];
+    final ftXml = XmlDocument.parse(fontTableXml);
+    final ftrXml = XmlDocument.parse(fontTableRelsXml);
+
+    // Parse relationships
+    final rels = <String, String>{}; // Id -> Target
+    for (var rel in ftrXml.findAllElements('Relationship')) {
+      final id = rel.getAttribute('Id');
+      final target = rel.getAttribute('Target');
+      if (id != null && target != null) rels[id] = target;
+    }
+
+    // Parse fonts
+    for (var fontElem in ftXml.findAllElements('w:font')) {
+      final name = fontElem.getAttribute('w:name');
+      if (name == null) continue;
+
+      // Check for embedded regular
+      final embed = fontElem.findAllElements('w:embedRegular').firstOrNull;
+      if (embed != null) {
+        final id = embed.getAttribute('r:id');
+        final key = embed.getAttribute('w:fontKey'); // {GUID}
+
+        if (id != null && key != null && rels.containsKey(id)) {
+          String target = rels[id]!;
+
+          // Locate file in archive
+          // Target usually relative to word/ e.g. "fonts/foo.odttf"
+          // We need search: "word/" + target
+          ArchiveFile? file;
+          if (target.startsWith('/')) {
+            target = target
+                .substring(1); // absolute in zip? usually not used in rels.
+            file = archive.findFile(target);
+          } else {
+            file = archive.findFile('word/$target');
+          }
+
+          if (file != null) {
+            String cleanKey = key.replaceAll(RegExp(r'[{}]'), '');
+            fonts.add(EmbeddedFont.fromObfuscated(
+              familyName: name,
+              obfuscatedBytes: Uint8List.fromList(file.content as List<int>),
+              obfuscationKey: cleanKey,
+            ));
+          }
+        }
+      }
+    }
+    return fonts;
   }
 
   String? _readXmlContent(String path) {
@@ -544,10 +605,54 @@ class _DocxReaderInternal {
 
   bool _isOrderedList(int numId) {
     // Parse numbering.xml to determine list type
-    // For now, use simple heuristic: even numId = unordered, odd = ordered
-    // This matches the common pattern in the exporter
-    // TODO: Actually parse numbering.xml for more accurate detection
-    return numId.isOdd;
+    final numberingXml = _readXmlContent('word/numbering.xml');
+    if (numberingXml == null) {
+      // Fallback: assume bullet lists are common
+      return false;
+    }
+
+    try {
+      final doc = XmlDocument.parse(numberingXml);
+
+      // Find the w:num element with matching numId
+      for (var numElem in doc.findAllElements('w:num')) {
+        final numIdAttr = numElem.getAttribute('w:numId');
+        if (numIdAttr != null && int.tryParse(numIdAttr) == numId) {
+          // Get the abstractNumId reference
+          final abstractNumIdElem = numElem.getElement('w:abstractNumId');
+          if (abstractNumIdElem != null) {
+            final abstractNumIdVal = abstractNumIdElem.getAttribute('w:val');
+            if (abstractNumIdVal != null) {
+              final abstractNumId = int.tryParse(abstractNumIdVal);
+              if (abstractNumId != null) {
+                // Find the abstractNum with this ID and check the numFmt
+                for (var abstractNum in doc.findAllElements('w:abstractNum')) {
+                  final absIdAttr = abstractNum.getAttribute('w:abstractNumId');
+                  if (absIdAttr != null &&
+                      int.tryParse(absIdAttr) == abstractNumId) {
+                    // Check the first level's numFmt
+                    final lvl0 = abstractNum.findElements('w:lvl').firstOrNull;
+                    if (lvl0 != null) {
+                      final numFmtElem = lvl0.getElement('w:numFmt');
+                      if (numFmtElem != null) {
+                        final numFmt = numFmtElem.getAttribute('w:val');
+                        // 'bullet' means unordered, anything else is ordered
+                        return numFmt != 'bullet';
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // If parsing fails, fall back to heuristic
+    }
+
+    // Fallback: assume unordered (bullet)
+    return false;
   }
 
   DocxSectionDef _parseSectionProperties(XmlElement body,

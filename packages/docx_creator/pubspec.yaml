@@ -21,6 +21,7 @@ dependencies:
   markdown: ^7.3.0
   html: ^0.15.6
   http: ^1.6.0
+  uuid: ^4.5.2
 
 dev_dependencies:
   lints: ^6.0.0

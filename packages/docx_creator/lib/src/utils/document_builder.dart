@@ -16,17 +16,17 @@ class DocumentBuilder {
   }) {
     switch (tag.toLowerCase()) {
       case 'h1':
-        return DocxParagraph.heading1(textContent ?? '');
+        return _buildHeading('Heading1', children, textContent);
       case 'h2':
-        return DocxParagraph.heading2(textContent ?? '');
+        return _buildHeading('Heading2', children, textContent);
       case 'h3':
-        return DocxParagraph.heading3(textContent ?? '');
+        return _buildHeading('Heading3', children, textContent);
       case 'h4':
-        return DocxParagraph.heading4(textContent ?? '');
+        return _buildHeading('Heading4', children, textContent);
       case 'h5':
-        return DocxParagraph.heading5(textContent ?? '');
+        return _buildHeading('Heading5', children, textContent);
       case 'h6':
-        return DocxParagraph.heading6(textContent ?? '');
+        return _buildHeading('Heading6', children, textContent);
 
       case 'p':
       case 'div':
@@ -35,7 +35,13 @@ class DocumentBuilder {
         );
 
       case 'blockquote':
-        return DocxParagraph.quote(textContent ?? '');
+        return DocxParagraph(
+          styleId: 'Quote',
+          indentLeft: 720,
+          children: children.isNotEmpty
+              ? children.whereType<DocxInline>().toList()
+              : [DocxText.italic(textContent ?? '')],
+        );
 
       case 'pre':
         return DocxParagraph.code(textContent ?? '');
@@ -44,6 +50,20 @@ class DocumentBuilder {
         return DocxParagraph(borderBottom: DocxBorder.single, children: []);
     }
     return null;
+  }
+
+  static DocxParagraph _buildHeading(
+      String styleId, List<DocxNode> children, String? textContent) {
+    if (children.isNotEmpty) {
+      return DocxParagraph(
+        styleId: styleId,
+        children: children.whereType<DocxInline>().toList(),
+      );
+    }
+    return DocxParagraph(
+      styleId: styleId,
+      children: [DocxText(textContent ?? '')],
+    );
   }
 
   /// Builds a checkbox (Common logic for input type=checkbox and [ ]/[x])
