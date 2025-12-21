@@ -48,6 +48,10 @@ class DocxStyle {
   final bool? isImprint;
   final DocxBorderSide? textBorder; // w:bdr element - border around text
 
+  // Table Cell Properties (for Table Styles)
+  final DocxVerticalAlign? verticalAlign;
+  final Map<String, DocxStyle> tableConditionals;
+
   const DocxStyle({
     required this.id,
     this.type,
@@ -85,16 +89,25 @@ class DocxStyle {
     this.isEmboss,
     this.isImprint,
     this.textBorder,
+    this.verticalAlign,
+    this.tableConditionals = const {},
   });
 
   /// Creates an empty style with no properties set.
   factory DocxStyle.empty() => const DocxStyle(id: 'empty');
 
   /// Parse a style element from styles.xml.
-  factory DocxStyle.fromXml(String id,
-      {String? type, String? basedOn, XmlElement? pPr, XmlElement? rPr}) {
+  factory DocxStyle.fromXml(
+    String id, {
+    String? type,
+    String? basedOn,
+    XmlElement? pPr,
+    XmlElement? rPr,
+    XmlElement? tcPr,
+    Map<String, DocxStyle>? tableConditionals,
+  }) {
     final pProps = _parseParagraphProperties(pPr);
-    final rProps = _parseRunProperties(rPr);
+    final rProps = _parseRunProperties(rPr, tcPr);
 
     return DocxStyle(
       id: id,
@@ -117,7 +130,7 @@ class DocxStyle {
       borderRight: pProps.borderRight,
       borderBetween: pProps.borderBetween,
       borderBottom: pProps.borderBottom,
-      // R Props
+      // R Props (merged)
       fontWeight: rProps.fontWeight,
       fontStyle: rProps.fontStyle,
       decoration: rProps.decoration,
@@ -135,6 +148,9 @@ class DocxStyle {
       isEmboss: rProps.isEmboss,
       isImprint: rProps.isImprint,
       textBorder: rProps.textBorder,
+      // Table Props
+      verticalAlign: rProps.verticalAlign,
+      tableConditionals: tableConditionals ?? const {},
     );
   }
 
@@ -179,6 +195,10 @@ class DocxStyle {
       isEmboss: other.isEmboss ?? isEmboss,
       isImprint: other.isImprint ?? isImprint,
       textBorder: other.textBorder ?? textBorder,
+      verticalAlign: other.verticalAlign ?? verticalAlign,
+      tableConditionals: other.tableConditionals.isNotEmpty
+          ? other.tableConditionals
+          : tableConditionals,
     );
   }
 
@@ -298,8 +318,10 @@ class DocxStyle {
   // RUN PROPERTIES PARSER
   // ============================================================
 
-  static DocxStyle _parseRunProperties(XmlElement? rPr) {
-    if (rPr == null) return const DocxStyle(id: 'temp');
+  static DocxStyle _parseRunProperties(XmlElement? rPr, XmlElement? tcPr) {
+    // if (rPr == null) return const DocxStyle(id: 'temp'); // This line was removed by the instruction.
+    // The instruction implies that rPr can be null, but tcPr might be present.
+    // So, we should not return early if rPr is null.
 
     DocxFontWeight? fontWeight;
     DocxFontStyle? fontStyle;
@@ -318,73 +340,104 @@ class DocxStyle {
     bool? isShadow;
     bool? isEmboss;
     bool? isImprint;
+    DocxVerticalAlign? verticalAlign; // Added for tcPr parsing
 
-    if (rPr.getElement('w:b') != null) fontWeight = DocxFontWeight.bold;
-    if (rPr.getElement('w:i') != null) fontStyle = DocxFontStyle.italic;
-    if (rPr.getElement('w:u') != null) {
-      decoration = DocxTextDecoration.underline;
-    }
-    if (rPr.getElement('w:strike') != null) {
-      decoration = DocxTextDecoration.strikethrough;
-    }
-
-    final colorElem = rPr.getElement('w:color');
-    if (colorElem != null) {
-      final val = colorElem.getAttribute('w:val');
-      if (val != null && val != 'auto') color = DocxColor('#$val');
-    }
-
-    final shdElem = rPr.getElement('w:shd');
-    if (shdElem != null) {
-      shadingFill = shdElem.getAttribute('w:fill');
-      if (shadingFill == 'auto') shadingFill = null;
-    }
-
-    final szElem = rPr.getElement('w:sz');
-    if (szElem != null) {
-      final val = szElem.getAttribute('w:val');
-      if (val != null) {
-        final halfPoints = int.tryParse(val);
-        if (halfPoints != null) fontSize = halfPoints / 2.0;
+    if (rPr != null) {
+      if (rPr.getElement('w:b') != null) fontWeight = DocxFontWeight.bold;
+      if (rPr.getElement('w:i') != null) fontStyle = DocxFontStyle.italic;
+      if (rPr.getElement('w:u') != null) {
+        decoration = DocxTextDecoration.underline;
       }
-    }
+      if (rPr.getElement('w:strike') != null) {
+        decoration = DocxTextDecoration.strikethrough;
+      }
 
-    final rFonts = rPr.getElement('w:rFonts');
-    if (rFonts != null) fontFamily = rFonts.getAttribute('w:ascii');
+      final colorElem = rPr.getElement('w:color');
+      if (colorElem != null) {
+        final val = colorElem.getAttribute('w:val');
+        if (val != null && val != 'auto') color = DocxColor('#$val');
+      }
 
-    final highlightElem = rPr.getElement('w:highlight');
-    if (highlightElem != null) {
-      final val = highlightElem.getAttribute('w:val');
-      if (val != null) {
-        for (var h in DocxHighlight.values) {
-          if (h.name == val) {
-            highlight = h;
-            break;
+      final shdElem = rPr.getElement('w:shd');
+      if (shdElem != null) {
+        shadingFill = shdElem.getAttribute('w:fill');
+        if (shadingFill == 'auto') shadingFill = null;
+      }
+
+      final szElem = rPr.getElement('w:sz');
+      if (szElem != null) {
+        final val = szElem.getAttribute('w:val');
+        if (val != null) {
+          final halfPoints = int.tryParse(val);
+          if (halfPoints != null) fontSize = halfPoints / 2.0;
+        }
+      }
+
+      final rFonts = rPr.getElement('w:rFonts');
+      if (rFonts != null) fontFamily = rFonts.getAttribute('w:ascii');
+
+      final highlightElem = rPr.getElement('w:highlight');
+      if (highlightElem != null) {
+        final val = highlightElem.getAttribute('w:val');
+        if (val != null) {
+          for (var h in DocxHighlight.values) {
+            if (h.name == val) {
+              highlight = h;
+              break;
+            }
           }
         }
       }
+
+      if (rPr.getElement('w:caps') != null) isAllCaps = true;
+      if (rPr.getElement('w:smallCaps') != null) isSmallCaps = true;
+      if (rPr.getElement('w:dstrike') != null) isDoubleStrike = true;
+      if (rPr.getElement('w:outline') != null) isOutline = true;
+      if (rPr.getElement('w:shadow') != null) isShadow = true;
+      if (rPr.getElement('w:emboss') != null) isEmboss = true;
+      if (rPr.getElement('w:imprint') != null) isImprint = true;
+
+      final vertAlignElem = rPr.getElement('w:vertAlign');
+      if (vertAlignElem != null) {
+        final val = vertAlignElem.getAttribute('w:val');
+        if (val == 'superscript') isSuperscript = true;
+        if (val == 'subscript') isSubscript = true;
+      }
     }
 
-    if (rPr.getElement('w:caps') != null) isAllCaps = true;
-    if (rPr.getElement('w:smallCaps') != null) isSmallCaps = true;
-    if (rPr.getElement('w:dstrike') != null) isDoubleStrike = true;
-    if (rPr.getElement('w:outline') != null) isOutline = true;
-    if (rPr.getElement('w:shadow') != null) isShadow = true;
-    if (rPr.getElement('w:emboss') != null) isEmboss = true;
-    if (rPr.getElement('w:imprint') != null) isImprint = true;
-
-    final vertAlignElem = rPr.getElement('w:vertAlign');
-    if (vertAlignElem != null) {
-      final val = vertAlignElem.getAttribute('w:val');
-      if (val == 'superscript') isSuperscript = true;
-      if (val == 'subscript') isSubscript = true;
-    }
-
-    // Parse text border (w:bdr) - box around text
+    // Parse text border (w:bdr)
     DocxBorderSide? textBorder;
-    final bdrElem = rPr.getElement('w:bdr');
-    if (bdrElem != null) {
-      textBorder = _parseBorderSide(bdrElem);
+    final bdr = rPr?.getElement('w:bdr');
+    if (bdr != null) {
+      textBorder = _parseBorderSide(bdr);
+    }
+
+    // Parse Cell Properties
+    if (tcPr != null) {
+      // Shading (Cell shading overrides paragraph shading if present)
+      final tcShd = tcPr.getElement('w:shd');
+      if (tcShd != null) {
+        final fill = tcShd.getAttribute('w:fill');
+        if (fill != null && fill != 'auto') {
+          // Normalize hex
+          if (fill.length == 6 && RegExp(r'^[0-9A-Fa-f]{6}$').hasMatch(fill)) {
+            shadingFill = '#$fill';
+          } else {
+            shadingFill = fill;
+          }
+        }
+      }
+
+      final vAlignElem = tcPr.getElement('w:vAlign');
+      if (vAlignElem != null) {
+        final val = vAlignElem.getAttribute('w:val');
+        if (val == 'top') verticalAlign = DocxVerticalAlign.top;
+        if (val == 'center') verticalAlign = DocxVerticalAlign.center;
+        if (val == 'bottom') verticalAlign = DocxVerticalAlign.bottom;
+      }
+
+      // TODO: Parse cell borders (w:tcBorders) here if needed for Style Resolver
+      // (Borders are currently on DocxTableStyle, but styles.xml defines them in w:tcBorders inside w:tcPr)
     }
 
     return DocxStyle(
@@ -407,6 +460,7 @@ class DocxStyle {
       isEmboss: isEmboss,
       isImprint: isImprint,
       textBorder: textBorder,
+      verticalAlign: verticalAlign,
     );
   }
 

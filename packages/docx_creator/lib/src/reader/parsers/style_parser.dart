@@ -22,12 +22,31 @@ class StyleParser {
           final pPr = styleElem.getElement('w:pPr');
           final rPr = styleElem.getElement('w:rPr');
 
+          // Parse conditional table styles
+          final tableConditionals = <String, DocxStyle>{};
+          for (var tblStylePr in styleElem.findAllElements('w:tblStylePr')) {
+            final type = tblStylePr.getAttribute('w:type');
+            if (type != null) {
+              final condPPr = tblStylePr.getElement('w:pPr');
+              final condRPr = tblStylePr.getElement('w:rPr');
+              final condTcPr = tblStylePr.getElement('w:tcPr');
+
+              tableConditionals[type] = DocxStyle.fromXml(
+                'conditional',
+                pPr: condPPr,
+                rPr: condRPr,
+                tcPr: condTcPr,
+              );
+            }
+          }
+
           context.styles[styleId] = DocxStyle.fromXml(
             styleId,
             type: type,
             basedOn: basedOn,
             pPr: pPr,
             rPr: rPr,
+            tableConditionals: tableConditionals,
           );
         }
       }

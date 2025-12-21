@@ -36,6 +36,9 @@ class DocxTableStyle {
   final DocxBorderSide? borderInsideH;
   final DocxBorderSide? borderInsideV;
 
+  /// Global table background color (shading).
+  final String? fill;
+
   const DocxTableStyle({
     this.border = DocxBorder.single,
     this.borderColor = 'auto',
@@ -50,13 +53,49 @@ class DocxTableStyle {
     this.borderRight,
     this.borderInsideH,
     this.borderInsideV,
+    this.fill,
   });
 
   /// Simple grid style with borders.
-  static const grid = DocxTableStyle();
+  static const grid = DocxTableStyle(
+    border: DocxBorder.single,
+    borderColor: 'auto',
+  );
 
-  /// No borders, clean look.
-  static const plain = DocxTableStyle(border: DocxBorder.none);
+  /// Plain style with no borders.
+  static const plain = DocxTableStyle(
+    border: DocxBorder.none,
+  );
+
+  DocxTableStyle copyWith({
+    DocxBorder? border,
+    String? borderColor,
+    String? headerFill,
+    String? evenRowFill,
+    String? oddRowFill,
+    DocxBorderSide? borderTop,
+    DocxBorderSide? borderBottom,
+    DocxBorderSide? borderLeft,
+    DocxBorderSide? borderRight,
+    DocxBorderSide? borderInsideH,
+    DocxBorderSide? borderInsideV,
+    String? fill,
+  }) {
+    return DocxTableStyle(
+      border: border ?? this.border,
+      borderColor: borderColor ?? this.borderColor,
+      headerFill: headerFill ?? this.headerFill,
+      evenRowFill: evenRowFill ?? this.evenRowFill,
+      oddRowFill: oddRowFill ?? this.oddRowFill,
+      borderTop: borderTop ?? this.borderTop,
+      borderBottom: borderBottom ?? this.borderBottom,
+      borderLeft: borderLeft ?? this.borderLeft,
+      borderRight: borderRight ?? this.borderRight,
+      borderInsideH: borderInsideH ?? this.borderInsideH,
+      borderInsideV: borderInsideV ?? this.borderInsideV,
+      fill: fill ?? this.fill,
+    );
+  }
 
   /// Header highlighted with gray background.
   static const headerHighlight = DocxTableStyle(headerFill: 'E0E0E0');
@@ -139,6 +178,25 @@ class DocxTablePosition {
   );
 }
 
+/// Table look flags (conditional formatting).
+class DocxTableLook {
+  final bool firstRow;
+  final bool lastRow;
+  final bool firstColumn;
+  final bool lastColumn;
+  final bool noHBand;
+  final bool noVBand;
+
+  const DocxTableLook({
+    this.firstRow = true,
+    this.lastRow = false,
+    this.firstColumn = true,
+    this.lastColumn = false,
+    this.noHBand = false,
+    this.noVBand = true,
+  });
+}
+
 /// A table element in the document.
 class DocxTable extends DocxBlock {
   /// Table rows.
@@ -146,6 +204,9 @@ class DocxTable extends DocxBlock {
 
   /// Table styling.
   final DocxTableStyle style;
+
+  /// Table look (conditional formatting).
+  final DocxTableLook look;
 
   /// Table width value.
   final int? width;
@@ -174,6 +235,7 @@ class DocxTable extends DocxBlock {
     this.alignment,
     this.position,
     this.styleId,
+    this.look = const DocxTableLook(),
     super.id,
   });
 
@@ -220,6 +282,7 @@ class DocxTable extends DocxBlock {
     DocxAlign? alignment,
     DocxTablePosition? position,
     String? styleId,
+    DocxTableLook? look,
   }) {
     return DocxTable(
       rows: rows ?? this.rows,
@@ -254,6 +317,25 @@ class DocxTable extends DocxBlock {
                 builder.attribute('w:val', styleId ?? 'TableGrid');
               },
             );
+
+            // Table Look
+            builder.element('w:tblLook', nest: () {
+              builder.attribute('w:val', '04A0'); // Default hex (conditional)
+              builder.attribute('w:firstRow', look.firstRow ? '1' : '0');
+              builder.attribute('w:lastRow', look.lastRow ? '1' : '0');
+              builder.attribute('w:firstColumn', look.firstColumn ? '1' : '0');
+              builder.attribute('w:lastColumn', look.lastColumn ? '1' : '0');
+              builder.attribute('w:noHBand', look.noHBand ? '1' : '0');
+              builder.attribute('w:noVBand', look.noVBand ? '1' : '0');
+            });
+
+            // Table shading (global)
+            if (style.fill != null) {
+              builder.element('w:shd', nest: () {
+                builder.attribute('w:fill', style.fill!.replaceAll('#', ''));
+                builder.attribute('w:val', 'clear');
+              });
+            }
             builder.element(
               'w:tblW',
               nest: () {
@@ -551,19 +633,26 @@ class DocxTableCell extends DocxNode {
     DocxVerticalAlign? verticalAlign,
     String? shadingFill,
     int? width,
+    DocxBorderSide? borderTop,
+    DocxBorderSide? borderBottom,
+    DocxBorderSide? borderLeft,
+    DocxBorderSide? borderRight,
+    int? marginLeft,
+    int? marginRight,
   }) {
     return DocxTableCell(
       children: children ?? this.children,
       colSpan: colSpan ?? this.colSpan,
       rowSpan: rowSpan ?? this.rowSpan,
       verticalAlign: verticalAlign ?? this.verticalAlign,
+      shadingFill: shadingFill ?? this.shadingFill,
       width: width ?? this.width,
-      borderTop: borderTop ?? borderTop,
-      borderBottom: borderBottom ?? borderBottom,
-      borderLeft: borderLeft ?? borderLeft,
-      borderRight: borderRight ?? borderRight,
-      marginLeft: marginLeft ?? marginLeft,
-      marginRight: marginRight ?? marginRight,
+      borderTop: borderTop ?? this.borderTop,
+      borderBottom: borderBottom ?? this.borderBottom,
+      borderLeft: borderLeft ?? this.borderLeft,
+      borderRight: borderRight ?? this.borderRight,
+      marginLeft: marginLeft ?? this.marginLeft,
+      marginRight: marginRight ?? this.marginRight,
       id: id,
     );
   }
@@ -628,7 +717,7 @@ class DocxTableCell extends DocxNode {
                 nest: () {
                   builder.attribute('w:val', 'clear');
                   builder.attribute('w:color', 'auto');
-                  builder.attribute('w:fill', shadingFill!);
+                  builder.attribute('w:fill', shadingFill!.replaceAll('#', ''));
                 },
               );
             }

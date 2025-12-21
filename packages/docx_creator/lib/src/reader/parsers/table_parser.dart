@@ -1,6 +1,7 @@
+import 'package:docx_creator/docx_creator.dart';
 import 'package:xml/xml.dart';
 
-import '../../../docx_creator.dart';
+import '../models/docx_style.dart';
 import '../reader_context.dart';
 import 'inline_parser.dart';
 
@@ -34,6 +35,15 @@ class TableParser {
           borderInsideH: _parseBorderSide(tblBorders.getElement('w:insideH')),
           borderInsideV: _parseBorderSide(tblBorders.getElement('w:insideV')),
         );
+      }
+
+      // Parse table shading (background)
+      final shd = tblPr.getElement('w:shd');
+      if (shd != null) {
+        final fill = shd.getAttribute('w:fill');
+        if (fill != null && fill != 'auto') {
+          style = style.copyWith(fill: fill);
+        }
       }
 
       final tblW = tblPr.getElement('w:tblW');
@@ -94,6 +104,23 @@ class TableParser {
       }
     }
 
+    // Parse table look (conditional formatting)
+    DocxTableLook look = const DocxTableLook();
+    if (tblPr != null) {
+      final tblLook = tblPr.getElement('w:tblLook');
+      if (tblLook != null) {
+        look = DocxTableLook(
+          firstRow: tblLook.getAttribute('w:firstRow') != '0', // Default 1
+          lastRow: tblLook.getAttribute('w:lastRow') == '1', // Default 0
+          firstColumn:
+              tblLook.getAttribute('w:firstColumn') == '1', // Default 0
+          lastColumn: tblLook.getAttribute('w:lastColumn') == '1', // Default 0
+          noHBand: tblLook.getAttribute('w:noHBand') == '1', // Default 0
+          noVBand: tblLook.getAttribute('w:noVBand') == '1', // Default 0
+        );
+      }
+    }
+
     // 2. Parse Rows and Cells
     final rawRows = <_TempRow>[];
 
@@ -124,23 +151,38 @@ class TableParser {
     final grid = _resolveRowSpans(rawRows.map((r) => r.cells).toList());
     final finalRows = <DocxTableRow>[];
 
+    // Resolve Table Style from context
+    final resolvedTableStyle = context.resolveStyle(styleId);
+    final rowCount = grid.length;
+    final int colCount =
+        grid.isNotEmpty ? grid.first.fold(0, (sum, c) => sum + c.gridSpan) : 0;
+
     for (int i = 0; i < grid.length; i++) {
       final r = grid[i];
       final isHeaderRow = i < rawRows.length ? rawRows[i].isHeader : false;
-      final cells = r
-          .map((c) => DocxTableCell(
-                children: c.children,
-                colSpan: c.gridSpan,
-                rowSpan: c.finalRowSpan,
-                shadingFill: c.shadingFill,
-                width: c.width,
-                borderTop: c.borderTop,
-                borderBottom: c.borderBottom,
-                borderLeft: c.borderLeft,
-                borderRight: c.borderRight,
-                verticalAlign: c.verticalAlign ?? DocxVerticalAlign.top,
-              ))
-          .toList();
+      final cells = <DocxTableCell>[];
+      int colIndex = 0;
+
+      for (var c in r) {
+        final effectiveStyle = _resolveCellStyle(
+            resolvedTableStyle, i, colIndex, rowCount, colCount, look);
+
+        cells.add(DocxTableCell(
+          children: c.children,
+          colSpan: c.gridSpan,
+          rowSpan: c.finalRowSpan,
+          shadingFill: c.shadingFill ?? effectiveStyle.shadingFill,
+          width: c.width,
+          borderTop: c.borderTop ?? effectiveStyle.borderTop,
+          borderBottom: c.borderBottom ?? effectiveStyle.borderBottomSide,
+          borderLeft: c.borderLeft ?? effectiveStyle.borderLeft,
+          borderRight: c.borderRight ?? effectiveStyle.borderRight,
+          verticalAlign: c.verticalAlign ??
+              effectiveStyle.verticalAlign ??
+              DocxVerticalAlign.top,
+        ));
+        colIndex += c.gridSpan;
+      }
       finalRows.add(DocxTableRow(cells: cells, isHeader: isHeaderRow));
     }
 
@@ -156,6 +198,7 @@ class TableParser {
       alignment: alignment,
       position: position,
       styleId: styleId,
+      look: look,
     );
   }
 
@@ -360,6 +403,75 @@ class TableParser {
     }
 
     return result;
+  }
+
+  DocxStyle _resolveCellStyle(DocxStyle base, int row, int col, int rowCount,
+      int colCount, DocxTableLook look) {
+    var style = base;
+
+    // Banding (Horizontal) - default Odd/Even assumption
+    if (!look.noHBand) {
+      if (row % 2 == 0) {
+        // Odd Row (Index 0, 2, 4...) -> Band 1
+        style = style
+            .merge(base.tableConditionals['band1Horz'] ?? DocxStyle.empty());
+      } else {
+        // Even Row -> Band 2
+        style = style
+            .merge(base.tableConditionals['band2Horz'] ?? DocxStyle.empty());
+      }
+    }
+    // Banding (Vertical)
+    if (!look.noVBand) {
+      if (col % 2 == 0) {
+        style = style
+            .merge(base.tableConditionals['band1Vert'] ?? DocxStyle.empty());
+      } else {
+        style = style
+            .merge(base.tableConditionals['band2Vert'] ?? DocxStyle.empty());
+      }
+    }
+
+    // First/Last Row/Col
+    if (look.firstRow && row == 0) {
+      style =
+          style.merge(base.tableConditionals['firstRow'] ?? DocxStyle.empty());
+    }
+    if (look.lastRow && row == rowCount - 1) {
+      style =
+          style.merge(base.tableConditionals['lastRow'] ?? DocxStyle.empty());
+    }
+    if (look.firstColumn && col == 0) {
+      style =
+          style.merge(base.tableConditionals['firstCol'] ?? DocxStyle.empty());
+    }
+    if (look.lastColumn && col == colCount - 1) {
+      style =
+          style.merge(base.tableConditionals['lastCol'] ?? DocxStyle.empty());
+    }
+
+    // Corners
+    if (look.firstRow && look.firstColumn && row == 0 && col == 0) {
+      style =
+          style.merge(base.tableConditionals['nwCell'] ?? DocxStyle.empty());
+    }
+    if (look.firstRow && look.lastColumn && row == 0 && col == colCount - 1) {
+      style =
+          style.merge(base.tableConditionals['neCell'] ?? DocxStyle.empty());
+    }
+    if (look.lastRow && look.firstColumn && row == rowCount - 1 && col == 0) {
+      style =
+          style.merge(base.tableConditionals['swCell'] ?? DocxStyle.empty());
+    }
+    if (look.lastRow &&
+        look.lastColumn &&
+        row == rowCount - 1 &&
+        col == colCount - 1) {
+      style =
+          style.merge(base.tableConditionals['seCell'] ?? DocxStyle.empty());
+    }
+
+    return style;
   }
 }
 
