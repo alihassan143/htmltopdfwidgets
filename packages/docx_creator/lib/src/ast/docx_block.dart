@@ -66,7 +66,15 @@ class DocxParagraph extends DocxBlock {
   final int? indentFirstLine;
 
   /// Bottom border style.
+  @Deprecated('Use borderBottomSide instead')
   final DocxBorder? borderBottom;
+
+  /// Detailed border overrides.
+  final DocxBorderSide? borderTop;
+  final DocxBorderSide? borderBottomSide;
+  final DocxBorderSide? borderLeft;
+  final DocxBorderSide? borderRight;
+  final DocxBorderSide? borderBetween;
 
   /// Background shading color hex.
   final String? shadingFill;
@@ -95,6 +103,11 @@ class DocxParagraph extends DocxBlock {
     this.indentRight,
     this.indentFirstLine,
     this.borderBottom,
+    this.borderTop,
+    this.borderBottomSide,
+    this.borderLeft,
+    this.borderRight,
+    this.borderBetween,
     this.shadingFill,
     this.outlineLevel,
     this.pageBreakBefore = false,
@@ -117,10 +130,12 @@ class DocxParagraph extends DocxBlock {
     DocxAlign align = DocxAlign.left,
     double? fontSize,
     String? fontFamily,
+    DocxBorder? borderBottom,
   }) {
     return DocxParagraph(
       align: align,
       children: [DocxText(text, fontSize: fontSize, fontFamily: fontFamily)],
+      borderBottom: borderBottom,
     );
   }
 
@@ -233,6 +248,11 @@ class DocxParagraph extends DocxBlock {
     int? indentRight,
     int? indentFirstLine,
     DocxBorder? borderBottom,
+    DocxBorderSide? borderTop,
+    DocxBorderSide? borderBottomSide,
+    DocxBorderSide? borderLeft,
+    DocxBorderSide? borderRight,
+    DocxBorderSide? borderBetween,
     String? shadingFill,
     int? outlineLevel,
     bool? pageBreakBefore,
@@ -250,6 +270,11 @@ class DocxParagraph extends DocxBlock {
       indentRight: indentRight ?? this.indentRight,
       indentFirstLine: indentFirstLine ?? this.indentFirstLine,
       borderBottom: borderBottom ?? this.borderBottom,
+      borderTop: borderTop ?? borderTop,
+      borderBottomSide: borderBottomSide ?? borderBottomSide,
+      borderLeft: borderLeft ?? borderLeft,
+      borderRight: borderRight ?? borderRight,
+      borderBetween: borderBetween ?? borderBetween,
       shadingFill: shadingFill ?? this.shadingFill,
       outlineLevel: outlineLevel ?? this.outlineLevel,
       pageBreakBefore: pageBreakBefore ?? this.pageBreakBefore,
@@ -337,19 +362,39 @@ class DocxParagraph extends DocxBlock {
                   },
                 );
               }
-              if (borderBottom != null && borderBottom != DocxBorder.none) {
+              // Borders
+              if (borderBottom != null ||
+                  borderTop != null ||
+                  borderBottomSide != null ||
+                  borderLeft != null ||
+                  borderRight != null ||
+                  borderBetween != null) {
                 builder.element(
                   'w:pBdr',
                   nest: () {
-                    builder.element(
-                      'w:bottom',
-                      nest: () {
-                        builder.attribute('w:val', borderBottom!.xmlValue);
-                        builder.attribute('w:sz', '4');
-                        builder.attribute('w:space', '1');
-                        builder.attribute('w:color', 'auto');
-                      },
-                    );
+                    if (borderTop != null)
+                      _buildBorder(builder, 'w:top', borderTop!);
+                    if (borderLeft != null)
+                      _buildBorder(builder, 'w:left', borderLeft!);
+                    if (borderRight != null)
+                      _buildBorder(builder, 'w:right', borderRight!);
+                    if (borderBetween != null)
+                      _buildBorder(builder, 'w:between', borderBetween!);
+
+                    if (borderBottomSide != null) {
+                      _buildBorder(builder, 'w:bottom', borderBottomSide!);
+                    } else if (borderBottom != null &&
+                        borderBottom != DocxBorder.none) {
+                      builder.element(
+                        'w:bottom',
+                        nest: () {
+                          builder.attribute('w:val', borderBottom!.xmlValue);
+                          builder.attribute('w:sz', '4');
+                          builder.attribute('w:space', '1');
+                          builder.attribute('w:color', 'auto');
+                        },
+                      );
+                    }
                   },
                 );
               }
@@ -415,8 +460,22 @@ class DocxParagraph extends DocxBlock {
       indentRight != null ||
       indentFirstLine != null ||
       borderBottom != null ||
+      borderTop != null ||
+      borderBottomSide != null ||
+      borderLeft != null ||
+      borderRight != null ||
+      borderBetween != null ||
       shadingFill != null ||
       outlineLevel != null ||
       pageBreakBefore ||
       numId != null;
+
+  void _buildBorder(XmlBuilder builder, String tag, DocxBorderSide side) {
+    builder.element(tag, nest: () {
+      builder.attribute('w:val', side.style.xmlValue);
+      builder.attribute('w:sz', side.size.toString());
+      builder.attribute('w:space', side.space.toString());
+      builder.attribute('w:color', side.color.hex);
+    });
+  }
 }

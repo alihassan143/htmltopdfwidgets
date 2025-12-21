@@ -1,0 +1,30 @@
+name: docx_viewer
+description: A Flutter package for rendering DOCX files with native widgets. View, zoom, search, and interact with Word documents.
+version: 1.0.0
+repository: https://github.com/alihassan143/htmltopdfwidgets
+homepage: https://github.com/alihassan143/htmltopdfwidgets/tree/main/packages/docx_viewer
+topics:
+  - docx
+  - word
+  - viewer
+  - document
+  - office
+
+environment:
+  sdk: ^3.0.0
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  docx_creator: ^1.0.2
+  url_launcher: ^6.3.2
+dependency_overrides:
+  meta: 1.17.0
+  docx_creator:
+    path: ../docx_creator
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  url_launcher: ^6.3.1

@@ -46,6 +46,7 @@ class DocxColor {
   factory DocxColor.fromHex(String value) => DocxColor(value);
 
   // Predefined colors
+  static const auto = DocxColor._('auto');
   static const black = DocxColor._('000000');
   static const white = DocxColor._('FFFFFF');
   static const red = DocxColor._('FF0000');
@@ -104,6 +105,29 @@ extension DocxBorderExtension on DocxBorder {
         return 'triple';
     }
   }
+}
+
+/// Defines a single border side properties.
+class DocxBorderSide {
+  final DocxBorder style;
+  final DocxColor color;
+
+  /// Border width in eighths of a point (4 = 0.5pt, 8 = 1pt).
+  final int size;
+  final int space;
+
+  const DocxBorderSide({
+    this.style = DocxBorder.single,
+    this.color = DocxColor.black,
+    this.size = 4,
+    this.space = 0,
+  });
+
+  const DocxBorderSide.none()
+      : style = DocxBorder.none,
+        color = DocxColor.auto,
+        size = 0,
+        space = 0;
 }
 
 // ============================================================

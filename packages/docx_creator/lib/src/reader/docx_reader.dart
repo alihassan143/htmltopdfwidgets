@@ -206,6 +206,14 @@ class _DocxReaderInternal {
     int? indentRight;
     int? indentFirstLine;
 
+    // Border variables
+    DocxBorderSide? borderTop;
+    DocxBorderSide? borderBottomSide;
+    DocxBorderSide? borderLeft;
+    DocxBorderSide? borderRight;
+    DocxBorderSide? borderBetween;
+    DocxBorder? borderBottom; // Legacy fallback
+
     // Parse paragraph properties
     final pPr = xml.getElement('w:pPr');
     if (pPr != null) {
@@ -273,6 +281,19 @@ class _DocxReaderInternal {
           ilvl = int.tryParse(ilvlElem.getAttribute('w:val') ?? '');
         }
       }
+
+      // Borders
+      final pBdr = pPr.getElement('w:pBdr');
+      if (pBdr != null) {
+        borderTop = _parseBorderSide(pBdr.getElement('w:top'));
+        borderBottomSide = _parseBorderSide(pBdr.getElement('w:bottom'));
+        borderLeft = _parseBorderSide(pBdr.getElement('w:left'));
+        borderRight = _parseBorderSide(pBdr.getElement('w:right'));
+        borderBetween = _parseBorderSide(pBdr.getElement('w:between'));
+
+        // Legacy fallback support for borderBottom if needed?
+        // DocxParagraph prefers borderBottomSide properties.
+      }
     }
 
     // Parse runs and other inline content
@@ -319,6 +340,12 @@ class _DocxReaderInternal {
       indentLeft: indentLeft,
       indentRight: indentRight,
       indentFirstLine: indentFirstLine,
+      borderTop: borderTop,
+      borderBottomSide: borderBottomSide,
+      borderLeft: borderLeft,
+      borderRight: borderRight,
+      borderBetween: borderBetween,
+      borderBottom: borderBottom,
     );
   }
 
@@ -327,13 +354,13 @@ class _DocxReaderInternal {
     final drawing = run.findAllElements('w:drawing').firstOrNull ??
         run.findAllElements('w:pict').firstOrNull;
     if (drawing != null) {
-      // Check for shape (wsp:wsp) first
+      // 1. Try VML Shape
       final wsp = drawing.findAllElements('wsp:wsp').firstOrNull;
       if (wsp != null) {
         return _readShape(drawing, wsp);
       }
 
-      // Check for image (a:blip)
+      // 2. Try Image (a:blip)
       final blip = drawing.findAllElements('a:blip').firstOrNull ??
           drawing.findAllElements('v:imagedata').firstOrNull;
       if (blip != null) {
@@ -342,6 +369,16 @@ class _DocxReaderInternal {
         if (embedId != null && _documentRelationships.containsKey(embedId)) {
           return _readImage(embedId, drawing);
         }
+      }
+
+      // 3. DrawingML Shape (fallback)
+      final prstGeom = drawing.findAllElements('a:prstGeom').firstOrNull;
+      if (prstGeom != null) {
+        return DocxShape(
+            width: 100,
+            height: 100,
+            preset: DocxShapePreset.rect,
+            text: 'Shape');
       }
     }
 
@@ -377,19 +414,15 @@ class _DocxReaderInternal {
     if (rPr != null) {
       if (rPr.getElement('w:b') != null) fontWeight = DocxFontWeight.bold;
       if (rPr.getElement('w:i') != null) fontStyle = DocxFontStyle.italic;
-      if (rPr.getElement('w:u') != null) {
+      if (rPr.getElement('w:u') != null)
         decoration = DocxTextDecoration.underline;
-      }
-      if (rPr.getElement('w:strike') != null) {
+      if (rPr.getElement('w:strike') != null)
         decoration = DocxTextDecoration.strikethrough;
-      }
 
       final colorElem = rPr.getElement('w:color');
       if (colorElem != null) {
         final val = colorElem.getAttribute('w:val');
-        if (val != null && val != 'auto') {
-          color = DocxColor('#$val');
-        }
+        if (val != null && val != 'auto') color = DocxColor('#$val');
       }
 
       final shdElem = rPr.getElement('w:shd');
@@ -403,23 +436,17 @@ class _DocxReaderInternal {
         final val = szElem.getAttribute('w:val');
         if (val != null) {
           final halfPoints = int.tryParse(val);
-          if (halfPoints != null) {
-            fontSize = halfPoints / 2.0;
-          }
+          if (halfPoints != null) fontSize = halfPoints / 2.0;
         }
       }
 
       final rFonts = rPr.getElement('w:rFonts');
-      if (rFonts != null) {
-        fontFamily = rFonts.getAttribute('w:ascii');
-      }
+      if (rFonts != null) fontFamily = rFonts.getAttribute('w:ascii');
 
-      // Highlight
       final highlightElem = rPr.getElement('w:highlight');
       if (highlightElem != null) {
         final val = highlightElem.getAttribute('w:val');
         if (val != null) {
-          // Map string to enum
           for (var h in DocxHighlight.values) {
             if (h.name == val) {
               highlight = h;
@@ -429,7 +456,6 @@ class _DocxReaderInternal {
         }
       }
 
-      // Text Effects
       if (rPr.getElement('w:caps') != null) isAllCaps = true;
       if (rPr.getElement('w:smallCaps') != null) isSmallCaps = true;
       if (rPr.getElement('w:dstrike') != null) isDoubleStrike = true;
@@ -438,7 +464,6 @@ class _DocxReaderInternal {
       if (rPr.getElement('w:emboss') != null) isEmboss = true;
       if (rPr.getElement('w:imprint') != null) isImprint = true;
 
-      // Vertical Align (Super/Sub)
       final vertAlignElem = rPr.getElement('w:vertAlign');
       if (vertAlignElem != null) {
         final val = vertAlignElem.getAttribute('w:val');
@@ -471,7 +496,6 @@ class _DocxReaderInternal {
       );
     }
 
-    // Fallback for unknown run content
     return DocxRawInline(run.toXmlString());
   }
 
@@ -778,28 +802,144 @@ class _DocxReaderInternal {
     return nodes;
   }
 
-  DocxTable _parseTable(XmlElement xml) {
-    final rows = <DocxTableRow>[];
-    for (var row in xml.findElements('w:tr')) {
-      final cells = <DocxTableCell>[];
-      for (var cell in row.findElements('w:tc')) {
-        String? shadingFill;
-        final tcPr = cell.getElement('w:tcPr');
-        if (tcPr != null) {
-          final shd = tcPr.getElement('w:shd');
-          if (shd != null) {
-            shadingFill = shd.getAttribute('w:fill');
-            if (shadingFill == 'auto') shadingFill = null;
+  DocxTable _parseTable(XmlElement node) {
+    // 1. Parse Table Properties
+    DocxTableStyle style = const DocxTableStyle();
+    int? tableWidth;
+    DocxWidthType widthType = DocxWidthType.auto;
+
+    final tblPr = node.getElement('w:tblPr');
+    if (tblPr != null) {
+      // Table Borders
+      final tblBorders = tblPr.getElement('w:tblBorders');
+      if (tblBorders != null) {
+        style = DocxTableStyle(
+          borderTop: _parseBorderSide(tblBorders.getElement('w:top')),
+          borderBottom: _parseBorderSide(tblBorders.getElement('w:bottom')),
+          borderLeft: _parseBorderSide(tblBorders.getElement('w:left')),
+          borderRight: _parseBorderSide(tblBorders.getElement('w:right')),
+          borderInsideH: _parseBorderSide(tblBorders.getElement('w:insideH')),
+          borderInsideV: _parseBorderSide(tblBorders.getElement('w:insideV')),
+          // Preserve other defaults or map them?
+          // DocxTableStyle defaults: border=single etc.
+          // If we have explicit borders, we might want to set basic border to custom?
+          // But DocxTableStyle uses specific fields now.
+        );
+      }
+
+      // Table Width
+      final tblW = tblPr.getElement('w:tblW');
+      if (tblW != null) {
+        final w = int.tryParse(tblW.getAttribute('w:w') ?? '');
+        final type = tblW.getAttribute('w:type');
+        if (w != null) tableWidth = w;
+        if (type == 'dxa') widthType = DocxWidthType.dxa;
+        if (type == 'pct') widthType = DocxWidthType.pct;
+        if (type == 'auto') widthType = DocxWidthType.auto;
+      }
+    }
+
+    // 2. Parse Rows and Cells into temporary structure
+    final rawRows = <List<_TempCell>>[];
+
+    for (var child in node.children) {
+      if (child is XmlElement && child.name.local == 'tr') {
+        final row = <_TempCell>[];
+        for (var cellNode in child.children) {
+          if (cellNode is XmlElement && cellNode.name.local == 'tc') {
+            // Parse cell properties
+            final tcPr = cellNode.getElement('w:tcPr');
+            int gridSpan = 1;
+            String? vMergeVal;
+            String? shadingFill;
+            int? cellWidth;
+            DocxBorderSide? borderTop;
+            DocxBorderSide? borderBottom;
+            DocxBorderSide? borderLeft;
+            DocxBorderSide? borderRight;
+
+            if (tcPr != null) {
+              final gs = tcPr.getElement('w:gridSpan');
+              if (gs != null)
+                gridSpan = int.tryParse(gs.getAttribute('w:val') ?? '1') ?? 1;
+
+              final vm = tcPr.getElement('w:vMerge');
+              if (vm != null)
+                vMergeVal = vm.getAttribute('w:val') ?? 'continue';
+
+              final shd = tcPr.getElement('w:shd');
+              if (shd != null) {
+                shadingFill = shd.getAttribute('w:fill');
+                if (shadingFill == 'auto') shadingFill = null;
+              }
+
+              final tcW = tcPr.getElement('w:tcW');
+              if (tcW != null) {
+                cellWidth = int.tryParse(tcW.getAttribute('w:w') ?? '');
+              }
+
+              final tcBorders = tcPr.getElement('w:tcBorders');
+              if (tcBorders != null) {
+                borderTop = _parseBorderSide(tcBorders.getElement('w:top'));
+                borderBottom =
+                    _parseBorderSide(tcBorders.getElement('w:bottom'));
+                borderLeft = _parseBorderSide(tcBorders.getElement('w:left'));
+                borderRight = _parseBorderSide(tcBorders.getElement('w:right'));
+              }
+            }
+
+            final children = <DocxBlock>[];
+            for (var c in cellNode.children) {
+              if (c is XmlElement && c.name.local == 'p') {
+                children.add(_parseParagraph(c));
+              } else if (c is XmlElement && c.name.local == 'tbl') {
+                children.add(_parseTable(c));
+              }
+            }
+
+            row.add(_TempCell(
+              children: children,
+              gridSpan: gridSpan,
+              vMerge: vMergeVal,
+              shadingFill: shadingFill,
+              width: cellWidth,
+              borderTop: borderTop,
+              borderBottom: borderBottom,
+              borderLeft: borderLeft,
+              borderRight: borderRight,
+            ));
           }
         }
-
-        final cellContent = _parseBlocks(cell.children);
-        cells.add(
-            DocxTableCell(children: cellContent, shadingFill: shadingFill));
+        if (row.isNotEmpty) rawRows.add(row);
       }
-      rows.add(DocxTableRow(cells: cells));
     }
-    return DocxTable(rows: rows);
+
+    final grid = _resolveRowSpans(rawRows);
+    final finalRows = <DocxTableRow>[];
+
+    for (var r in grid) {
+      final cells = r
+          .map((c) => DocxTableCell(
+                children: c.children,
+                colSpan: c.gridSpan,
+                rowSpan: c.finalRowSpan,
+                shadingFill: c.shadingFill,
+                width: c.width,
+                borderTop: c.borderTop,
+                borderBottom: c.borderBottom,
+                borderLeft: c.borderLeft,
+                borderRight: c.borderRight,
+              ))
+          .toList();
+      finalRows.add(DocxTableRow(cells: cells));
+    }
+
+    return DocxTable(
+      rows: finalRows,
+      style: style,
+      width: tableWidth,
+      widthType: widthType,
+    );
   }
 
   DocxList _createListFromParagraphs(
@@ -1051,4 +1191,156 @@ class _DocxRelationship {
   final String target;
 
   _DocxRelationship(this.id, this.type, this.target);
+}
+
+class _TempCell {
+  final List<DocxBlock> children;
+  final int gridSpan;
+  final String? vMerge;
+  final String? shadingFill;
+
+  int finalRowSpan = 1;
+  bool isMerged =
+      false; // If true, this cell is part of a merge but NOT the start (should be skipped or hidden?)
+  // Actually, for DocxViewer/Table, we usually want the start cell to have rowSpan > 1,
+  // and subsequent cells to NOT EXIST in the row?
+  // CustomTableLayout expects them to exist?
+  // No, CustomTableLayout expects "cells" list.
+  // If use "Table", we need to emit correct number of cells (ghost cells).
+  // But DocxTableCell definition implies we return the structure.
+  // I will keep the cells but mark them?
+  // If DocxViewer's TableBuilder ignores cells that are "covered", we should provide them?
+  // My new CustomTableWidget handles occupied cells.
+  // So I should return ALL cells, but correct rowSpan.
+  // Wait, if rowSpan is 2, the cell in the next row at that col should exist?
+  // In HTML tables, spanning cells cover slots. The slots in next row are implicit?
+  // In CustomTableWidget logic: "Track which cells span...". It expects the *next* row to NOT have a cell definition for that slot?
+  // Or it effectively skips them.
+  // Whatever logic I implemented in CustomTableWidget, I should match.
+  // CustomTableWidget: "for (final cell in cells) ... if (cell.rowSpan > 1) ... spanningCells".
+  // ... "while (currentCol < columnCount) ... if (occupiedCols.contains) ... empty spacer".
+  // So CustomTableWidget handles it.
+  // So _DocxReader should produce cells with correct span.
+  // For "continued" cells (vMerge=continue), should they have rowSpan=0? Or -1?
+  // Or should they be REMOVED from the row?
+  // If I remove them, CustomTableLayout needs to know they are missing.
+  // CustomTableLayout iterates input cells.
+  // So if I have row 1: Cell(span=2)
+  // Row 2: (Empty because covered).
+  // Then Row 2 in AST should have NO cell for that column?
+  // Yes.
+  // So my _resolveRowSpans should filtering out "continued" cells?
+  // Let's implement that.
+
+  _TempCell({
+    required this.children,
+    required this.gridSpan,
+    this.vMerge,
+    this.shadingFill,
+    this.width,
+    this.borderTop,
+    this.borderBottom,
+    this.borderLeft,
+    this.borderRight,
+  });
+
+  final int? width;
+  final DocxBorderSide? borderTop;
+  final DocxBorderSide? borderBottom;
+  final DocxBorderSide? borderLeft;
+  final DocxBorderSide? borderRight;
+}
+
+List<List<_TempCell>> _resolveRowSpans(List<List<_TempCell>> rawRows) {
+  // Track active merge starts per column index
+  // ColIndex -> _TempCell (the start of the merge)
+  final activeMerges = <int, _TempCell>{};
+
+  // We need to map visual columns.
+  // Since gridSpan affects column index.
+
+  for (int r = 0; r < rawRows.length; r++) {
+    final row = rawRows[r];
+    int colIndex = 0;
+
+    for (int c = 0; c < row.length; c++) {
+      final cell = row[c];
+
+      // Calculate current range of columns
+      final startCol = colIndex;
+      // final endCol = colIndex + cell.gridSpan;
+
+      if (cell.vMerge == 'restart') {
+        // Start a new merge
+        // Close previous if any (shouldn't happen for restart unless nested, but key is colIndex)
+        // For gridSpan > 1, we track the FIRST col index.
+        activeMerges[startCol] = cell;
+        cell.finalRowSpan = 1;
+      } else if (cell.vMerge == 'continue' ||
+          (cell.vMerge != null && cell.vMerge!.isEmpty)) {
+        // Continue merge
+        final startCell = activeMerges[startCol];
+        if (startCell != null) {
+          startCell.finalRowSpan++;
+          cell.isMerged = true; // Mark to remove
+        }
+      } else {
+        // No merge.
+        activeMerges.remove(startCol);
+      }
+
+      colIndex += cell.gridSpan;
+    }
+  }
+
+  // Filter out merged cells (continue)
+  // We recreate the rows without the 'continue' cells
+  final result = <List<_TempCell>>[];
+  for (final row in rawRows) {
+    result.add(row.where((c) => !c.isMerged).toList());
+  }
+  return result;
+}
+
+DocxBorderSide? _parseBorderSide(XmlElement? borderElem) {
+  if (borderElem == null) return null;
+  final val = borderElem.getAttribute('w:val');
+  if (val == null || val == 'none' || val == 'nil')
+    return const DocxBorderSide.none();
+
+  var style = DocxBorder.single;
+  for (var s in DocxBorder.values) {
+    if (s.xmlValue == val) {
+      style = s;
+      break;
+    }
+  }
+
+  // Size is in 1/8 pt
+  int size = 4;
+  final szAttr = borderElem.getAttribute('w:sz');
+  if (szAttr != null) {
+    size = int.tryParse(szAttr) ?? 4;
+  }
+
+  // Space
+  int space = 0;
+  final spAttr = borderElem.getAttribute('w:space');
+  if (spAttr != null) {
+    space = int.tryParse(spAttr) ?? 0;
+  }
+
+  // Color
+  var color = DocxColor.auto;
+  final colorAttr = borderElem.getAttribute('w:color');
+  if (colorAttr != null && colorAttr != 'auto') {
+    color = DocxColor(colorAttr);
+  }
+
+  return DocxBorderSide(
+    style: style,
+    size: size,
+    space: space,
+    color: color,
+  );
 }

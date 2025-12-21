@@ -1,0 +1,18 @@
+--- document.xml content ---
+
+Found w:tbl at 8933:
+kStart w:id="8" w:name="_Toc359077856"/><w:r><w:t>Tables</w:t></w:r><w:bookmarkEnd w:id="8"/></w:p><w:tbl><w:tblPr><w:tblStyle w:val="LightList-Accent3"/><w:tblpPr w:rightFromText="187" w:bottomFromText="72" w:vertAnchor="text" w:tblpY="1"/><w:tblOverlap w:val="never"/><w:tblW w:w="0" w:type="auto"/><w:tblLook w:val="0620"/></w:tblPr><w:tblGrid><w:gridCol w:w="1818"/><w:gridCol w:w="1620"/></w:tblGrid><w:tr w:rsidR="00297ABF" w:rsidTr="00B86920"><w:trPr><w:cnfStyle w:val="100000000000"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1818" w:type="dxa"/></w:tcPr><w:p w:rsidR="00297ABF" w:rsidRDefault="0029
+
+Found w:drawing at 124459:
+f the normal text flow, like this image of a green dot </w:t></w:r><w:r><w:rPr><w:noProof/></w:rPr><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="137160" cy="137160"/><wp:effectExtent l="19050" t="0" r="0" b="0"/><wp:docPr id="1" name="Picture 0" descr="dot_green.png"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/pictur
+
+Found w:gridSpan at 42352:
+"center"/></w:trPr><w:tc><w:tcPr><w:cnfStyle w:val="001000000000"/><w:tcW w:w="7500" w:type="dxa"/><w:gridSpan w:val="13"/></w:tcPr><w:p w:rsidR="00B727BF" w:rsidRDefault="00B727BF"><w:r><w:t>December 2007</w:t></w:r></w:p></w:tc></w:tr><w:tr w:rsidR="00B727BF" w:rsidTr="004E0FAE"><w:trPr><w:trHeight w:val="576"/><w:jc w:val="center"/></w:trPr><w:tc><w:tcPr><w:cnfStyle w:val="001000000000"/><w:tcW w:w="864" w:type="dxa"/><w:tcBorders><w:bottom w:val="single" w:sz="4" w:space="0" w:color="365F91" w:themeColor="accent1" w:themeShade="BF"/></w:tcBorders><w:noWrap/><w:tcMar><w:left w:w="43" w:type
+
+Found w:vMerge at 39146:
+Tr="00D41AC9"><w:trPr><w:jc w:val="center"/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1678" w:type="dxa"/><w:vMerge w:val="restart"/></w:tcPr><w:p w:rsidR="00272A32" w:rsidRDefault="00272A32" w:rsidP="009A211E"><w:pPr><w:spacing w:before="240"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:t>One</w:t></w:r></w:p><w:p w:rsidR="00272A32" w:rsidRDefault="00272A32" w:rsidP="00272A32"><w:pPr><w:spacing w:before="240"/><w:ind w:firstLine="0"/></w:pPr><w:r><w:t>Three</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1629" w:type="dxa"/></w:tcPr><w:p w:rsidR="00272A32" w:rsidRDefault="00272A32" w:rsidP="009A211E">
+
+Found w:shd at 5009:
+n </w:t></w:r><w:r w:rsidRPr="00386659"><w:rPr><w:color w:val="FFFFFF" w:themeColor="background1"/><w:shd w:val="clear" w:color="auto" w:fill="000000" w:themeFill="text1"/></w:rPr><w:t>inverse video</w:t></w:r><w:r><w:t>.</w:t></w:r></w:p><w:p w:rsidR="00A65B8B" w:rsidRDefault="00A65B8B" w:rsidP="00A65B8B"><w:r><w:t xml:space="preserve">A paragraph with styled text: </w:t></w:r><w:r w:rsidRPr="00A65B8B"><w:rPr><w:rStyle w:val="SubtleEmphasis"/></w:rPr><w:t>subtle emphasis</w:t></w:r><w:r><w:rPr><w:rStyle w:val="SubtleEmphasis"/></w:rPr><w:t xml:space="preserve">  </w:t></w:r><w:r w:rsidRPr="00
+
+wsp:wsp NOT FOUND

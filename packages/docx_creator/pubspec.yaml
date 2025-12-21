@@ -17,7 +17,7 @@ dependencies:
   xml: ^6.6.1
   archive: ^4.0.7
   path: ^1.9.1
-  image: ^4.7.1
+  image: ^4.3.0
   markdown: ^7.3.0
   html: ^0.15.6
   http: ^1.6.0

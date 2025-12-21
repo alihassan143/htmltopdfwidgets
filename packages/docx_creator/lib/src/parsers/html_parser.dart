@@ -155,6 +155,10 @@ class DocxParser {
           children: children,
           shadingFill: blockStyles.shadingFill,
           align: blockStyles.align,
+          borderTop: blockStyles.borderTop,
+          borderBottomSide: blockStyles.borderBottom,
+          borderLeft: blockStyles.borderLeft,
+          borderRight: blockStyles.borderRight,
         );
 
       case 'ul':
@@ -219,6 +223,10 @@ class DocxParser {
           return built.copyWith(
             shadingFill: blockStyles.shadingFill ?? built.shadingFill,
             align: blockStyles.align,
+            borderTop: blockStyles.borderTop,
+            borderBottomSide: blockStyles.borderBottom,
+            borderLeft: blockStyles.borderLeft,
+            borderRight: blockStyles.borderRight,
           );
         }
         return built;
@@ -412,7 +420,18 @@ class DocxParser {
     }
 
     return _BlockStyles(
-        shadingFill: shadingFill, align: align, colorHex: colorHex);
+      shadingFill: shadingFill,
+      align: align,
+      colorHex: colorHex,
+      borderTop: _parseCssBorderProperty(style, 'border-top') ??
+          _parseCssBorderProperty(style, 'border'),
+      borderBottom: _parseCssBorderProperty(style, 'border-bottom') ??
+          _parseCssBorderProperty(style, 'border'),
+      borderLeft: _parseCssBorderProperty(style, 'border-left') ??
+          _parseCssBorderProperty(style, 'border'),
+      borderRight: _parseCssBorderProperty(style, 'border-right') ??
+          _parseCssBorderProperty(style, 'border'),
+    );
   }
 
   static Future<DocxList> _parseList(
@@ -494,7 +513,7 @@ class DocxParser {
     DocxBorder border = DocxBorder.none;
     if (styleStr.contains('border')) {
       // Simple check
-      // TODO: robust parsing of border: 1px solid black
+      // TODO: robust parsing of border: 1px solid red
       if (styleStr.contains('solid')) border = DocxBorder.single;
     }
     if (element.attributes.containsKey('border')) {
@@ -503,9 +522,20 @@ class DocxParser {
 
     return DocxTable(
       rows: rows,
-      style: border != DocxBorder.none
-          ? DocxTableStyle(border: border)
-          : DocxTableStyle.headerHighlight,
+      style: DocxTableStyle(
+        borderTop: _parseCssBorderProperty(styleStr, 'border-top') ??
+            _parseCssBorderProperty(styleStr, 'border') ??
+            (border != DocxBorder.none ? DocxBorderSide(style: border) : null),
+        borderBottom: _parseCssBorderProperty(styleStr, 'border-bottom') ??
+            _parseCssBorderProperty(styleStr, 'border') ??
+            (border != DocxBorder.none ? DocxBorderSide(style: border) : null),
+        borderLeft: _parseCssBorderProperty(styleStr, 'border-left') ??
+            _parseCssBorderProperty(styleStr, 'border') ??
+            (border != DocxBorder.none ? DocxBorderSide(style: border) : null),
+        borderRight: _parseCssBorderProperty(styleStr, 'border-right') ??
+            _parseCssBorderProperty(styleStr, 'border') ??
+            (border != DocxBorder.none ? DocxBorderSide(style: border) : null),
+      ),
     );
   }
 
@@ -551,6 +581,14 @@ class DocxParser {
       colSpan: colSpan,
       rowSpan: rowSpan,
       shadingFill: shadingFill,
+      borderTop: _parseCssBorderProperty(style, 'border-top') ??
+          _parseCssBorderProperty(style, 'border'),
+      borderBottom: _parseCssBorderProperty(style, 'border-bottom') ??
+          _parseCssBorderProperty(style, 'border'),
+      borderLeft: _parseCssBorderProperty(style, 'border-left') ??
+          _parseCssBorderProperty(style, 'border'),
+      borderRight: _parseCssBorderProperty(style, 'border-right') ??
+          _parseCssBorderProperty(style, 'border'),
     );
   }
 
@@ -911,9 +949,67 @@ class DocxParser {
 
     // Try to see if it is a valid hex without #
     if (RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(trimmed)) {
-      return trimmed.toUpperCase();
+      return cssColors[trimmed] ??
+          (cssColors.containsKey(trimmed) ? '000000' : null);
     }
     return null;
+  }
+
+  static DocxBorderSide? _parseCssBorderProperty(
+      String style, String property) {
+    // Regex to find property value: property: value;
+    // Matches "border: 1px solid red" or "border-top: ..."
+    // Handle semicolons or end of string.
+    final regex = RegExp('$property:\\s*([^;]+)(?:;|\$)', caseSensitive: false);
+    final match = regex.firstMatch(style);
+    if (match != null) {
+      return _parseCssBorder(match.group(1)!);
+    }
+    return null;
+  }
+
+  static DocxBorderSide? _parseCssBorder(String value) {
+    if (value.contains('none') || value.contains('hidden')) return null;
+
+    // Parse width
+    int size = 4; // default 0.5pt
+    if (value.contains('px')) {
+      final wMatch = RegExp(r'(\d+)px').firstMatch(value);
+      if (wMatch != null) {
+        final px = int.tryParse(wMatch.group(1) ?? '1') ?? 1;
+        size = px *
+            8; // simplified mapping (1px = 1/8 inch? No. 1px approx 0.75pt. 1pt = 8 units. Docx unit is 1/8 pt.)
+        // 1px ~ 0.75pt = 6 eighths.
+        size = (px * 6).toInt();
+      }
+    }
+
+    // Parse color & style
+    DocxColor color = DocxColor.black;
+    DocxBorder borderStyle = DocxBorder.single;
+
+    final parts = value.split(RegExp(r'\s+'));
+    for (var part in parts) {
+      final parsedColor = _parseColor(part);
+      if (parsedColor != null) {
+        color = DocxColor(parsedColor);
+        continue;
+      }
+
+      if (part == 'solid')
+        borderStyle = DocxBorder.single;
+      else if (part == 'double')
+        borderStyle = DocxBorder.double;
+      else if (part == 'dotted')
+        borderStyle = DocxBorder.dotted;
+      else if (part == 'dashed')
+        borderStyle = DocxBorder.dashed;
+      else if (part == 'thick')
+        borderStyle = DocxBorder
+            .thick; // css 'thick' is usually size, but we support 'thick' border style
+    }
+
+    return DocxBorderSide(style: borderStyle, size: size, color: color);
   }
 
   static String _toHex(int val) {
@@ -948,7 +1044,20 @@ class _BlockStyles {
   final String? shadingFill;
   final String? colorHex;
   final DocxAlign align;
-  _BlockStyles({this.shadingFill, this.colorHex, this.align = DocxAlign.left});
+  final DocxBorderSide? borderTop;
+  final DocxBorderSide? borderBottom;
+  final DocxBorderSide? borderLeft;
+  final DocxBorderSide? borderRight;
+
+  _BlockStyles({
+    this.shadingFill,
+    this.colorHex,
+    this.align = DocxAlign.left,
+    this.borderTop,
+    this.borderBottom,
+    this.borderLeft,
+    this.borderRight,
+  });
 }
 
 class DocxStyleContext {

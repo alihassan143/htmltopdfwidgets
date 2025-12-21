@@ -57,8 +57,16 @@ class DocxDocumentBuilder {
   DocxDocumentBuilder h3(String text) => heading3(text);
 
   /// Adds a paragraph with plain text.
-  DocxDocumentBuilder p(String text, {DocxAlign align = DocxAlign.left}) {
-    _elements.add(DocxParagraph.text(text, align: align));
+  DocxDocumentBuilder p(
+    String text, {
+    DocxAlign align = DocxAlign.left,
+    DocxBorder? borderBottom,
+  }) {
+    _elements.add(DocxParagraph.text(
+      text,
+      align: align,
+      borderBottom: borderBottom,
+    ));
     return this;
   }
 

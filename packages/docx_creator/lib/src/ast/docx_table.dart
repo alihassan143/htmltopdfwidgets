@@ -28,6 +28,14 @@ class DocxTableStyle {
   /// Cell padding in twips.
   final int cellPadding;
 
+  /// Detailed border overrides.
+  final DocxBorderSide? borderTop;
+  final DocxBorderSide? borderBottom;
+  final DocxBorderSide? borderLeft;
+  final DocxBorderSide? borderRight;
+  final DocxBorderSide? borderInsideH;
+  final DocxBorderSide? borderInsideV;
+
   const DocxTableStyle({
     this.border = DocxBorder.single,
     this.borderColor = 'auto',
@@ -36,6 +44,12 @@ class DocxTableStyle {
     this.evenRowFill,
     this.oddRowFill,
     this.cellPadding = 115,
+    this.borderTop,
+    this.borderBottom,
+    this.borderLeft,
+    this.borderRight,
+    this.borderInsideH,
+    this.borderInsideV,
   });
 
   /// Simple grid style with borders.
@@ -162,19 +176,35 @@ class DocxTable extends DocxBlock {
                 builder.attribute('w:type', widthType.name);
               },
             );
-            if (style.border != DocxBorder.none) {
-              builder.element(
-                'w:tblBorders',
-                nest: () {
-                  _buildBorder(builder, 'w:top');
-                  _buildBorder(builder, 'w:bottom');
-                  _buildBorder(builder, 'w:left');
-                  _buildBorder(builder, 'w:right');
-                  _buildBorder(builder, 'w:insideH');
-                  _buildBorder(builder, 'w:insideV');
-                },
-              );
-            }
+            // Borders
+            builder.element(
+              'w:tblBorders',
+              nest: () {
+                // If specific side is provided, use it. Otherwise fall back to global border settings if not none.
+
+                // Helper to resolve border
+                void buildSide(String tag, DocxBorderSide? side) {
+                  if (side != null) {
+                    builder.element(tag, nest: () {
+                      builder.attribute('w:val', side.style.xmlValue);
+                      builder.attribute('w:sz', side.size.toString());
+                      builder.attribute('w:space', side.space.toString());
+                      builder.attribute('w:color', side.color.hex);
+                    });
+                  } else if (style.border != DocxBorder.none) {
+                    // Fallback to global style
+                    _buildBorder(builder, tag);
+                  }
+                }
+
+                buildSide('w:top', style.borderTop);
+                buildSide('w:bottom', style.borderBottom);
+                buildSide('w:left', style.borderLeft);
+                buildSide('w:right', style.borderRight);
+                buildSide('w:insideH', style.borderInsideH);
+                buildSide('w:insideV', style.borderInsideV);
+              },
+            );
             // Cell margins/padding
             builder.element(
               'w:tblCellMar',
@@ -325,6 +355,16 @@ class DocxTableCell extends DocxNode {
   /// Cell width in twips.
   final int? width;
 
+  // Borders
+  final DocxBorderSide? borderTop;
+  final DocxBorderSide? borderBottom;
+  final DocxBorderSide? borderLeft;
+  final DocxBorderSide? borderRight;
+
+  // Margins
+  final int? marginLeft;
+  final int? marginRight;
+
   const DocxTableCell({
     this.children = const [],
     this.colSpan = 1,
@@ -332,6 +372,12 @@ class DocxTableCell extends DocxNode {
     this.verticalAlign = DocxVerticalAlign.center,
     this.shadingFill,
     this.width,
+    this.borderTop,
+    this.borderBottom,
+    this.borderLeft,
+    this.borderRight,
+    this.marginLeft,
+    this.marginRight,
     super.id,
   });
 
@@ -376,8 +422,13 @@ class DocxTableCell extends DocxNode {
       colSpan: colSpan ?? this.colSpan,
       rowSpan: rowSpan ?? this.rowSpan,
       verticalAlign: verticalAlign ?? this.verticalAlign,
-      shadingFill: shadingFill ?? this.shadingFill,
       width: width ?? this.width,
+      borderTop: borderTop ?? borderTop,
+      borderBottom: borderBottom ?? borderBottom,
+      borderLeft: borderLeft ?? borderLeft,
+      borderRight: borderRight ?? borderRight,
+      marginLeft: marginLeft ?? marginLeft,
+      marginRight: marginRight ?? marginRight,
       id: id,
     );
   }
@@ -385,6 +436,15 @@ class DocxTableCell extends DocxNode {
   @override
   void accept(DocxVisitor visitor) {
     visitor.visitTableCell(this);
+  }
+
+  void _buildBorder(XmlBuilder builder, String tag, DocxBorderSide side) {
+    builder.element(tag, nest: () {
+      builder.attribute('w:val', side.style.xmlValue);
+      builder.attribute('w:sz', side.size.toString());
+      builder.attribute('w:space', side.space.toString());
+      builder.attribute('w:color', side.color.hex);
+    });
   }
 
   @override
@@ -436,6 +496,22 @@ class DocxTableCell extends DocxNode {
                   builder.attribute('w:fill', shadingFill!);
                 },
               );
+            }
+            // Borders
+            if (borderTop != null ||
+                borderBottom != null ||
+                borderLeft != null ||
+                borderRight != null) {
+              builder.element('w:tcBorders', nest: () {
+                if (borderTop != null)
+                  _buildBorder(builder, 'w:top', borderTop!);
+                if (borderBottom != null)
+                  _buildBorder(builder, 'w:bottom', borderBottom!);
+                if (borderLeft != null)
+                  _buildBorder(builder, 'w:left', borderLeft!);
+                if (borderRight != null)
+                  _buildBorder(builder, 'w:right', borderRight!);
+              });
             }
           },
         );
