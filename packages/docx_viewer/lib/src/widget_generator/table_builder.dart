@@ -54,36 +54,94 @@ class TableBuilder {
     final borderWidth = (tableStyle.borderWidth / 8.0).clamp(0.5, 4.0);
 
     // Calculate table width
-    String tableWidth = '100%';
+    // Calculate table width
+    String tableWidth = 'auto'; // Default to auto, not 100%
     if (table.width != null && table.width! > 0) {
       if (table.widthType == DocxWidthType.pct) {
         tableWidth = '${table.width! / 50}%'; // DOCX percentage is in fiftieths
       } else if (table.widthType == DocxWidthType.dxa) {
-        tableWidth =
-            '${table.width! / 20}px'; // Twips to pixels (approximately)
+        // Twips to pixels: 1440 twips = 1 inch. 96 px = 1 inch. 1 px = 15 twips.
+        tableWidth = '${table.width! / 15}px';
+      }
+    }
+
+    // Handle floating table position (margins/offsets)
+    // HTML renderer doesn't support absolute positioning well in this context,
+    // so we translate what we can to buffer-level styles or separate wrapper.
+
+    // Global table fill
+    String tableBackground = '';
+    if (tableStyle.fill != null) {
+      tableBackground = 'background-color: #${_cleanHex(tableStyle.fill!)};';
+    }
+
+    // Handle alignment and floating
+    String containerStyle = '';
+    String tableFloat = '';
+
+    if (table.position != null) {
+      // Floating table logic
+      if (table.alignment == DocxAlign.left) {
+        tableFloat = 'float: left; margin-right: 1em;';
+      } else if (table.alignment == DocxAlign.right) {
+        tableFloat = 'float: right; margin-left: 1em;';
+      }
+    } else {
+      // Standard table alignment
+      if (table.alignment == DocxAlign.center) {
+        containerStyle = 'text-align: center;';
+        // Also set margin auto for block centering
+        tableFloat = 'margin-left: auto; margin-right: auto;';
+      } else if (table.alignment == DocxAlign.right) {
+        containerStyle = 'text-align: right;';
+        tableFloat = 'margin-left: auto;';
       }
     }
 
     buffer.writeln('<html><body>');
+
+    // Wrap table in a div for alignment/floating
+    // If floating, the div floats. If centering, the div aligns text.
+    if (tableFloat.isNotEmpty || containerStyle.isNotEmpty) {
+      buffer.writeln('<div style="$containerStyle $tableFloat">');
+    }
+
     buffer.writeln(
-        '<table style="border-collapse: collapse; width: $tableWidth;">');
+        '<table style="border-collapse: collapse; width: $tableWidth; $tableBackground">');
+
+    // Use table look flags
+    final look = table.look;
 
     for (int rowIndex = 0; rowIndex < table.rows.length; rowIndex++) {
       final row = table.rows[rowIndex];
       final isFirstRow = rowIndex == 0;
+      final isLastRow = rowIndex == table.rows.length - 1;
+      final isEven = rowIndex % 2 == 0;
 
       buffer.writeln('<tr>');
 
-      for (final cell in row.cells) {
+      for (int colIndex = 0; colIndex < row.cells.length; colIndex++) {
+        final cell = row.cells[colIndex];
+
         // Get cell dimensions
         final colSpan = cell.colSpan > 0 ? cell.colSpan : 1;
         final rowSpan = cell.rowSpan > 0 ? cell.rowSpan : 1;
+
+        final isFirstCol = colIndex == 0;
+        final isLastCol = colIndex == row.cells.length - 1;
 
         // Build cell style
         final cellStyle = _buildCellStyle(
           cell,
           tableStyle,
-          isFirstRow: isFirstRow,
+          isHeader: (isFirstRow && look.firstRow) ||
+              (isLastRow && look.lastRow), // Simplified logic
+          isFirstRow: isFirstRow && look.firstRow,
+          isLastRow: isLastRow && look.lastRow,
+          isFirstCol: isFirstCol && look.firstColumn,
+          isLastCol: isLastCol && look.lastColumn,
+          isEven: isEven,
+          look: look,
           defaultBorderColor: borderColor,
           defaultBorderWidth: borderWidth,
         );
@@ -103,6 +161,11 @@ class TableBuilder {
     }
 
     buffer.writeln('</table>');
+
+    if (tableFloat.isNotEmpty) {
+      buffer.writeln('</div>');
+    }
+
     buffer.writeln('</body></html>');
 
     return buffer.toString();
@@ -112,7 +175,13 @@ class TableBuilder {
   String _buildCellStyle(
     DocxTableCell cell,
     DocxTableStyle tableStyle, {
+    required bool isHeader,
     required bool isFirstRow,
+    required bool isLastRow,
+    required bool isFirstCol,
+    required bool isLastCol,
+    required bool isEven,
+    required DocxTableLook look,
     required String defaultBorderColor,
     required double defaultBorderWidth,
   }) {
@@ -135,42 +204,59 @@ class TableBuilder {
         break;
     }
 
-    // Background color
+    // Background color priority:
+    // 1. Cell specific fill
+    // 2. Conditional formatting (Header, Total Row, Banding)
+
     if (cell.shadingFill != null && cell.shadingFill != 'auto') {
       styles.add('background-color: #${_cleanHex(cell.shadingFill!)}');
-    } else if (isFirstRow) {
-      // Header row styling
-      styles.add(
-          'background-color: #${_colorToHex(theme.tableHeaderBackground)}');
+    } else {
+      // Conditional styling
+      String? conditionalFill;
+
+      if (isFirstRow && tableStyle.headerFill != null) {
+        conditionalFill = tableStyle.headerFill;
+      } else if (isLastRow && tableStyle.headerFill != null) {
+        // Often total rows share header style, but AST doesn't have specific totalRowFill.
+        // Implementation dependent.
+      } else if (!look.noHBand) {
+        // Banding enabled
+        if (isEven && tableStyle.evenRowFill != null) {
+          conditionalFill = tableStyle.evenRowFill;
+        } else if (!isEven && tableStyle.oddRowFill != null) {
+          conditionalFill = tableStyle.oddRowFill;
+        }
+      }
+
+      if (conditionalFill != null) {
+        styles.add('background-color: #${_cleanHex(conditionalFill)}');
+      } else if (isHeader) {
+        styles.add(
+            'background-color: #${_colorToHex(theme.tableHeaderBackground)}');
+      }
     }
 
-    // Cell borders
+    // Cell borders logic for border-collapse
+    // In collapsed mode, borders are shared.
+    // If we define all 4 borders for every cell, simple HTML renderers might double them up or draw them adjacent.
+    // To mimic standard behavior, we ensure precise border definitions.
+    // However, with HtmlWidget's border-collapse: collapse, defining all borders is usually safe *if* they are identical.
+    // The visual artifact might be due to default border width or color mismatches.
+
     if (cell.borderTop != null) {
       styles.add('border-top: ${_borderSideToCSS(cell.borderTop!)}');
-    } else {
-      styles.add(
-          'border-top: ${defaultBorderWidth}px solid #$defaultBorderColor');
     }
 
     if (cell.borderBottom != null) {
       styles.add('border-bottom: ${_borderSideToCSS(cell.borderBottom!)}');
-    } else {
-      styles.add(
-          'border-bottom: ${defaultBorderWidth}px solid #$defaultBorderColor');
     }
 
     if (cell.borderLeft != null) {
       styles.add('border-left: ${_borderSideToCSS(cell.borderLeft!)}');
-    } else {
-      styles.add(
-          'border-left: ${defaultBorderWidth}px solid #$defaultBorderColor');
     }
 
     if (cell.borderRight != null) {
       styles.add('border-right: ${_borderSideToCSS(cell.borderRight!)}');
-    } else {
-      styles.add(
-          'border-right: ${defaultBorderWidth}px solid #$defaultBorderColor');
     }
 
     // Cell width if specified

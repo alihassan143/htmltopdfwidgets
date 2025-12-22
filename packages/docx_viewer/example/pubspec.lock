@@ -141,10 +141,10 @@ packages:
     dependency: transitive
     description:
       name: docx_creator
-      sha256: "13047eccedf0aaad7d42a33b2a8866ad11ef2f74314070f5003793035997cdc4"
+      sha256: "0b26fac443abad3485a316a0259dc93c07fee11b7fb2d6700672d4ce668c817e"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.3"
+    version: "1.0.4"
   docx_viewer:
     dependency: "direct main"
     description:

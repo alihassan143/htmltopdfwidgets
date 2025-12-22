@@ -42,7 +42,7 @@ class ImageBuilder {
 
   /// Build an inline image widget.
   Widget buildInlineImage(DocxInlineImage image) {
-    return Image.memory(
+    Widget imageWidget = Image.memory(
       image.bytes,
       width: image.width,
       height: image.height,
@@ -50,6 +50,21 @@ class ImageBuilder {
       errorBuilder: (context, error, stackTrace) =>
           _buildInlineErrorPlaceholder(image),
     );
+
+    // If it's a floating image, we might want to wrap it or handle alignment
+    // For inline context (inside a span), we can't do much about absolute positioning
+    // without breaking the text flow.
+    // However, we can respect simple alignment or wrapping properties if they translate to inline behavior.
+
+    // For floating images that are actually inline in the DOM order:
+    if (image.positionMode == DocxDrawingPosition.floating) {
+      // If floating, wrapping logic is handled by ParagraphBuilder's Row application.
+      // However, we can add some internal padding here if needed, or
+      // if we want to support 'center' float which ParagraphBuilder doesn't yet do fully.
+      // For now, return as is, letting ParagraphBuilder handle the layout wrapper.
+    }
+
+    return imageWidget;
   }
 
   Widget _buildErrorPlaceholder(DocxImage image) {

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:docx_creator/docx_creator.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../docx_view_config.dart';
 import '../search/docx_search_controller.dart';
 import '../theme/docx_view_theme.dart';
+import '../widgets/drop_cap_text.dart';
 
 /// Builds Flutter widgets from [DocxParagraph] elements.
 class ParagraphBuilder {
@@ -30,31 +33,238 @@ class ParagraphBuilder {
   /// Build a widget from a [DocxParagraph].
   Widget build(DocxParagraph paragraph, {int? blockIndex}) {
     if (blockIndex != null) _blockIndex = blockIndex;
+    return _buildNativeParagraph(paragraph);
+  }
 
-    // Calculate line height from lineSpacing (240 = single line, 360 = 1.5, 480 = double)
-    double? lineHeight;
-    if (paragraph.lineSpacing != null) {
-      lineHeight = paragraph.lineSpacing! / 240.0;
+  /// Native Flutter builder for standard paragraphs.
+  Widget _buildNativeParagraph(DocxParagraph paragraph) {
+    // Check for floating images to use specific wrapping layout
+    DocxInlineImage? leftFloatingImage;
+    DocxInlineImage? rightFloatingImage;
+    List<DocxInline> textChildren = [];
+
+    // Separate content
+    for (var child in paragraph.children) {
+      if (child is DocxInlineImage &&
+          child.positionMode == DocxDrawingPosition.floating) {
+        if (child.hAlign == DrawingHAlign.right) {
+          rightFloatingImage = child;
+        } else {
+          leftFloatingImage = child;
+        }
+      } else {
+        textChildren.add(child);
+      }
     }
 
-    final spans = _buildTextSpans(paragraph.children, lineHeight: lineHeight);
+    // Build the text spans
+    // Note: We need the Style/TextSpan to measure.
+    // Calculate line height from lineSpacing
+    double? lineHeightScale;
+    if (paragraph.lineSpacing != null) {
+      lineHeightScale = paragraph.lineSpacing! / 240.0;
+    }
+
+    final spans = _buildTextSpans(textChildren, lineHeight: lineHeightScale);
+    final fullTextSpan = TextSpan(children: spans);
     final textAlign = _convertAlign(paragraph.align);
 
-    Widget content;
+    // If we have floating images, we need to manually layout and slice the text to wrap around them.
+    // This provides the "text starting from next line" behavior (flowing under the float).
+    if (leftFloatingImage != null || rightFloatingImage != null) {
+      return _wrapWithParagraphStyle(
+          paragraph,
+          _buildFloatingLayout(
+            textSpan: fullTextSpan,
+            leftImage: leftFloatingImage,
+            rightImage: rightFloatingImage,
+            textAlign: textAlign,
+            lineHeightScale: lineHeightScale,
+          ));
+    }
+
+    // Standard paragraph
+    Widget textContent;
     if (config.enableSelection) {
-      content = SelectableText.rich(
-        TextSpan(children: spans),
+      textContent = SelectableText.rich(
+        fullTextSpan,
         textAlign: textAlign,
       );
     } else {
-      content = RichText(
-        text: TextSpan(children: spans),
+      textContent = RichText(
+        text: fullTextSpan,
         textAlign: textAlign,
       );
     }
 
+    // Ensure strictly full width to respect alignment
+    textContent = SizedBox(width: double.infinity, child: textContent);
+
+    return _wrapWithParagraphStyle(paragraph, textContent);
+  }
+
+  /// Builds a layout that wraps text around left and/or right floating images.
+  Widget _buildFloatingLayout({
+    required TextSpan textSpan,
+    DocxInlineImage? leftImage,
+    DocxInlineImage? rightImage,
+    required TextAlign textAlign,
+    double? lineHeightScale,
+  }) {
+    return LayoutBuilder(builder: (context, constraints) {
+      // 1. Measure images
+      double lWidth = 0, lHeight = 0;
+      double rWidth = 0, rHeight = 0;
+
+      Widget? lWidget, rWidget;
+
+      if (leftImage != null) {
+        lWidth = leftImage.width;
+        lHeight = leftImage.height;
+        lWidget = Image.memory(leftImage.bytes,
+            width: lWidth, height: lHeight, fit: BoxFit.contain);
+        // Add padding
+        lWidth += 12.0;
+        lWidget = Padding(
+            padding: const EdgeInsets.only(right: 12.0), child: lWidget);
+      }
+
+      if (rightImage != null) {
+        rWidth = rightImage.width;
+        rHeight = rightImage.height;
+        rWidget = Image.memory(rightImage.bytes,
+            width: rWidth, height: rHeight, fit: BoxFit.contain);
+        rWidth += 12.0;
+        rWidget =
+            Padding(padding: const EdgeInsets.only(left: 12.0), child: rWidget);
+      }
+
+      final floatHeight =
+          max(lHeight, rHeight); // We wrap under the tallest one
+      // Note: complex mixed heights would require efficient line-by-line sizing (complex).
+      // We assume "shared" float height for the row.
+
+      final availableWidth = constraints.maxWidth - lWidth - rWidth;
+      if (availableWidth <= 0) return const SizedBox(); // Too narrow
+
+      // 2. Measure text to see how many lines fit in the float height
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+        textAlign: textAlign,
+      );
+
+      // Fix for WidgetSpan crash: provide placeholder dimensions
+      final placeholders = _getPlaceholderDimensions(textSpan);
+      if (placeholders.isNotEmpty) {
+        textPainter.setPlaceholderDimensions(placeholders);
+      }
+
+      textPainter.layout(
+          maxWidth: constraints.maxWidth); // First to get line height
+      // Use default line height if calculated is weird, but try to use preference
+      double lineHeight = textPainter.preferredLineHeight;
+      // If empty text?
+      if (lineHeight == 0) lineHeight = 14.0;
+
+      int rows = (floatHeight / lineHeight).ceil();
+      if (rows == 0 && floatHeight > 0) rows = 1;
+
+      // 3. Find break point
+      textPainter.maxLines = rows;
+      textPainter.layout(maxWidth: availableWidth);
+
+      int breakIndex = 0;
+      if (!textPainter.didExceedMaxLines) {
+        // Fits completely
+        // To get length we need to traverse
+        // Or just render all in the row
+        breakIndex = -1; // Flag for all
+      } else {
+        // Get exact break
+        final pos = textPainter
+            .getPositionForOffset(Offset(availableWidth, floatHeight - 1));
+        breakIndex = pos.offset;
+      }
+
+      // 4. Slice
+      TextSpan? span1, span2;
+
+      if (breakIndex == -1) {
+        span1 = textSpan;
+      } else {
+        // We need the helper from DropCapText. Ideally it should be shared.
+        // Since it's private in DropCapText, I will implement a local one or make it public.
+        // For now, implement local helper to be safe.
+        span1 = _sliceSpan(textSpan, 0, breakIndex);
+        span2 = _sliceSpan(textSpan, breakIndex);
+      }
+
+      // 5. Build
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (lWidget != null) lWidget,
+              Expanded(
+                child: SizedBox(
+                  height: floatHeight > 0
+                      ? floatHeight
+                      : null, // Force height match
+                  child: RichText(
+                    text: span1 ?? const TextSpan(text: ''),
+                    textAlign: textAlign,
+                    overflow: TextOverflow.clip,
+                  ),
+                ),
+              ),
+              if (rWidget != null) rWidget,
+            ],
+          ),
+          if (span2 != null)
+            RichText(
+              text: span2,
+              textAlign: textAlign,
+            )
+        ],
+      );
+    });
+  }
+
+  /// Helper to collect placeholder dimensions for WidgetSpans.
+  List<PlaceholderDimensions> _getPlaceholderDimensions(InlineSpan span) {
+    List<PlaceholderDimensions> dimensions = [];
+    span.visitChildren((child) {
+      if (child is WidgetSpan) {
+        dimensions.add(const PlaceholderDimensions(
+            size: Size(14, 14), alignment: PlaceholderAlignment.middle));
+      }
+      return true;
+    });
+    return dimensions;
+  }
+
+  // Helper moved from DropCapText (simplified version for local use)
+  TextSpan? _sliceSpan(TextSpan span, int start, [int? end]) {
+    final walker = _ParagraphSliceWalker(start, end);
+    walker.visit(span);
+    if (walker.result.isEmpty) return null;
+    return TextSpan(children: walker.result);
+  }
+
+  /// Helper to build rich text content (Deprecated/Refactored into inline logic above)
+  /// Kept for buildDropCap usage if needed, or remove?
+  /// _buildTextContent above was removed/replaced in _buildNativeParagraph?
+  /// wait, I am replacing lines 38-141. _buildTextContent was at line 111.
+  /// So checking if buildDropCap or others use it.
+  /// buildDropCap uses `_buildTextSpans`.
+  /// No other usages of `_buildTextContent` in this file.
+
+  /// Helper to apply paragraph decorations (indent, padding, shading, borders)
+  Widget _wrapWithParagraphStyle(DocxParagraph paragraph, Widget content) {
     // Apply paragraph styling from DocxParagraph properties
-    // Convert twips to pixels (20 twips = 1 point, 1 point ≈ 1.33 pixels)
     const double twipsToPixels = 1 / 15.0;
 
     double leftPadding = (paragraph.indentLeft ?? 0) * twipsToPixels;
@@ -62,17 +272,12 @@ class ParagraphBuilder {
     double topPadding = (paragraph.spacingBefore ?? 80) * twipsToPixels;
     double bottomPadding = (paragraph.spacingAfter ?? 80) * twipsToPixels;
 
-    // Handle first line indent
-    if (paragraph.indentFirstLine != null && paragraph.indentFirstLine! > 0) {
-      // Apply first line indent by wrapping content
-      content = Padding(
-        padding:
-            EdgeInsets.only(left: paragraph.indentFirstLine! * twipsToPixels),
-        child: content,
-      );
-    }
+    // Handle first line indent (only applies if we have a simple block, but here we apply to wrapper padding?)
+    // Actually standard first line indent shifts the first line text.
+    // If we have a Row layout, the indent should apply to the TEXT block.
+    // For simplicity, we apply wrapping padding here.
 
-    // Heading detection - use larger spacing
+    // Heading detection
     if (paragraph.children.isNotEmpty) {
       final first = paragraph.children.first;
       if (first is DocxText &&
@@ -83,12 +288,10 @@ class ParagraphBuilder {
       }
     }
 
-    // Build decoration with shading and borders
     BoxDecoration? decoration = _buildParagraphDecoration(paragraph);
 
-    // Handle page break before
+    // Page break
     if (paragraph.pageBreakBefore) {
-      // Add a visual separator for page breaks
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -135,13 +338,15 @@ class ParagraphBuilder {
     if (paragraph.borderTop != null) {
       topBorder = _buildBorderSide(paragraph.borderTop!);
     }
-    if (paragraph.borderBottomSide != null) {
-      bottomBorder = _buildBorderSide(paragraph.borderBottomSide!);
-    } else if (paragraph.borderBottom != null &&
-        paragraph.borderBottom != DocxBorder.none) {
-      // Legacy support for deprecated borderBottom
-      bottomBorder = BorderSide(color: Colors.grey.shade400, width: 1);
+
+    // Choose the most specific bottom border available
+    // Prioritize borderBottomSide (DocxBorderSide)
+    final bottomSpec = paragraph.borderBottomSide ?? paragraph.borderBetween;
+
+    if (bottomSpec != null) {
+      bottomBorder = _buildBorderSide(bottomSpec);
     }
+
     if (paragraph.borderLeft != null) {
       leftBorder = _buildBorderSide(paragraph.borderLeft!);
     }
@@ -178,12 +383,12 @@ class ParagraphBuilder {
     }
 
     // Convert size from eighths of a point to pixels
-    final width = side.size / 8.0;
+    final width = (side.size / 8.0).clamp(0.5, 10.0);
     final color = _parseHexColor(side.color.hex);
 
     return BorderSide(
       color: color,
-      width: width.clamp(0.5, 10.0),
+      width: width,
       style: side.style == DocxBorder.dotted
           ? BorderStyle.none // Flutter doesn't support dotted natively
           : BorderStyle.solid,
@@ -228,6 +433,10 @@ class ParagraphBuilder {
           alignment: PlaceholderAlignment.middle,
           child: _buildInlineShape(inline),
         ));
+      } else if (inline is DocxFootnoteRef) {
+        spans.add(_buildFootnoteRef(inline));
+      } else if (inline is DocxEndnoteRef) {
+        spans.add(_buildEndnoteRef(inline));
       }
     }
 
@@ -264,7 +473,7 @@ class ParagraphBuilder {
   }
 
   /// Build a TextSpan from a [DocxText] element.
-  TextSpan _buildTextSpan(DocxText text, {double? lineHeight}) {
+  InlineSpan _buildTextSpan(DocxText text, {double? lineHeight}) {
     // Transform content based on text effects
     String content = text.content;
     if (text.isAllCaps) {
@@ -312,7 +521,15 @@ class ParagraphBuilder {
       backgroundColor = _highlightToColor(text.highlight);
     }
 
-    double? fontSize = text.fontSize ?? theme.defaultTextStyle.fontSize;
+    double? fontSize = text.fontSize;
+    if (fontSize != null) {
+      // Convert Points to Logical Pixels
+      // 1 pt = 1.333 px (96 dpi / 72 dpi)
+      fontSize = fontSize * 1.333;
+    } else {
+      fontSize = theme.defaultTextStyle.fontSize;
+    }
+
     String? fontFamily = text.fontFamily;
 
     // Apply font fallbacks if no specific font
@@ -378,6 +595,16 @@ class ParagraphBuilder {
       textColor = null; // Can't use both color and foreground
     }
 
+    // Text Border
+    BoxBorder? textBorder;
+    if (text.textBorder != null) {
+      final side = _buildBorderSide(text.textBorder!);
+      if (side != BorderSide.none) {
+        textBorder =
+            Border.all(color: side.color, width: side.width, style: side.style);
+      }
+    }
+
     final style = TextStyle(
       fontWeight: fontWeight,
       fontStyle: fontStyle,
@@ -414,9 +641,113 @@ class ParagraphBuilder {
       );
     }
 
+    // Check if we need to wrap text in a Container for border (WidgetSpan)
+    if (textBorder != null) {
+      return WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+            decoration: BoxDecoration(
+              border: textBorder,
+              color:
+                  backgroundColor, // Background needs to be here if border is present
+            ),
+            child: Text(content, style: style.copyWith(backgroundColor: null)),
+          ));
+    }
+
     return TextSpan(
       text: content,
       style: style,
+    );
+  }
+
+  /// Build a widget for a paragraph with a drop cap.
+  Widget buildDropCap(DocxDropCap dropCap) {
+    // Uses the custom DropCapText widget for robust "L-shaped" text wrapping.
+
+    // Scale the drop cap letter
+    const pointToPx = 1.333;
+    final defaultFontSize = theme.defaultTextStyle.fontSize ?? 14.0;
+
+    double fontSizePx;
+    if (dropCap.fontSize != null) {
+      fontSizePx = dropCap.fontSize! * pointToPx;
+    } else {
+      fontSizePx = dropCap.lines * defaultFontSize;
+    }
+
+    final color = theme.defaultTextStyle.color ?? Colors.black;
+    final fontFamily = dropCap.fontFamily ?? theme.defaultTextStyle.fontFamily;
+
+    // Measure the drop cap
+    final dropCapStyle = TextStyle(
+        fontSize: fontSizePx,
+        color: color,
+        fontFamily: fontFamily,
+        height: 1.0,
+        fontWeight: FontWeight.bold);
+
+    // We treat the drop cap as a simple text span for standard cases
+    final painter = TextPainter(
+      text: TextSpan(text: dropCap.letter, style: dropCapStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final dcWidth = painter.width;
+    final dcHeight = painter.height;
+
+    // Build the rest of paragraph TextSpan
+    final spans = _buildTextSpans(dropCap.restOfParagraph);
+    final fullTextSpan = TextSpan(children: spans);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: DropCapText(
+        '',
+        textSpan: fullTextSpan,
+        dropCap: DropCap(
+          width: dcWidth,
+          height: dcHeight,
+          child: Text(dropCap.letter, style: dropCapStyle),
+        ),
+        mode: DropCapMode.inside, // L-shape
+        dropCapPadding:
+            EdgeInsets.only(right: (dropCap.hSpace / 20.0).clamp(4.0, 20.0)),
+      ),
+    );
+  }
+
+  TextSpan _buildFootnoteRef(DocxFootnoteRef ref) {
+    return TextSpan(
+      text: '${ref.footnoteId}',
+      style: TextStyle(
+        fontSize: (theme.defaultTextStyle.fontSize ?? 14) * 0.6,
+        color: theme.linkStyle.color,
+        fontFeatures: const [FontFeature.superscripts()],
+      ),
+      recognizer: TapGestureRecognizer()
+        ..onTap = () {
+          // TODO: Show footnote content
+          // logic could be added to show a dialog or toast
+          debugPrint('Footnote ${ref.footnoteId} clicked');
+        },
+    );
+  }
+
+  TextSpan _buildEndnoteRef(DocxEndnoteRef ref) {
+    return TextSpan(
+      text: '${ref.endnoteId}',
+      style: TextStyle(
+        fontSize: (theme.defaultTextStyle.fontSize ?? 14) * 0.6,
+        color: theme.linkStyle.color,
+        fontFeatures: const [FontFeature.superscripts()],
+      ),
+      recognizer: TapGestureRecognizer()
+        ..onTap = () {
+          // TODO: Show endnote content
+          debugPrint('Endnote ${ref.endnoteId} clicked');
+        },
     );
   }
 
@@ -526,6 +857,62 @@ class ParagraphBuilder {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
+    }
+  }
+}
+
+class _ParagraphSliceWalker {
+  final int start;
+  final int? end;
+  final List<InlineSpan> result = [];
+  int currentPos = 0;
+
+  _ParagraphSliceWalker(this.start, this.end);
+
+  void visit(InlineSpan root) {
+    final List<InlineSpan> stack = [root];
+
+    while (stack.isNotEmpty) {
+      final span = stack.removeLast();
+
+      if (span is TextSpan) {
+        final text = span.text;
+        if (text != null) {
+          final len = text.length;
+          final rangeStart = currentPos;
+          final rangeEnd = currentPos + len;
+
+          final reqStart = start;
+          final reqEnd = end ?? 0x7FFFFFFF;
+
+          final overlapStart = max(rangeStart, reqStart);
+          final overlapEnd = min(rangeEnd, reqEnd);
+
+          if (overlapStart < overlapEnd) {
+            final s = overlapStart - rangeStart;
+            final e = overlapEnd - rangeStart;
+            result.add(TextSpan(
+              text: text.substring(s, e),
+              style: span.style,
+              recognizer: span.recognizer,
+            ));
+          }
+          currentPos += len;
+        }
+
+        if (span.children != null) {
+          // Push children in reverse order to process them in correct order (DFS)
+          final children = span.children!;
+          for (var i = children.length - 1; i >= 0; i--) {
+            stack.add(children[i]);
+          }
+        }
+      } else if (span is WidgetSpan) {
+        if (currentPos >= start && (end == null || currentPos < end!)) {
+          result.add(span);
+        }
+        currentPos += 1;
+      }
     }
   }
 }

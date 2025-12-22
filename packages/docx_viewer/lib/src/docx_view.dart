@@ -110,7 +110,6 @@ class DocxView extends StatefulWidget {
 }
 
 class _DocxViewState extends State<DocxView> {
-  DocxBuiltDocument? _document;
   List<Widget>? _widgets;
   List<String>? _textIndex;
   bool _isLoading = true;
@@ -191,7 +190,6 @@ class _DocxViewState extends State<DocxView> {
       final textIndex = _generator.extractTextForSearch(doc.elements);
 
       setState(() {
-        _document = doc;
         _widgets = widgets;
         _textIndex = textIndex;
         _isLoading = false;

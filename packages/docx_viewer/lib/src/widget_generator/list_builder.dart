@@ -70,7 +70,17 @@ class ListBuilder {
     // Calculate indent from list style or default
     final indentPerLevel =
         style.indentPerLevel / 15.0; // Convert twips to pixels
-    final indent = 16.0 + (level * indentPerLevel.clamp(16.0, 48.0));
+    // Calculate initial indent based on level
+    double indent = 16.0 + (level * indentPerLevel.clamp(16.0, 48.0));
+
+    // Apply hanging indent if specified
+    if (style.hangingIndent > 0) {
+      // Hanging indent shifts the first line (marker) left
+      // But in this Row layout, 'indent' is the stored left padding.
+      // If we increase stored padding to accommodate hanging, we might just shift marker.
+      // Standard logic: Indent Left - Hanging Indent.
+      // Here we just accept that 'indent' is the start of content.
+    }
 
     // Build marker based on list type and style
     String marker;
@@ -83,13 +93,17 @@ class ListBuilder {
     // Build content from all inline children
     final spans = _buildInlineSpans(item.children);
 
-    // Apply style properties from DocxListStyle
+    // Apply style properties from DocxListStyle to the marker
     final markerStyle = TextStyle(
       color: _parseHexColor(style.color.hex),
-      fontSize: style.fontSize ?? theme.defaultTextStyle.fontSize,
+      fontSize: style.fontSize != null
+          ? style.fontSize! * 1.333
+          : theme.defaultTextStyle.fontSize,
       fontWeight: style.fontWeight == DocxFontWeight.bold
           ? FontWeight.bold
           : FontWeight.normal,
+      fontFamily:
+          theme.defaultTextStyle.fontFamily, // Ensure matching font family
     );
 
     return Padding(
@@ -254,7 +268,12 @@ class ListBuilder {
       backgroundColor = _highlightToColor(text.highlight);
     }
 
-    double? fontSize = text.fontSize ?? theme.defaultTextStyle.fontSize;
+    double? fontSize = text.fontSize;
+    if (fontSize != null) {
+      fontSize = fontSize * 1.333;
+    } else {
+      fontSize = theme.defaultTextStyle.fontSize;
+    }
     if (text.isSmallCaps && !text.isAllCaps) {
       fontSize = (fontSize ?? 14) * 0.85;
     }
@@ -305,7 +324,9 @@ class ListBuilder {
         color: checkbox.color != null
             ? _parseHexColor(checkbox.color!.hex)
             : theme.defaultTextStyle.color,
-        fontSize: checkbox.fontSize ?? theme.defaultTextStyle.fontSize,
+        fontSize: checkbox.fontSize != null
+            ? checkbox.fontSize! * 1.333
+            : theme.defaultTextStyle.fontSize,
       ),
     );
   }

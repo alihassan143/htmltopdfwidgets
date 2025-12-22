@@ -58,14 +58,97 @@ class DocxWidgetGenerator {
   }
 
   /// Generate a list of widgets from document elements.
+  ///
+  /// This method also handles layout orchestration for floating elements:
+  /// - Floating tables are grouped with following paragraphs into Row layouts
   List<Widget> generateWidgets(List<DocxNode> elements) {
     final widgets = <Widget>[];
+    int i = 0;
 
-    for (final element in elements) {
+    while (i < elements.length) {
+      final element = elements[i];
+
+      // Check for floating table
+      if (element is DocxTable && element.position != null) {
+        // This is a floating table - group with following paragraphs
+        final floatingTable = element;
+        final followingParagraphs = <DocxNode>[];
+
+        // Collect paragraphs that should wrap around this table
+        // We take paragraphs until we hit another block-level element (table, list, image)
+        // or until we've collected enough content (heuristic: ~5 paragraphs max)
+        int j = i + 1;
+        while (j < elements.length && followingParagraphs.length < 5) {
+          final next = elements[j];
+          if (next is DocxParagraph || next is DocxDropCap) {
+            followingParagraphs.add(next);
+            j++;
+          } else {
+            break; // Stop at non-paragraph block
+          }
+        }
+
+        if (followingParagraphs.isNotEmpty) {
+          // Build the floating Row layout
+          final tableWidget = _tableBuilder.build(floatingTable);
+          final paragraphWidgets = followingParagraphs.map((p) {
+            if (p is DocxParagraph) {
+              return _paragraphBuilder.build(p);
+            } else if (p is DocxDropCap) {
+              return _paragraphBuilder.buildDropCap(p);
+            }
+            return const SizedBox.shrink();
+          }).toList();
+
+          // Determine float side from table position
+          final isRightFloat =
+              floatingTable.position?.hAnchor == DocxTableHAnchor.margin &&
+                  floatingTable.alignment == DocxAlign.right;
+
+          Widget rowWidget;
+          if (isRightFloat) {
+            // Table on the right
+            rowWidget = Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: paragraphWidgets)),
+                const SizedBox(width: 12),
+                tableWidget,
+              ],
+            );
+          } else {
+            // Table on the left (default)
+            rowWidget = Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                tableWidget,
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: paragraphWidgets)),
+              ],
+            );
+          }
+
+          widgets.add(Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: rowWidget,
+          ));
+          i = j; // Skip to after grouped paragraphs
+          continue;
+        }
+      }
+
+      // Standard element processing
       final widget = generateWidget(element);
       if (widget != null) {
         widgets.add(widget);
       }
+      i++;
     }
 
     return widgets;
@@ -83,6 +166,8 @@ class DocxWidgetGenerator {
       return _imageBuilder.buildBlockImage(node);
     } else if (node is DocxShapeBlock) {
       return _shapeBuilder.buildBlockShape(node);
+    } else if (node is DocxDropCap) {
+      return _paragraphBuilder.buildDropCap(node);
     } else if (node is DocxSectionBreakBlock) {
       // Render section breaks as horizontal dividers
       return const Divider(height: 24, thickness: 1);
@@ -127,6 +212,12 @@ class DocxWidgetGenerator {
   String _extractText(DocxNode node) {
     if (node is DocxParagraph) {
       return node.children.whereType<DocxText>().map((t) => t.content).join();
+    } else if (node is DocxDropCap) {
+      return node.letter +
+          node.restOfParagraph
+              .whereType<DocxText>()
+              .map((t) => t.content)
+              .join();
     } else if (node is DocxList) {
       return node.items
           .map((item) =>
