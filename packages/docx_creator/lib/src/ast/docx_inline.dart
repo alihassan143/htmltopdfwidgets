@@ -506,6 +506,7 @@ class DocxText extends DocxInline {
                   nest: () {
                     builder.attribute('w:ascii', fontFamily!);
                     builder.attribute('w:hAnsi', fontFamily!);
+                    builder.attribute('w:cs', fontFamily!);
                   },
                 );
               }

@@ -226,11 +226,41 @@ class DocxTable extends DocxBlock {
   /// Table style ID (e.g., "TableGrid", "MediumShading1-Accent1").
   final String? styleId;
 
-  /// Column widths from w:tblGrid (in twips).
-  ///
-  /// This preserves the original grid layout for round-trip fidelity.
-  /// If null, the grid will be calculated from cell widths.
   final List<int>? gridColumns;
+
+  /// Returns effective grid columns.
+  ///
+  /// If [gridColumns] is set, returns it.
+  /// Otherwise, calculates columns based on the first row's cells.
+  /// If [width] type is auto/pct (or null), assumes ~9022 twips (A4 printable width)
+  /// and distributes evenly if cell widths are missing.
+  List<int> get resolvedGridColumns {
+    if (gridColumns != null && gridColumns!.isNotEmpty) {
+      return gridColumns!;
+    }
+
+    if (rows.isEmpty) return [];
+
+    final firstRowCells = rows.first.cells;
+    final int columnCount = firstRowCells.length;
+    if (columnCount == 0) return [];
+
+    // Check if we have explicit cell widths
+    final hasCellWidths = firstRowCells.every((c) => c.width != null);
+    if (hasCellWidths) {
+      return firstRowCells.map((c) => c.width!).toList();
+    }
+
+    // Distribute total available width
+    // Standard A4 (11906) - Margins (1440*2) = 9026. Rounding to 9022 as suggested.
+    const int totalWidth = 9022;
+    // For now, simple equal distribution if widths are missing
+    final colWidth = (totalWidth / columnCount).floor();
+    return List<int>.filled(columnCount, colWidth);
+  }
+
+  /// Whether this table is floating (has custom positioning).
+  bool get isFloating => position != null;
 
   const DocxTable({
     required this.rows,
@@ -452,22 +482,13 @@ class DocxTable extends DocxBlock {
           },
         );
         // Table Grid - use preserved values or calculate from cells
+        // Table Grid
         builder.element('w:tblGrid', nest: () {
-          if (gridColumns != null && gridColumns!.isNotEmpty) {
-            // Use preserved grid columns (True-Fidelity round-trip)
-            for (var colWidth in gridColumns!) {
-              builder.element('w:gridCol', nest: () {
-                builder.attribute('w:w', colWidth.toString());
-              });
-            }
-          } else if (rows.isNotEmpty) {
-            // Calculate from first row cell widths
-            for (var cell in rows.first.cells) {
-              builder.element('w:gridCol', nest: () {
-                // Default to 2160 twips (1.5 inches) if no width specified
-                builder.attribute('w:w', (cell.width ?? 2160).toString());
-              });
-            }
+          final cols = resolvedGridColumns;
+          for (var colWidth in cols) {
+            builder.element('w:gridCol', nest: () {
+              builder.attribute('w:w', colWidth.toString());
+            });
           }
         });
 

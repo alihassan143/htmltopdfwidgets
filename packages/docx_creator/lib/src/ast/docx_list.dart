@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:xml/xml.dart';
 
 import '../core/enums.dart';
@@ -28,6 +30,11 @@ class DocxListStyle {
   final DocxColor color;
   final double? fontSize;
 
+  /// Custom image bullet bytes (png/jpg).
+  ///
+  /// If provided, this overrides [bullet] and [numberFormat].
+  final Uint8List? imageBulletBytes;
+
   const DocxListStyle({
     this.bullet = '•',
     this.numberFormat = DocxNumberFormat.decimal,
@@ -36,6 +43,7 @@ class DocxListStyle {
     this.fontWeight = DocxFontWeight.normal,
     this.color = DocxColor.black,
     this.fontSize,
+    this.imageBulletBytes,
   });
 
   /// Solid disc bullet (default)

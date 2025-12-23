@@ -14,7 +14,11 @@ class DocxExporter {
   int _imageCounter = 0;
   int _uniqueIdCounter = 1;
   int _numIdCounter = 1;
-  final List<bool> _listTypes = []; // true = ordered, false = bullet
+  // final List<bool> _listTypes = []; // Removed in favor of _listAbstractNumMap
+  final List<Uint8List> _imageBullets = [];
+  final Map<int, int> _listAbstractNumMap = {}; // numId -> abstractNumId
+  final Map<int, int> _abstractNumImageBulletMap =
+      {}; // abstractNumId -> imageBulletIndex
   DocxBackgroundImage? _backgroundImage;
   final FontManager fontManager = FontManager();
 
@@ -62,7 +66,9 @@ class DocxExporter {
     _imageCounter = 0;
     _uniqueIdCounter = 1;
     _numIdCounter = 1;
-    _listTypes.clear();
+    _listAbstractNumMap.clear();
+    _imageBullets.clear();
+    _abstractNumImageBulletMap.clear();
     _backgroundImage = null;
 
     // Register document fonts
@@ -89,9 +95,23 @@ class DocxExporter {
 
     // Process lists recursively
     final allLists = _collectLists(doc);
+    int abstractNumIdCounter = 2; // 0 and 1 are reserved for default styles
+
     for (var list in allLists) {
       list.numId = _numIdCounter++;
-      _listTypes.add(list.isOrdered);
+
+      if (list.style.imageBulletBytes != null) {
+        // Image Bullet List
+        final bulletIndex = _imageBullets.length;
+        _imageBullets.add(list.style.imageBulletBytes!);
+
+        final absId = abstractNumIdCounter++;
+        _abstractNumImageBulletMap[absId] = bulletIndex;
+        _listAbstractNumMap[list.numId!] = absId;
+      } else {
+        // Standard List
+        _listAbstractNumMap[list.numId!] = list.isOrdered ? 1 : 0;
+      }
     }
 
     final archive = Archive();
@@ -105,6 +125,17 @@ class DocxExporter {
     archive.addFile(_createFontTable(doc));
     archive.addFile(_createFontTableRels(doc)); // Add Font Table Rels
     archive.addFile(_createNumbering(doc));
+
+    // Numbering Rels (for image bullets)
+    if (_imageBullets.isNotEmpty) {
+      archive.addFile(_createNumberingRels());
+      // Add image bullet files
+      for (int i = 0; i < _imageBullets.length; i++) {
+        final filename = 'word/media/imageBullet$i.png';
+        archive.addFile(
+            ArchiveFile(filename, _imageBullets[i].length, _imageBullets[i]));
+      }
+    }
 
     // Process fonts
     for (var font in fontManager.fonts) {
@@ -236,6 +267,11 @@ class DocxExporter {
       // Ensure we register unique extensions
       final contentType = 'image/${ext == "jpg" ? "jpeg" : ext}';
       generator.registerExtension(ext, contentType);
+    }
+
+    // Ensure png is registered for image bullets
+    if (_imageBullets.isNotEmpty) {
+      generator.registerExtension('png', 'image/png');
     }
 
     final xml = generator.generate();
@@ -1228,11 +1264,50 @@ class DocxExporter {
     final buffer = StringBuffer();
     buffer.writeln('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     buffer.writeln(
-      '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">',
+      '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+      'xmlns:v="urn:schemas-microsoft-com:vml" '
+      'xmlns:o="urn:schemas-microsoft-com:office:office" '
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+      'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+      'xmlns:w10="urn:schemas-microsoft-com:office:word" '
+      'xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml">',
     );
 
     // Bullet characters for each level
     const bulletChars = ['•', '○', '▪', '•', '○', '▪', '•', '○', '▪'];
+
+    // Image Bullets definitions
+    const vmlShapetype =
+        '<v:shapetype id="_x0000_t75" coordsize="21600,21600" o:spt="75" o:preferrelative="t" path="m@4@5l@4@11@9@11@9@5xe" filled="f" stroked="f">'
+        '<v:stroke joinstyle="miter"/>'
+        '<v:formulas>'
+        '<v:f eqn="if lineDrawn pixelLineWidth 0"/>'
+        '<v:f eqn="sum @0 1 0"/>'
+        '<v:f eqn="sum 0 0 @1"/>'
+        '<v:f eqn="prod @2 1 2"/>'
+        '<v:f eqn="prod @3 21600 pixelWidth"/>'
+        '<v:f eqn="prod @3 21600 pixelHeight"/>'
+        '<v:f eqn="sum @0 0 1"/>'
+        '<v:f eqn="prod @6 1 2"/>'
+        '<v:f eqn="prod @7 21600 pixelWidth"/>'
+        '<v:f eqn="sum @8 21600 0"/>'
+        '<v:f eqn="prod @7 21600 pixelHeight"/>'
+        '<v:f eqn="sum @10 21600 0"/>'
+        '</v:formulas>'
+        '<v:path o:extrusionok="f" gradientshapeok="t" o:connecttype="rect"/>'
+        '<o:lock v:ext="edit" aspectratio="t"/>'
+        '</v:shapetype>';
+
+    for (int i = 0; i < _imageBullets.length; i++) {
+      buffer.writeln('  <w:numPicBullet w:numPicBulletId="$i">');
+      buffer.writeln('    <w:pict>');
+      if (i == 0) buffer.writeln(vmlShapetype);
+      buffer.writeln(
+          '      <v:shape id="_x0000_i102$i" type="#_x0000_t75" style="width:9pt;height:9pt" o:bullet="t">');
+      buffer.writeln('      <v:imagedata r:id="rIdImgBullet$i" o:title=""/>');
+      buffer.writeln('    </v:shape></w:pict>');
+      buffer.writeln('  </w:numPicBullet>');
+    }
 
     // Abstract numbering for bullets (abstractNumId=0) - 9 levels
     buffer.writeln('  <w:abstractNum w:abstractNumId="0">');
@@ -1308,20 +1383,83 @@ class DocxExporter {
     }
     buffer.writeln('  </w:abstractNum>');
 
-    // Generate num instances linking to correct abstractNumId
-    // Each list instance gets its own numId, ensuring proper restart
-    for (int i = 0; i < _listTypes.length; i++) {
-      final numId = i + 1;
-      final abstractNumId = _listTypes[i] ? 1 : 0; // ordered = 1, bullet = 0
+    // Abstract Custom Image Bullets
+    _abstractNumImageBulletMap.forEach((absId, bulletIndex) {
+      buffer.writeln('  <w:abstractNum w:abstractNumId="$absId">');
       buffer.writeln(
-        '  <w:num w:numId="$numId"><w:abstractNumId w:val="$abstractNumId"/></w:num>',
+          '    <w:nsid w:val="${(100000 + absId).toRadixString(16)}"/>');
+      buffer.writeln('    <w:multiLevelType w:val="hybridMultilevel"/>');
+
+      for (int lvl = 0; lvl < 9; lvl++) {
+        // Use 360 twips (0.25 inch) step for image bullets to match demo.docx fidelity
+        // Level 0 starts at 720 (0.5 inch), then increments by 360.
+        final indent = 720 + (lvl * 360);
+        buffer.writeln('''
+      <w:lvl w:ilvl="$lvl">
+        <w:start w:val="1"/>
+        <w:numFmt w:val="bullet"/>
+        <w:lvlText w:val=""/>
+        <w:lvlPicBulletId w:val="$bulletIndex"/>
+        <w:lvlJc w:val="left"/>
+        <w:pPr>
+          <w:tabs><w:tab w:val="num" w:pos="$indent"/></w:tabs>
+          <w:ind w:left="$indent" w:hanging="360"/>
+        </w:pPr>
+        <w:rPr>
+          <w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/>
+          <w:color w:val="auto"/>
+        </w:rPr>
+      </w:lvl>''');
+      }
+      buffer.writeln('  </w:abstractNum>');
+    });
+
+    // Generate num instances linking to correct abstractNumId
+    _listAbstractNumMap.forEach((numId, absId) {
+      buffer.writeln(
+        '  <w:num w:numId="$numId"><w:abstractNumId w:val="$absId"/></w:num>',
       );
-    }
+    });
 
     buffer.writeln('</w:numbering>');
     final xml = buffer.toString();
     return ArchiveFile(
       'word/numbering.xml',
+      utf8.encode(xml).length,
+      utf8.encode(xml),
+    );
+  }
+
+  ArchiveFile _createNumberingRels() {
+    final builder = XmlBuilder();
+    builder.processing(
+        'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
+    builder.element(
+      'Relationships',
+      nest: () {
+        builder.attribute(
+          'xmlns',
+          'http://schemas.openxmlformats.org/package/2006/relationships',
+        );
+
+        for (int i = 0; i < _imageBullets.length; i++) {
+          builder.element(
+            'Relationship',
+            nest: () {
+              builder.attribute('Id', 'rIdImgBullet$i');
+              builder.attribute(
+                'Type',
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+              );
+              builder.attribute('Target', 'media/imageBullet$i.png');
+            },
+          );
+        }
+      },
+    );
+    final xml = builder.buildDocument().toXmlString();
+    return ArchiveFile(
+      'word/_rels/numbering.xml.rels',
       utf8.encode(xml).length,
       utf8.encode(xml),
     );
