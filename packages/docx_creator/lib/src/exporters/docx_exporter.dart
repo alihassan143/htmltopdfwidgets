@@ -18,6 +18,18 @@ class DocxExporter {
   DocxBackgroundImage? _backgroundImage;
   final FontManager fontManager = FontManager();
 
+  /// ID generator for unique element IDs (available for advanced usage).
+  final DocxIdGenerator idGenerator = DocxIdGenerator();
+
+  /// Optional validator for pre-export validation.
+  /// If set, the document will be validated before export.
+  final DocxValidator? validator;
+
+  /// Creates a DocxExporter.
+  ///
+  /// Optionally provide a [validator] for pre-export validation.
+  DocxExporter({this.validator});
+
   /// Exports the document to a file.
   Future<void> exportToFile(DocxBuiltDocument doc, String filePath) async {
     try {
@@ -35,6 +47,17 @@ class DocxExporter {
 
   /// Exports the document to bytes.
   Future<Uint8List> exportToBytes(DocxBuiltDocument doc) async {
+    // Run validation if validator is provided
+    if (validator != null) {
+      final isValid = validator!.validate(doc);
+      if (!isValid) {
+        throw DocxExportException(
+          'Document validation failed: ${validator!.errors.join(", ")}',
+          targetFormat: 'DOCX',
+        );
+      }
+    }
+
     _images.clear();
     _imageCounter = 0;
     _uniqueIdCounter = 1;
@@ -103,15 +126,26 @@ class DocxExporter {
       archive.addFile(_createBackgroundHeaderRels(doc));
     }
 
-    // Footnotes and Endnotes (for round-tripping)
-    if (doc.footnotesXml != null) {
+    // Theme (for round-tripping)
+    if (doc.themeXml != null) {
+      archive.addFile(_createTheme(doc));
+    }
+
+    // Footnotes and Endnotes
+    // Priority: Generated Objects > Raw XML (Round-trip)
+    if (doc.footnotes != null && doc.footnotes!.isNotEmpty) {
+      archive.addFile(_createFootnotes(doc.footnotes!));
+    } else if (doc.footnotesXml != null) {
       archive.addFile(ArchiveFile(
         'word/footnotes.xml',
         utf8.encode(doc.footnotesXml!).length,
         utf8.encode(doc.footnotesXml!),
       ));
     }
-    if (doc.endnotesXml != null) {
+
+    if (doc.endnotes != null && doc.endnotes!.isNotEmpty) {
+      archive.addFile(_createEndnotes(doc.endnotes!));
+    } else if (doc.endnotesXml != null) {
       archive.addFile(ArchiveFile(
         'word/endnotes.xml',
         utf8.encode(doc.endnotesXml!).length,
@@ -124,6 +158,11 @@ class DocxExporter {
       archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
     }
 
+    // Theme (for round-tripping)
+    if (doc.themeXml != null) {
+      archive.addFile(_createTheme(doc));
+    }
+
     final encoder = ZipEncoder();
     final bytes = encoder.encode(archive);
     if (bytes.isEmpty) {
@@ -131,6 +170,14 @@ class DocxExporter {
     }
 
     return Uint8List.fromList(bytes);
+  }
+
+  ArchiveFile _createTheme(DocxBuiltDocument doc) {
+    return ArchiveFile(
+      'word/theme/theme1.xml',
+      utf8.encode(doc.themeXml!).length,
+      utf8.encode(doc.themeXml!),
+    );
   }
 
   ArchiveFile _createContentTypes(DocxBuiltDocument doc) {
@@ -141,180 +188,57 @@ class DocxExporter {
         utf8.encode(doc.contentTypesXml!),
       );
     }
-    final builder = XmlBuilder();
-    builder.processing(
-      'xml',
-      'version="1.0" encoding="UTF-8" standalone="yes"',
-    );
-    builder.element(
-      'Types',
-      nest: () {
-        builder.attribute(
-          'xmlns',
-          'http://schemas.openxmlformats.org/package/2006/content-types',
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'rels');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-package.relationships+xml',
-            );
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'xml');
-            builder.attribute('ContentType', 'application/xml');
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'png');
-            builder.attribute('ContentType', 'image/png');
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'jpeg');
-            builder.attribute('ContentType', 'image/jpeg');
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'jpg');
-            builder.attribute('ContentType', 'image/jpeg');
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'gif');
-            builder.attribute('ContentType', 'image/gif');
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'bmp');
-            builder.attribute('ContentType', 'image/bmp');
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'tiff');
-            builder.attribute('ContentType', 'image/tiff');
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'odttf');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-package.obfuscated-font',
-            );
-          },
-        );
-        builder.element(
-          'Default',
-          nest: () {
-            builder.attribute('Extension', 'tif');
-            builder.attribute('ContentType', 'image/tiff');
-          },
-        );
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/document.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml',
-            );
-          },
-        );
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/styles.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml',
-            );
-          },
-        );
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/settings.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml',
-            );
-          },
-        );
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/fontTable.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml',
-            );
-          },
-        );
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/numbering.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml',
-            );
-          },
-        );
-        // Background header content type (if using background image)
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/header_bg.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml',
-            );
-          },
-        );
-        // Regular header content type
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/header1.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml',
-            );
-          },
-        );
-        // Footer content type
-        builder.element(
-          'Override',
-          nest: () {
-            builder.attribute('PartName', '/word/footer1.xml');
-            builder.attribute(
-              'ContentType',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml',
-            );
-          },
-        );
-      },
-    );
-    final xml = builder.buildDocument().toXmlString();
+
+    // Dynamic generation using ContentTypesGenerator
+    final generator = ContentTypesGenerator();
+
+    // Register standard parts
+    generator.registerPart('/word/document.xml',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml');
+    generator.registerPart('/word/styles.xml',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml');
+    generator.registerPart('/word/settings.xml',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml');
+    generator.registerPart('/word/fontTable.xml',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml');
+    generator.registerPart('/word/numbering.xml',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml');
+
+    // Theme
+    if (doc.themeXml != null) {
+      generator.registerPart('/word/theme/theme1.xml',
+          'application/vnd.openxmlformats-officedocument.theme+xml');
+    }
+
+    // Footnotes/Endnotes
+    if (doc.footnotesXml != null) {
+      generator.registerPart('/word/footnotes.xml',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml');
+    }
+    if (doc.endnotesXml != null) {
+      generator.registerPart('/word/endnotes.xml',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml');
+    }
+
+    // Headers/Footers
+    if (doc.section?.header != null) generator.registerHeader('header1.xml');
+    if (doc.section?.footer != null) generator.registerFooter('footer1.xml');
+
+    // Background Header
+    if (_backgroundImage != null) {
+      generator.registerHeader('header_bg.xml');
+    }
+
+    // Scan for images to register extensions
+    for (var i = 0; i < _images.length; i++) {
+      final key = _images.keys.elementAt(i);
+      final ext = key.split('.').last.toLowerCase();
+      // Ensure we register unique extensions
+      final contentType = 'image/${ext == "jpg" ? "jpeg" : ext}';
+      generator.registerExtension(ext, contentType);
+    }
+
+    final xml = generator.generate();
     return ArchiveFile(
       '[Content_Types].xml',
       utf8.encode(xml).length,
@@ -369,19 +293,32 @@ class DocxExporter {
     builder.element(
       'w:document',
       nest: () {
+        // Core WordprocessingML namespace
         builder.attribute(
           'xmlns:w',
           'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
         );
+        // DrawingML WordprocessingDrawing namespace
         builder.attribute(
           'xmlns:wp',
           'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing',
         );
+        // Relationships namespace
         builder.attribute(
           'xmlns:r',
           'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
         );
-        // Add VML namespaces for background images
+        // DrawingML main namespace
+        builder.attribute(
+          'xmlns:a',
+          'http://schemas.openxmlformats.org/drawingml/2006/main',
+        );
+        // Picture namespace
+        builder.attribute(
+          'xmlns:pic',
+          'http://schemas.openxmlformats.org/drawingml/2006/picture',
+        );
+        // VML namespaces for legacy shapes
         builder.attribute(
           'xmlns:v',
           'urn:schemas-microsoft-com:vml',
@@ -390,9 +327,35 @@ class DocxExporter {
           'xmlns:o',
           'urn:schemas-microsoft-com:office:office',
         );
+        // Math namespace
+        builder.attribute(
+          'xmlns:m',
+          'http://schemas.openxmlformats.org/officeDocument/2006/math',
+        );
+        // Markup Compatibility namespace
+        builder.attribute(
+          'xmlns:mc',
+          'http://schemas.openxmlformats.org/markup-compatibility/2006',
+        );
+        // Word 2010 extensions
         builder.attribute(
           'xmlns:w14',
           'http://schemas.microsoft.com/office/word/2010/wordml',
+        );
+        // WordprocessingShape namespace (Word 2010+)
+        builder.attribute(
+          'xmlns:wps',
+          'http://schemas.microsoft.com/office/word/2010/wordprocessingShape',
+        );
+        // WordprocessingGroup namespace (Word 2010+)
+        builder.attribute(
+          'xmlns:wpg',
+          'http://schemas.microsoft.com/office/word/2010/wordprocessingGroup',
+        );
+        // DrawingML WordprocessingDrawing (Word 2010+)
+        builder.attribute(
+          'xmlns:wp14',
+          'http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing',
         );
 
         // Add background (color and/or image)
@@ -869,6 +832,58 @@ class DocxExporter {
     );
   }
 
+  ArchiveFile _createFootnotes(List<DocxFootnote> footnotes) {
+    final builder = XmlBuilder();
+    builder.processing(
+        'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
+    builder.element(
+      'w:footnotes',
+      nest: () {
+        builder.attribute(
+          'xmlns:w',
+          'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+        );
+
+        for (var note in footnotes) {
+          note.buildXml(builder);
+        }
+      },
+    );
+
+    final xml = builder.buildDocument().toXmlString();
+    return ArchiveFile(
+      'word/footnotes.xml',
+      utf8.encode(xml).length,
+      utf8.encode(xml),
+    );
+  }
+
+  ArchiveFile _createEndnotes(List<DocxEndnote> endnotes) {
+    final builder = XmlBuilder();
+    builder.processing(
+        'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
+    builder.element(
+      'w:endnotes',
+      nest: () {
+        builder.attribute(
+          'xmlns:w',
+          'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+        );
+
+        for (var note in endnotes) {
+          note.buildXml(builder);
+        }
+      },
+    );
+
+    final xml = builder.buildDocument().toXmlString();
+    return ArchiveFile(
+      'word/endnotes.xml',
+      utf8.encode(xml).length,
+      utf8.encode(xml),
+    );
+  }
+
   ArchiveFile _createDocumentRels(DocxBuiltDocument doc) {
     final builder = XmlBuilder();
     builder.processing('xml', 'version="1.0" encoding="UTF-8"');
@@ -1010,7 +1025,8 @@ class DocxExporter {
           builder.attribute('Target', 'fontTable.xml');
         });
 
-        if (doc.footnotesXml != null) {
+        if ((doc.footnotes != null && doc.footnotes!.isNotEmpty) ||
+            doc.footnotesXml != null) {
           builder.element('Relationship', nest: () {
             builder.attribute('Id', 'rIdFootnotes');
             builder.attribute('Type',
@@ -1019,7 +1035,8 @@ class DocxExporter {
           });
         }
 
-        if (doc.endnotesXml != null) {
+        if ((doc.endnotes != null && doc.endnotes!.isNotEmpty) ||
+            doc.endnotesXml != null) {
           builder.element('Relationship', nest: () {
             builder.attribute('Id', 'rIdEndnotes');
             builder.attribute('Type',

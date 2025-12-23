@@ -757,8 +757,35 @@ DocxParagraph(
 
 ### Footnotes & Endnotes
 
-Footnotes and endnotes from existing documents are fully preserved during read/edit operations.
-Programmatic creation of new footnotes via the Builder API is currently not supported.
+Docs can now include footnotes and endnotes programmatically or preserve them from existing documents.
+
+#### Programmatic Creation
+
+```dart
+final doc = docx()
+  .p('Main text content.')
+  
+  // Add a footnote
+  .addFootnote(DocxFootnote(
+    footnoteId: 1, // Unique internal ID
+    content: [
+      DocxParagraph.text('This is a footnote at the bottom of the page.'),
+    ],
+  ))
+  
+  // Add an endnote
+  .addEndnote(DocxEndnote(
+    endnoteId: 1, // Unique internal ID
+    content: [
+      DocxParagraph.text('This is an endnote at the end of the document.'),
+    ],
+  ))
+  .build();
+```
+
+#### Round-Trip Preservation
+
+When reading an existing DOCX file, `footnotes.xml` and `endnotes.xml` are parsed into `DocxFootnote` and `DocxEndnote` objects. These are preserved and re-exported when saving the document, ensuring no data loss.
 
 ### Text Borders
 

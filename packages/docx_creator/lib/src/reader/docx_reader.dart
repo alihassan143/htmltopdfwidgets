@@ -68,11 +68,27 @@ class _DocxReaderOrchestrator {
       _styleParser.parse(stylesXml);
     }
 
-    // 3. Load numbering for list detection
+    // 3. Parse theme (colors and fonts) from theme1.xml
+    DocxThemeColors themeColors = const DocxThemeColors();
+    DocxThemeFonts themeFonts = const DocxThemeFonts();
+    final themeXml = context.readContent('word/theme/theme1.xml');
+    if (themeXml != null) {
+      final (colors, fonts) = ThemeParser.parse(themeXml);
+      themeColors = colors;
+      themeFonts = fonts;
+    }
+
+    // 4. Load and parse numbering for list detection
     final numberingXml = context.readContent('word/numbering.xml');
     context.numberingXml = numberingXml;
+    if (numberingXml != null) {
+      final numberingParser = NumberingParser(context);
+      numberingParser.parse(numberingXml);
+      // Store parsed numbering in context for use by block parser
+      context.parsedNumberings = numberingParser.numberings;
+    }
 
-    // 4. Parse document content
+    // 5. Parse document content
     final documentFile = context.archive.findFile('word/document.xml');
     if (documentFile == null) {
       throw Exception('Invalid docx file: missing word/document.xml');
@@ -84,7 +100,7 @@ class _DocxReaderOrchestrator {
     final body = documentXml.findAllElements('w:body').first;
     final elements = _blockParser.parseBody(body);
 
-    // 5. Parse document background
+    // 6. Parse document background
     DocxColor? backgroundColor;
     final bgElem = documentXml.findAllElements('w:background').firstOrNull;
     if (bgElem != null) {
@@ -94,17 +110,17 @@ class _DocxReaderOrchestrator {
       }
     }
 
-    // 6. Parse section properties
+    // 7. Parse section properties
     final section =
         _sectionParser.parse(body, backgroundColor: backgroundColor);
 
-    // 7. Read fonts
+    // 8. Read fonts
     final fontTableXml = context.readContent('word/fontTable.xml');
     final fontTableRelsXml =
         context.readContent('word/_rels/fontTable.xml.rels');
     final fonts = _readFonts(fontTableXml, fontTableRelsXml);
 
-    // 8. Gather raw XML strings for preservation
+    // 9. Gather raw XML strings for preservation
     final settingsXml = context.readContent('word/settings.xml');
     final contentTypesXml = context.readContent('[Content_Types].xml');
     final rootRelsXml = context.readContent('_rels/.rels');
@@ -112,25 +128,87 @@ class _DocxReaderOrchestrator {
     final headerBgRelsXml =
         context.readContent('word/_rels/header_bg.xml.rels');
 
-    // 9. Read footnotes and endnotes
+    // 10. Read footnotes and endnotes
     final footnotesXml = context.readContent('word/footnotes.xml');
     final endnotesXml = context.readContent('word/endnotes.xml');
+
+    List<DocxFootnote>? footnotes;
+    if (footnotesXml != null) {
+      footnotes = _parseFootnotes(footnotesXml);
+    }
+
+    List<DocxEndnote>? endnotes;
+    if (endnotesXml != null) {
+      endnotes = _parseEndnotes(endnotesXml);
+    }
+
+    // 11. Build DocxTheme from parsed style and theme data
+    final theme = _styleParser.buildTheme(
+      colors: themeColors,
+      fonts: themeFonts,
+    );
 
     return DocxBuiltDocument(
       elements: elements,
       section: section,
       stylesXml: stylesXml,
+      rootRelsXml: rootRelsXml,
       numberingXml: numberingXml,
       settingsXml: settingsXml,
       fontTableXml: fontTableXml,
       contentTypesXml: contentTypesXml,
-      rootRelsXml: rootRelsXml,
       headerBgXml: headerBgXml,
       headerBgRelsXml: headerBgRelsXml,
       footnotesXml: footnotesXml,
       endnotesXml: endnotesXml,
       fonts: fonts,
+      footnotes: footnotes,
+      endnotes: endnotes,
+      theme: theme,
+      themeXml: themeXml,
     );
+  }
+
+  List<DocxFootnote> _parseFootnotes(String xml) {
+    final results = <DocxFootnote>[];
+    try {
+      final doc = XmlDocument.parse(xml);
+      for (var elem in doc.findAllElements('w:footnote')) {
+        final id = int.tryParse(elem.getAttribute('w:id') ?? '');
+        if (id != null) {
+          // Parse content blocks (paragraphs etc) inside the footnote
+          final content = _blockParser.parseBlocks(elem.children);
+          results.add(DocxFootnote(
+            footnoteId: id,
+            content: content.whereType<DocxBlock>().toList(),
+          ));
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors, fallback to raw XML
+    }
+    return results;
+  }
+
+  List<DocxEndnote> _parseEndnotes(String xml) {
+    final results = <DocxEndnote>[];
+    try {
+      final doc = XmlDocument.parse(xml);
+      for (var elem in doc.findAllElements('w:endnote')) {
+        final id = int.tryParse(elem.getAttribute('w:id') ?? '');
+        if (id != null) {
+          // Parse content blocks (paragraphs etc) inside the endnote
+          final content = _blockParser.parseBlocks(elem.children);
+          results.add(DocxEndnote(
+            endnoteId: id,
+            content: content.whereType<DocxBlock>().toList(),
+          ));
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors, fallback to raw XML
+    }
+    return results;
   }
 
   List<EmbeddedFont> _readFonts(

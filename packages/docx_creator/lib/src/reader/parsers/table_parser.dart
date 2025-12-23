@@ -121,6 +121,21 @@ class TableParser {
       }
     }
 
+    // ============================================================
+    // True-Fidelity: Parse Table Grid (column widths)
+    // ============================================================
+    List<int>? gridColumns;
+    final tblGrid = node.getElement('w:tblGrid');
+    if (tblGrid != null) {
+      gridColumns = <int>[];
+      for (var gridCol in tblGrid.findAllElements('w:gridCol')) {
+        final w = int.tryParse(gridCol.getAttribute('w:w') ?? '');
+        if (w != null) gridColumns.add(w);
+      }
+      // If empty list, set to null
+      if (gridColumns.isEmpty) gridColumns = null;
+    }
+
     // 2. Parse Rows and Cells
     final rawRows = <_TempRow>[];
 
@@ -142,8 +157,9 @@ class TableParser {
             cells.add(_parseCell(cellNode));
           }
         }
-        if (cells.isNotEmpty)
+        if (cells.isNotEmpty) {
           rawRows.add(_TempRow(cells: cells, isHeader: isHeader));
+        }
       }
     }
 
@@ -199,6 +215,7 @@ class TableParser {
       position: position,
       styleId: styleId,
       look: look,
+      gridColumns: gridColumns,
     );
   }
 

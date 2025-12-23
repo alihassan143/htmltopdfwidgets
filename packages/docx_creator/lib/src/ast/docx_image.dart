@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:xml/xml.dart';
 
 import '../core/enums.dart';
+import '../core/xml_extension.dart';
 import 'docx_drawing.dart';
 import 'docx_node.dart';
 
@@ -47,6 +48,46 @@ class DocxInlineImage extends DocxInline {
   /// Vertical position origin (relative from).
   final DocxVerticalPositionFrom vPositionFrom;
 
+  // ==========================================================================
+  // True-Fidelity Anchor Attributes (for round-trip preservation)
+  // ==========================================================================
+
+  /// Distance from text on top (in EMUs). Default: 0
+  final int distT;
+
+  /// Distance from text on bottom (in EMUs). Default: 0
+  final int distB;
+
+  /// Distance from text on left (in EMUs). Default: 114300 (0.125 inch)
+  final int distL;
+
+  /// Distance from text on right (in EMUs). Default: 114300 (0.125 inch)
+  final int distR;
+
+  /// Whether simple positioning is used (simplePos attribute).
+  final bool simplePos;
+
+  /// Relative z-order height for overlapping objects.
+  final int relativeHeight;
+
+  /// Whether the anchor position is locked.
+  final bool locked;
+
+  /// Whether the object can be positioned inside a table cell.
+  final bool layoutInCell;
+
+  /// Whether overlapping with other floating objects is allowed.
+  final bool allowOverlap;
+
+  /// Effect extent values (l, t, r, b) in EMUs for shadows/glows.
+  final int effectExtentL;
+  final int effectExtentT;
+  final int effectExtentR;
+  final int effectExtentB;
+
+  /// Stores unknown anchor attributes for round-trip preservation.
+  final XmlExtensionMap? anchorExtensions;
+
   // Internal: Set by the exporter when processing
   String? _relationshipId;
   int? _uniqueId;
@@ -65,6 +106,21 @@ class DocxInlineImage extends DocxInline {
     this.vAlign,
     this.hPositionFrom = DocxHorizontalPositionFrom.column,
     this.vPositionFrom = DocxVerticalPositionFrom.paragraph,
+    // True-Fidelity anchor attributes with sensible defaults
+    this.distT = 0,
+    this.distB = 0,
+    this.distL = 114300,
+    this.distR = 114300,
+    this.simplePos = false,
+    this.relativeHeight = 251658240,
+    this.locked = false,
+    this.layoutInCell = true,
+    this.allowOverlap = true,
+    this.effectExtentL = 0,
+    this.effectExtentT = 0,
+    this.effectExtentR = 0,
+    this.effectExtentB = 0,
+    this.anchorExtensions,
     super.id,
   });
 
@@ -127,17 +183,21 @@ class DocxInlineImage extends DocxInline {
     builder.element(
       'wp:anchor',
       nest: () {
-        builder.attribute('distT', '0');
-        builder.attribute('distB', '0');
-        builder.attribute('distL', '114300'); // Standard margin
-        builder.attribute('distR', '114300');
-        builder.attribute('simplePos', '0');
-        builder.attribute('relativeHeight', '251658240');
+        // True-Fidelity: Use preserved values instead of hardcoded ones
+        builder.attribute('distT', distT.toString());
+        builder.attribute('distB', distB.toString());
+        builder.attribute('distL', distL.toString());
+        builder.attribute('distR', distR.toString());
+        builder.attribute('simplePos', simplePos ? '1' : '0');
+        builder.attribute('relativeHeight', relativeHeight.toString());
         builder.attribute(
             'behindDoc', textWrap == DocxTextWrap.behindText ? '1' : '0');
-        builder.attribute('locked', '0');
-        builder.attribute('layoutInCell', '1');
-        builder.attribute('allowOverlap', '1');
+        builder.attribute('locked', locked ? '1' : '0');
+        builder.attribute('layoutInCell', layoutInCell ? '1' : '0');
+        builder.attribute('allowOverlap', allowOverlap ? '1' : '0');
+
+        // Write back any unknown extension attributes
+        anchorExtensions?.writeAttributesTo(builder);
 
         builder.element('wp:simplePos', nest: () {
           builder.attribute('x', '0');
@@ -182,13 +242,14 @@ class DocxInlineImage extends DocxInline {
           },
         );
 
+        // True-Fidelity: Use preserved effect extent values
         builder.element(
           'wp:effectExtent',
           nest: () {
-            builder.attribute('l', '0');
-            builder.attribute('t', '0');
-            builder.attribute('r', '0');
-            builder.attribute('b', '0');
+            builder.attribute('l', effectExtentL.toString());
+            builder.attribute('t', effectExtentT.toString());
+            builder.attribute('r', effectExtentR.toString());
+            builder.attribute('b', effectExtentB.toString());
           },
         );
 

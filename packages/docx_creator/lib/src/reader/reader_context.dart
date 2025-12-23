@@ -6,6 +6,7 @@ import 'package:xml/xml.dart';
 
 import 'models/docx_relationship.dart';
 import 'models/docx_style.dart';
+import 'models/docx_theme.dart';
 
 /// Shared context for all reader components.
 ///
@@ -28,6 +29,9 @@ class ReaderContext {
 
   /// Raw numbering XML for list type detection
   String? numberingXml;
+
+  /// Parsed numbering definitions (numId -> DocxNumberingDef)
+  Map<int, DocxNumberingDef> parsedNumberings = {};
 
   ReaderContext(this.archive);
 

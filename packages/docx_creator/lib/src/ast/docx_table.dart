@@ -226,6 +226,12 @@ class DocxTable extends DocxBlock {
   /// Table style ID (e.g., "TableGrid", "MediumShading1-Accent1").
   final String? styleId;
 
+  /// Column widths from w:tblGrid (in twips).
+  ///
+  /// This preserves the original grid layout for round-trip fidelity.
+  /// If null, the grid will be calculated from cell widths.
+  final List<int>? gridColumns;
+
   const DocxTable({
     required this.rows,
     this.style = const DocxTableStyle(),
@@ -236,6 +242,7 @@ class DocxTable extends DocxBlock {
     this.position,
     this.styleId,
     this.look = const DocxTableLook(),
+    this.gridColumns,
     super.id,
   });
 
@@ -283,6 +290,7 @@ class DocxTable extends DocxBlock {
     DocxTablePosition? position,
     String? styleId,
     DocxTableLook? look,
+    List<int>? gridColumns,
   }) {
     return DocxTable(
       rows: rows ?? this.rows,
@@ -293,6 +301,8 @@ class DocxTable extends DocxBlock {
       alignment: alignment ?? this.alignment,
       position: position ?? this.position,
       styleId: styleId ?? this.styleId,
+      look: look ?? this.look,
+      gridColumns: gridColumns ?? this.gridColumns,
       id: id,
     );
   }
@@ -441,7 +451,25 @@ class DocxTable extends DocxBlock {
             );
           },
         );
-        builder.element('w:tblGrid');
+        // Table Grid - use preserved values or calculate from cells
+        builder.element('w:tblGrid', nest: () {
+          if (gridColumns != null && gridColumns!.isNotEmpty) {
+            // Use preserved grid columns (True-Fidelity round-trip)
+            for (var colWidth in gridColumns!) {
+              builder.element('w:gridCol', nest: () {
+                builder.attribute('w:w', colWidth.toString());
+              });
+            }
+          } else if (rows.isNotEmpty) {
+            // Calculate from first row cell widths
+            for (var cell in rows.first.cells) {
+              builder.element('w:gridCol', nest: () {
+                // Default to 2160 twips (1.5 inches) if no width specified
+                builder.attribute('w:w', (cell.width ?? 2160).toString());
+              });
+            }
+          }
+        });
 
         // Rows
         for (int i = 0; i < rows.length; i++) {

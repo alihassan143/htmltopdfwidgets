@@ -32,6 +32,8 @@ export 'src/core/defaults.dart';
 // Core
 export 'src/core/enums.dart';
 export 'src/core/exceptions.dart';
+export 'src/core/measurements.dart';
+export 'src/core/xml_extension.dart';
 // Exporters
 export 'src/exporters/docx_exporter.dart';
 export 'src/exporters/html_exporter.dart';
@@ -39,3 +41,10 @@ export 'src/exporters/html_exporter.dart';
 export 'src/parsers/html_parser.dart';
 export 'src/parsers/markdown_parser.dart';
 export 'src/reader/docx_reader.dart';
+// Reader Models
+export 'src/reader/models/docx_theme.dart';
+// Utilities
+export 'src/utils/content_types_generator.dart';
+export 'src/utils/docx_id_generator.dart';
+export 'src/utils/docx_validator.dart';
+export 'src/utils/xml_utils.dart' hide DocxIdGenerator;

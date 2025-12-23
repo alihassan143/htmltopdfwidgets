@@ -627,6 +627,33 @@ docx()
 
 ---
 
+## Footnotes & Endnotes
+
+Add academic citations and notes programmatically:
+
+```dart
+final doc = docx()
+  .p('This statement needs a citation.')
+  .addFootnote(DocxFootnote(
+    footnoteId: 1,
+    content: [
+      DocxParagraph.text('Source: Official Documentation, 2024.'),
+    ],
+  ))
+  .p('Unexpected finding.')
+  .addEndnote(DocxEndnote(
+    endnoteId: 1,
+    content: [
+      DocxParagraph.text('Further investigation required.'),
+    ],
+  ))
+  .build();
+```
+
+> **Note:** IDs must be unique. Word handles re-numbering automatically, but you must provide improved internal IDs for linking.
+
+---
+
 ## Font Embedding
 
 Embed custom fonts with OOXML-compliant obfuscation:

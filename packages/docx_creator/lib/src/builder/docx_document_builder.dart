@@ -208,12 +208,33 @@ class DocxDocumentBuilder {
     return this;
   }
 
+  final List<DocxFootnote> _footnotes = [];
+  final List<DocxEndnote> _endnotes = [];
+
+  /// Adds a footnote to the document.
+  ///
+  /// You should reference this footnote in your text using [DocxFootnoteRef].
+  DocxDocumentBuilder addFootnote(DocxFootnote note) {
+    _footnotes.add(note);
+    return this;
+  }
+
+  /// Adds an endnote to the document.
+  ///
+  /// You should reference this endnote in your text using [DocxEndnoteRef].
+  DocxDocumentBuilder addEndnote(DocxEndnote note) {
+    _endnotes.add(note);
+    return this;
+  }
+
   /// Builds the final document.
   DocxBuiltDocument build() {
     return DocxBuiltDocument(
       elements: List.unmodifiable(_elements),
       section: _currentSection,
       fonts: List.unmodifiable(_fonts),
+      footnotes: _footnotes.isNotEmpty ? List.unmodifiable(_footnotes) : null,
+      endnotes: _endnotes.isNotEmpty ? List.unmodifiable(_endnotes) : null,
     );
   }
 }
@@ -223,18 +244,27 @@ class DocxBuiltDocument {
   final List<DocxNode> elements;
   final DocxSectionDef? section;
   final List<EmbeddedFont> fonts;
+  final List<DocxFootnote>? footnotes;
+  final List<DocxEndnote>? endnotes;
 
   // Raw XML content preserved from original document (for round-tripping)
   final String? stylesXml;
   final String? numberingXml;
   final String? settingsXml;
   final String? fontTableXml;
+  final String? themeXml;
   final String? contentTypesXml;
   final String? rootRelsXml;
   final String? headerBgXml;
   final String? headerBgRelsXml;
   final String? footnotesXml;
   final String? endnotesXml;
+
+  /// Parsed theme information (styles, colors, fonts).
+  ///
+  /// This is populated when reading an existing document with [DocxReader].
+  /// It provides access to theme colors, fonts, and named styles.
+  final DocxTheme? theme;
 
   const DocxBuiltDocument({
     required this.elements,
@@ -243,6 +273,7 @@ class DocxBuiltDocument {
     this.numberingXml,
     this.settingsXml,
     this.fontTableXml,
+    this.themeXml,
     this.contentTypesXml,
     this.rootRelsXml,
     this.headerBgXml,
@@ -250,6 +281,9 @@ class DocxBuiltDocument {
     this.footnotesXml,
     this.endnotesXml,
     this.fonts = const [],
+    this.footnotes,
+    this.endnotes,
+    this.theme,
   });
 }
 

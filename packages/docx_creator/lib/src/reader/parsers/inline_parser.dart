@@ -1,6 +1,7 @@
 import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
+import '../../core/xml_extension.dart';
 import '../models/docx_style.dart';
 import '../reader_context.dart';
 
@@ -186,6 +187,61 @@ class InlineParser {
             if (isAnchor) {
               final anchor = drawing.findAllElements('wp:anchor').first;
 
+              // ============================================================
+              // True-Fidelity: Parse all anchor-level attributes
+              // ============================================================
+              final distT =
+                  int.tryParse(anchor.getAttribute('distT') ?? '0') ?? 0;
+              final distB =
+                  int.tryParse(anchor.getAttribute('distB') ?? '0') ?? 0;
+              final distL =
+                  int.tryParse(anchor.getAttribute('distL') ?? '114300') ??
+                      114300;
+              final distR =
+                  int.tryParse(anchor.getAttribute('distR') ?? '114300') ??
+                      114300;
+              final simplePos = anchor.getAttribute('simplePos') == '1';
+              final relativeHeight = int.tryParse(
+                      anchor.getAttribute('relativeHeight') ?? '251658240') ??
+                  251658240;
+              final locked = anchor.getAttribute('locked') == '1';
+              final layoutInCell = anchor.getAttribute('layoutInCell') != '0';
+              final allowOverlap = anchor.getAttribute('allowOverlap') != '0';
+
+              // Parse effect extent
+              int effectExtentL = 0, effectExtentT = 0;
+              int effectExtentR = 0, effectExtentB = 0;
+              final effectExtent =
+                  anchor.findAllElements('wp:effectExtent').firstOrNull;
+              if (effectExtent != null) {
+                effectExtentL =
+                    int.tryParse(effectExtent.getAttribute('l') ?? '0') ?? 0;
+                effectExtentT =
+                    int.tryParse(effectExtent.getAttribute('t') ?? '0') ?? 0;
+                effectExtentR =
+                    int.tryParse(effectExtent.getAttribute('r') ?? '0') ?? 0;
+                effectExtentB =
+                    int.tryParse(effectExtent.getAttribute('b') ?? '0') ?? 0;
+              }
+
+              // Capture unknown attributes for round-trip
+              const knownAnchorAttrs = {
+                'distT',
+                'distB',
+                'distL',
+                'distR',
+                'simplePos',
+                'relativeHeight',
+                'behindDoc',
+                'locked',
+                'layoutInCell',
+                'allowOverlap',
+              };
+              final anchorExtensions = XmlExtensionMap.extractFromElement(
+                anchor,
+                knownAttributes: knownAnchorAttrs,
+              );
+
               // Parse horizontal position
               double? hOffset;
               DrawingHAlign? hAlign;
@@ -297,6 +353,22 @@ class InlineParser {
                 vAlign: vAlign,
                 hPositionFrom: hFrom,
                 vPositionFrom: vFrom,
+                // True-Fidelity attributes
+                distT: distT,
+                distB: distB,
+                distL: distL,
+                distR: distR,
+                simplePos: simplePos,
+                relativeHeight: relativeHeight,
+                locked: locked,
+                layoutInCell: layoutInCell,
+                allowOverlap: allowOverlap,
+                effectExtentL: effectExtentL,
+                effectExtentT: effectExtentT,
+                effectExtentR: effectExtentR,
+                effectExtentB: effectExtentB,
+                anchorExtensions:
+                    anchorExtensions.isEmpty ? null : anchorExtensions,
               );
             }
 
