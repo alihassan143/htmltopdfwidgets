@@ -259,6 +259,8 @@ class DocxBuiltDocument {
   final String? headerBgRelsXml;
   final String? footnotesXml;
   final String? endnotesXml;
+  final String? numberingRelsXml;
+  final Map<String, Uint8List> numberingImages;
 
   /// Parsed theme information (styles, colors, fonts).
   ///
@@ -280,6 +282,8 @@ class DocxBuiltDocument {
     this.headerBgRelsXml,
     this.footnotesXml,
     this.endnotesXml,
+    this.numberingRelsXml,
+    this.numberingImages = const {},
     this.fonts = const [],
     this.footnotes,
     this.endnotes,

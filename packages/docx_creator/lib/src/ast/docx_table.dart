@@ -25,8 +25,8 @@ class DocxTableStyle {
   final String? evenRowFill;
   final String? oddRowFill;
 
-  /// Cell padding in twips.
-  final int cellPadding;
+  /// Cell padding in twips, or null to use Word defaults.
+  final int? cellPadding;
 
   /// Detailed border overrides.
   final DocxBorderSide? borderTop;
@@ -46,7 +46,7 @@ class DocxTableStyle {
     this.headerFill,
     this.evenRowFill,
     this.oddRowFill,
-    this.cellPadding = 115,
+    this.cellPadding,
     this.borderTop,
     this.borderBottom,
     this.borderLeft,
@@ -195,6 +195,18 @@ class DocxTableLook {
     this.noHBand = false,
     this.noVBand = true,
   });
+
+  /// Calculates the hex value for w:val attribute based on flags.
+  String get hex {
+    int val = 0;
+    if (firstRow) val |= 0x0020;
+    if (lastRow) val |= 0x0040;
+    if (firstColumn) val |= 0x0080;
+    if (lastColumn) val |= 0x0100;
+    if (noHBand) val |= 0x0200;
+    if (noVBand) val |= 0x0400;
+    return val.toRadixString(16).padLeft(4, '0').toUpperCase();
+  }
 }
 
 /// A table element in the document.
@@ -360,7 +372,7 @@ class DocxTable extends DocxBlock {
 
             // Table Look
             builder.element('w:tblLook', nest: () {
-              builder.attribute('w:val', '04A0'); // Default hex (conditional)
+              builder.attribute('w:val', look.hex);
               builder.attribute('w:firstRow', look.firstRow ? '1' : '0');
               builder.attribute('w:lastRow', look.lastRow ? '1' : '0');
               builder.attribute('w:firstColumn', look.firstColumn ? '1' : '0');
@@ -426,10 +438,23 @@ class DocxTable extends DocxBlock {
                 void buildSide(String tag, DocxBorderSide? side) {
                   if (side != null) {
                     builder.element(tag, nest: () {
-                      builder.attribute('w:val', side.style.xmlValue);
+                      builder.attribute('w:val', side.xmlStyle);
                       builder.attribute('w:sz', side.size.toString());
                       builder.attribute('w:space', side.space.toString());
-                      builder.attribute('w:color', side.color.hex);
+                      if (side.color != DocxColor.auto) {
+                        builder.attribute('w:color', side.color.hex);
+                      } else {
+                        builder.attribute('w:color', 'auto');
+                      }
+                      if (side.themeColor != null) {
+                        builder.attribute('w:themeColor', side.themeColor!);
+                      }
+                      if (side.themeTint != null) {
+                        builder.attribute('w:themeTint', side.themeTint!);
+                      }
+                      if (side.themeShade != null) {
+                        builder.attribute('w:themeShade', side.themeShade!);
+                      }
                     });
                   } else if (style.border != DocxBorder.none) {
                     // Fallback to global style
@@ -445,40 +470,42 @@ class DocxTable extends DocxBlock {
                 buildSide('w:insideV', style.borderInsideV);
               },
             );
-            // Cell margins/padding
-            builder.element(
-              'w:tblCellMar',
-              nest: () {
-                builder.element(
-                  'w:top',
-                  nest: () {
-                    builder.attribute('w:w', style.cellPadding.toString());
-                    builder.attribute('w:type', 'dxa');
-                  },
-                );
-                builder.element(
-                  'w:left',
-                  nest: () {
-                    builder.attribute('w:w', style.cellPadding.toString());
-                    builder.attribute('w:type', 'dxa');
-                  },
-                );
-                builder.element(
-                  'w:bottom',
-                  nest: () {
-                    builder.attribute('w:w', style.cellPadding.toString());
-                    builder.attribute('w:type', 'dxa');
-                  },
-                );
-                builder.element(
-                  'w:right',
-                  nest: () {
-                    builder.attribute('w:w', style.cellPadding.toString());
-                    builder.attribute('w:type', 'dxa');
-                  },
-                );
-              },
-            );
+            // Cell margins/padding - only emit if explicitly set
+            if (style.cellPadding != null) {
+              builder.element(
+                'w:tblCellMar',
+                nest: () {
+                  builder.element(
+                    'w:top',
+                    nest: () {
+                      builder.attribute('w:w', style.cellPadding.toString());
+                      builder.attribute('w:type', 'dxa');
+                    },
+                  );
+                  builder.element(
+                    'w:left',
+                    nest: () {
+                      builder.attribute('w:w', style.cellPadding.toString());
+                      builder.attribute('w:type', 'dxa');
+                    },
+                  );
+                  builder.element(
+                    'w:bottom',
+                    nest: () {
+                      builder.attribute('w:w', style.cellPadding.toString());
+                      builder.attribute('w:type', 'dxa');
+                    },
+                  );
+                  builder.element(
+                    'w:right',
+                    nest: () {
+                      builder.attribute('w:w', style.cellPadding.toString());
+                      builder.attribute('w:type', 'dxa');
+                    },
+                  );
+                },
+              );
+            }
           },
         );
         // Table Grid - use preserved values or calculate from cells
@@ -529,10 +556,14 @@ class DocxTableRow extends DocxNode {
   /// Whether this row is a header row (repeats on new pages).
   final bool isHeader;
 
+  /// Conditional formatting style flags (e.g., '100000000000' for header row).
+  final String? cnfStyle;
+
   const DocxTableRow({
     required this.cells,
     this.height,
     this.isHeader = false,
+    this.cnfStyle,
     super.id,
   });
 
@@ -540,11 +571,13 @@ class DocxTableRow extends DocxNode {
     List<DocxTableCell>? cells,
     int? height,
     bool? isHeader,
+    String? cnfStyle,
   }) {
     return DocxTableRow(
       cells: cells ?? this.cells,
       height: height ?? this.height,
       isHeader: isHeader ?? this.isHeader,
+      cnfStyle: cnfStyle ?? this.cnfStyle,
       id: id,
     );
   }
@@ -574,10 +607,16 @@ class DocxTableRow extends DocxNode {
       'w:tr',
       nest: () {
         // Row properties
-        if (height != null || isHeader || this.isHeader) {
+        if (height != null || isHeader || this.isHeader || cnfStyle != null) {
           builder.element(
             'w:trPr',
             nest: () {
+              // Conditional formatting style (must come first)
+              if (cnfStyle != null) {
+                builder.element('w:cnfStyle', nest: () {
+                  builder.attribute('w:val', cnfStyle!);
+                });
+              }
               if (height != null) {
                 builder.element(
                   'w:trHeight',
@@ -618,8 +657,20 @@ class DocxTableCell extends DocxNode {
   /// Background shading color hex.
   final String? shadingFill;
 
+  /// Theme-based fill color reference.
+  final String? themeFill;
+
+  /// Theme fill tint adjustment.
+  final String? themeFillTint;
+
+  /// Theme fill shade adjustment.
+  final String? themeFillShade;
+
   /// Cell width in twips.
   final int? width;
+
+  /// Conditional formatting style flags.
+  final String? cnfStyle;
 
   // Borders
   final DocxBorderSide? borderTop;
@@ -637,6 +688,9 @@ class DocxTableCell extends DocxNode {
     this.rowSpan = 1,
     this.verticalAlign = DocxVerticalAlign.center,
     this.shadingFill,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     this.width,
     this.borderTop,
     this.borderBottom,
@@ -644,6 +698,7 @@ class DocxTableCell extends DocxNode {
     this.borderRight,
     this.marginLeft,
     this.marginRight,
+    this.cnfStyle,
     super.id,
   });
 
@@ -713,10 +768,23 @@ class DocxTableCell extends DocxNode {
 
   void _buildBorder(XmlBuilder builder, String tag, DocxBorderSide side) {
     builder.element(tag, nest: () {
-      builder.attribute('w:val', side.style.xmlValue);
+      builder.attribute('w:val', side.xmlStyle);
       builder.attribute('w:sz', side.size.toString());
       builder.attribute('w:space', side.space.toString());
-      builder.attribute('w:color', side.color.hex);
+      if (side.color != DocxColor.auto) {
+        builder.attribute('w:color', side.color.hex);
+      } else {
+        builder.attribute('w:color', 'auto');
+      }
+      if (side.themeColor != null) {
+        builder.attribute('w:themeColor', side.themeColor!);
+      }
+      if (side.themeTint != null) {
+        builder.attribute('w:themeTint', side.themeTint!);
+      }
+      if (side.themeShade != null) {
+        builder.attribute('w:themeShade', side.themeShade!);
+      }
     });
   }
 
@@ -729,6 +797,11 @@ class DocxTableCell extends DocxNode {
         builder.element(
           'w:tcPr',
           nest: () {
+            if (cnfStyle != null) {
+              builder.element('w:cnfStyle', nest: () {
+                builder.attribute('w:val', cnfStyle!);
+              });
+            }
             if (width != null) {
               builder.element(
                 'w:tcW',
@@ -760,13 +833,23 @@ class DocxTableCell extends DocxNode {
                 builder.attribute('w:val', verticalAlign.name);
               },
             );
-            if (shadingFill != null) {
+            if (shadingFill != null || themeFill != null) {
               builder.element(
                 'w:shd',
                 nest: () {
                   builder.attribute('w:val', 'clear');
                   builder.attribute('w:color', 'auto');
-                  builder.attribute('w:fill', shadingFill!.replaceAll('#', ''));
+                  builder.attribute(
+                      'w:fill', shadingFill?.replaceAll('#', '') ?? 'auto');
+                  if (themeFill != null) {
+                    builder.attribute('w:themeFill', themeFill!);
+                  }
+                  if (themeFillTint != null) {
+                    builder.attribute('w:themeFillTint', themeFillTint!);
+                  }
+                  if (themeFillShade != null) {
+                    builder.attribute('w:themeFillShade', themeFillShade!);
+                  }
                 },
               );
             }

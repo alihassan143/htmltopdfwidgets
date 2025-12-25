@@ -91,6 +91,9 @@ class DocxParagraph extends DocxBlock {
   /// Indentation level for list items (0-based).
   final int? ilvl;
 
+  /// Conditional formatting style flags for table paragraphs.
+  final String? cnfStyle;
+
   /// Creates a paragraph with specified children and formatting.
   const DocxParagraph({
     this.children = const [],
@@ -113,6 +116,7 @@ class DocxParagraph extends DocxBlock {
     this.pageBreakBefore = false,
     this.numId,
     this.ilvl,
+    this.cnfStyle,
     super.id,
   });
 
@@ -258,6 +262,7 @@ class DocxParagraph extends DocxBlock {
     bool? pageBreakBefore,
     int? numId,
     int? ilvl,
+    String? cnfStyle,
   }) {
     return DocxParagraph(
       children: children ?? this.children,
@@ -280,6 +285,7 @@ class DocxParagraph extends DocxBlock {
       pageBreakBefore: pageBreakBefore ?? this.pageBreakBefore,
       numId: numId ?? this.numId,
       ilvl: ilvl ?? this.ilvl,
+      cnfStyle: cnfStyle ?? this.cnfStyle,
       id: id,
     );
   }
@@ -438,6 +444,14 @@ class DocxParagraph extends DocxBlock {
                   },
                 );
               }
+              if (cnfStyle != null) {
+                builder.element(
+                  'w:cnfStyle',
+                  nest: () {
+                    builder.attribute('w:val', cnfStyle!);
+                  },
+                );
+              }
             },
           );
         }
@@ -468,14 +482,28 @@ class DocxParagraph extends DocxBlock {
       shadingFill != null ||
       outlineLevel != null ||
       pageBreakBefore ||
-      numId != null;
+      numId != null ||
+      cnfStyle != null;
 
   void _buildBorder(XmlBuilder builder, String tag, DocxBorderSide side) {
     builder.element(tag, nest: () {
-      builder.attribute('w:val', side.style.xmlValue);
+      builder.attribute('w:val', side.xmlStyle);
       builder.attribute('w:sz', side.size.toString());
       builder.attribute('w:space', side.space.toString());
-      builder.attribute('w:color', side.color.hex);
+      if (side.color != DocxColor.auto) {
+        builder.attribute('w:color', side.color.hex);
+      } else {
+        builder.attribute('w:color', 'auto');
+      }
+      if (side.themeColor != null) {
+        builder.attribute('w:themeColor', side.themeColor!);
+      }
+      if (side.themeTint != null) {
+        builder.attribute('w:themeTint', side.themeTint!);
+      }
+      if (side.themeShade != null) {
+        builder.attribute('w:themeShade', side.themeShade!);
+      }
     });
   }
 }

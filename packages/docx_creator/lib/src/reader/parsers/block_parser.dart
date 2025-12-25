@@ -186,9 +186,25 @@ class BlockParser {
     // Update the count for this numId
     _numIdItemCounts[numId] = (start - 1) + items.length;
 
+    // Determine list style (specifically image bullets)
+    DocxListStyle listStyle = const DocxListStyle();
+    final numberingDef = context.parsedNumberings[numId];
+    if (numberingDef != null) {
+      // Check the level of the first item to determine style
+      // Ideally we'd handle mixed styles, but DocxList takes one style
+      final firstLevel = paragraphs.first.ilvl ?? 0;
+      final levelDef =
+          numberingDef.levels.where((l) => l.level == firstLevel).firstOrNull;
+
+      if (levelDef?.picBulletImage != null) {
+        listStyle = DocxListStyle(imageBulletBytes: levelDef!.picBulletImage);
+      }
+    }
+
     return DocxList(
       items: items,
       isOrdered: _isOrderedList(numId),
+      style: listStyle,
       startIndex: start,
       numId: numId,
     );
@@ -196,6 +212,18 @@ class BlockParser {
 
   /// Determine if a list is ordered based on numbering definitions.
   bool _isOrderedList(int numId) {
+    if (context.parsedNumberings.containsKey(numId)) {
+      final def = context.parsedNumberings[numId]!;
+      // Check level 0 or any level?
+      // Usually checking level 0 is sufficient for list type
+      final lvl = def.levels.where((l) => l.level == 0).firstOrNull ??
+          def.levels.firstOrNull;
+      if (lvl != null) {
+        return lvl.numFmt != 'bullet';
+      }
+    }
+
+    // Fallback to XML parsing if not found in parsed map (legacy/safety)
     final numberingXml = context.numberingXml;
     if (numberingXml == null) return false;
 

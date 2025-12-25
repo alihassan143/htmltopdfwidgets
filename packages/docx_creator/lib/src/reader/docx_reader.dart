@@ -70,10 +70,24 @@ class _DocxReaderOrchestrator {
       _styleParser.parse(stylesXml);
     }
 
-    // 3. Parse theme (colors and fonts) from theme1.xml
+    // 3. Parse theme (colors and fonts)
     DocxThemeColors themeColors = const DocxThemeColors();
     DocxThemeFonts themeFonts = const DocxThemeFonts();
-    final themeXml = context.readContent('word/theme/theme1.xml');
+
+    // Find theme file via relationships to handle variations (e.g. theme2.xml)
+    String themePath = 'word/theme/theme1.xml'; // Default fallback
+    final themeRel = _relationshipManager
+        .getByType(
+            'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme')
+        .firstOrNull;
+    if (themeRel != null) {
+      final resolved = _relationshipManager.resolveTarget(themeRel.id);
+      if (resolved != null) {
+        themePath = resolved;
+      }
+    }
+
+    final themeXml = context.readContent(themePath);
     if (themeXml != null) {
       final (colors, fonts) = ThemeParser.parse(themeXml);
       themeColors = colors;
@@ -84,9 +98,11 @@ class _DocxReaderOrchestrator {
     final numberingXml = context.readContent('word/numbering.xml');
     context.numberingXml = numberingXml;
 
-    // Parse numbering relationships for image bullets
+    // Parse numbering relationships for image bullets and preservation
     final numberingRelsXml =
         context.readContent('word/_rels/numbering.xml.rels');
+    final numberingImages = <String, Uint8List>{};
+
     if (numberingRelsXml != null) {
       try {
         final relsDoc = XmlDocument.parse(numberingRelsXml);
@@ -100,6 +116,23 @@ class _DocxReaderOrchestrator {
               type: type ?? '',
               target: target,
             );
+
+            // If it's an image, read it for preservation
+            if (type?.contains('image') == true) {
+              // Target is usually "media/image1.png" relative to "word/"
+              // or "/word/media/image1.png" absolute
+              String imagePath;
+              if (target.startsWith('/')) {
+                imagePath = target.substring(1);
+              } else {
+                imagePath = 'word/$target';
+              }
+              final file = context.archive.findFile(imagePath);
+              if (file != null) {
+                numberingImages[target] =
+                    Uint8List.fromList(file.content as List<int>);
+              }
+            }
           }
         }
       } catch (_) {}
@@ -178,6 +211,8 @@ class _DocxReaderOrchestrator {
       stylesXml: stylesXml,
       rootRelsXml: rootRelsXml,
       numberingXml: numberingXml,
+      numberingRelsXml: numberingRelsXml,
+      numberingImages: numberingImages,
       settingsXml: settingsXml,
       fontTableXml: fontTableXml,
       contentTypesXml: contentTypesXml,

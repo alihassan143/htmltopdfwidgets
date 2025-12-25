@@ -146,16 +146,30 @@ class DocxExporter {
     archive.addFile(_createStyles(doc));
     archive.addFile(_createFontTable(doc));
     archive.addFile(_createFontTableRels(doc)); // Add Font Table Rels
+    archive.addFile(_createTheme(doc)); // Add Theme (Critical for fonts)
+
     archive.addFile(_createNumbering(doc));
 
-    // Numbering Rels (for image bullets)
-    if (_imageBullets.isNotEmpty) {
-      archive.addFile(_createNumberingRels());
-      // Add image bullet files
+    // Numbering Rels (for image bullets - check doc first for preservation)
+    if (_imageBullets.isNotEmpty || doc.numberingRelsXml != null) {
+      archive.addFile(_createNumberingRels(doc));
+
+      // Add image bullet files (generated)
       for (int i = 0; i < _imageBullets.length; i++) {
         final filename = 'word/media/imageBullet$i.png';
         archive.addFile(
             ArchiveFile(filename, _imageBullets[i].length, _imageBullets[i]));
+      }
+
+      // Add original numbering images (preserved)
+      if (doc.numberingImages.isNotEmpty) {
+        doc.numberingImages.forEach((target, bytes) {
+          final filename = target.startsWith('/')
+              ? target.substring(1)
+              : 'word/$target'; // Target is relative to word/ usually
+          // Avoid duplicate entries if something overlaps (unlikely if naming differs)
+          archive.addFile(ArchiveFile(filename, bytes.length, bytes));
+        });
       }
     }
 
@@ -177,11 +191,6 @@ class DocxExporter {
     if (_backgroundImage != null) {
       archive.addFile(_createBackgroundHeader(doc));
       archive.addFile(_createBackgroundHeaderRels(doc));
-    }
-
-    // Theme (for round-tripping)
-    if (doc.themeXml != null) {
-      archive.addFile(_createTheme(doc));
     }
 
     // Footnotes and Endnotes
@@ -211,11 +220,6 @@ class DocxExporter {
       archive.addFile(ArchiveFile(entry.key, entry.value.length, entry.value));
     }
 
-    // Theme (for round-tripping)
-    if (doc.themeXml != null) {
-      archive.addFile(_createTheme(doc));
-    }
-
     final encoder = ZipEncoder();
     final bytes = encoder.encode(archive);
     if (bytes.isEmpty) {
@@ -226,10 +230,11 @@ class DocxExporter {
   }
 
   ArchiveFile _createTheme(DocxBuiltDocument doc) {
+    final themeXml = doc.themeXml ?? _defaultThemeXml;
     return ArchiveFile(
       'word/theme/theme1.xml',
-      utf8.encode(doc.themeXml!).length,
-      utf8.encode(doc.themeXml!),
+      utf8.encode(themeXml).length,
+      utf8.encode(themeXml),
     );
   }
 
@@ -258,10 +263,8 @@ class DocxExporter {
         'application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml');
 
     // Theme
-    if (doc.themeXml != null) {
-      generator.registerPart('/word/theme/theme1.xml',
-          'application/vnd.openxmlformats-officedocument.theme+xml');
-    }
+    generator.registerPart('/word/theme/theme1.xml',
+        'application/vnd.openxmlformats-officedocument.theme+xml');
 
     // Footnotes/Endnotes
     if (doc.footnotesXml != null) {
@@ -997,6 +1000,13 @@ class DocxExporter {
           },
         );
 
+        builder.element('Relationship', nest: () {
+          builder.attribute('Id', 'rIdTheme');
+          builder.attribute('Type',
+              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme');
+          builder.attribute('Target', 'theme/theme1.xml');
+        });
+
         // Header (rId5)
         if (doc.section?.header != null) {
           builder.element(
@@ -1459,7 +1469,14 @@ class DocxExporter {
     );
   }
 
-  ArchiveFile _createNumberingRels() {
+  ArchiveFile _createNumberingRels(DocxBuiltDocument doc) {
+    if (doc.numberingRelsXml != null) {
+      return ArchiveFile(
+        'word/_rels/numbering.xml.rels',
+        utf8.encode(doc.numberingRelsXml!).length,
+        utf8.encode(doc.numberingRelsXml!),
+      );
+    }
     final builder = XmlBuilder();
     builder.processing(
         'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
@@ -1621,3 +1638,36 @@ class DocxExporter {
     }
   }
 }
+
+const String _defaultThemeXml =
+    '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme">
+  <a:themeElements>
+    <a:clrScheme name="Office">
+      <a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>
+      <a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>
+      <a:dk2><a:srgbClr val="1F497D"/></a:dk2>
+      <a:lt2><a:srgbClr val="EEECE1"/></a:lt2>
+      <a:accent1><a:srgbClr val="4F81BD"/></a:accent1>
+      <a:accent2><a:srgbClr val="C0504D"/></a:accent2>
+      <a:accent3><a:srgbClr val="9BBB59"/></a:accent3>
+      <a:accent4><a:srgbClr val="8064A2"/></a:accent4>
+      <a:accent5><a:srgbClr val="4BACC6"/></a:accent5>
+      <a:accent6><a:srgbClr val="F79646"/></a:accent6>
+      <a:hlink><a:srgbClr val="0000FF"/></a:hlink>
+      <a:folHlink><a:srgbClr val="800080"/></a:folHlink>
+    </a:clrScheme>
+    <a:fontScheme name="Office">
+      <a:majorFont><a:latin typeface="Cambria"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
+      <a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
+    </a:fontScheme>
+    <a:fmtScheme name="Office">
+      <a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="50000"/><a:satMod val="300000"/></a:schemeClr></a:gs><a:gs pos="35000"><a:schemeClr val="phClr"><a:tint val="37000"/><a:satMod val="300000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:tint val="15000"/><a:satMod val="350000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="16200000" scaled="1"/></a:gradFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:shade val="51000"/><a:satMod val="130000"/></a:schemeClr></a:gs><a:gs pos="80000"><a:schemeClr val="phClr"><a:shade val="93000"/><a:satMod val="130000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="94000"/><a:satMod val="135000"/></a:schemeClr></a:gs></a:gsLst><a:lin ang="16200000" scaled="0"/></a:gradFill></a:fillStyleLst>
+      <a:lnStyleLst><a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"><a:shade val="95000"/><a:satMod val="105000"/></a:schemeClr></a:solidFill><a:prstDash val="solid"/></a:ln><a:ln w="25400" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln><a:ln w="38100" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln></a:lnStyleLst>
+      <a:effectStyleLst><a:effectStyle><a:effectLst><a:outerShdw blurRad="40000" dist="20000" dir="5400000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="38000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle><a:effectStyle><a:effectLst><a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle><a:effectStyle><a:effectLst><a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle></a:effectStyleLst>
+      <a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="40000"/><a:satMod val="350000"/></a:schemeClr></a:gs><a:gs pos="40000"><a:schemeClr val="phClr"><a:tint val="45000"/><a:shade val="99000"/><a:satMod val="350000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="20000"/><a:satMod val="255000"/></a:schemeClr></a:gs></a:gsLst><a:path path="circle"><a:fillToRect l="50000" t="-80000" r="50000" b="180000"/></a:path></a:gradFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="80000"/><a:satMod val="300000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"><a:shade val="30000"/><a:satMod val="200000"/></a:schemeClr></a:gs></a:gsLst><a:path path="circle"><a:fillToRect l="50000" t="50000" r="50000" b="50000"/></a:path></a:gradFill></a:bgFillStyleLst>
+    </a:fmtScheme>
+  </a:themeElements>
+  <a:objectDefaults/>
+  <a:extraClrSchemeLst/>
+</a:theme>''';

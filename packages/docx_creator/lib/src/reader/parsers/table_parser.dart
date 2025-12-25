@@ -15,7 +15,7 @@ class TableParser {
   /// Parse a table element into DocxTable.
   DocxTable parse(XmlElement node) {
     // 1. Parse Table Properties
-    DocxTableStyle style = const DocxTableStyle();
+    DocxTableStyle style = const DocxTableStyle(border: DocxBorder.none);
     int? tableWidth;
     DocxWidthType widthType = DocxWidthType.auto;
 
@@ -109,15 +109,39 @@ class TableParser {
     if (tblPr != null) {
       final tblLook = tblPr.getElement('w:tblLook');
       if (tblLook != null) {
-        look = DocxTableLook(
-          firstRow: tblLook.getAttribute('w:firstRow') != '0', // Default 1
-          lastRow: tblLook.getAttribute('w:lastRow') == '1', // Default 0
-          firstColumn:
-              tblLook.getAttribute('w:firstColumn') == '1', // Default 0
-          lastColumn: tblLook.getAttribute('w:lastColumn') == '1', // Default 0
-          noHBand: tblLook.getAttribute('w:noHBand') == '1', // Default 0
-          noVBand: tblLook.getAttribute('w:noVBand') == '1', // Default 0
-        );
+        // Try individual attributes first (newer Word format)
+        final firstRowAttr = tblLook.getAttribute('w:firstRow');
+        final lastRowAttr = tblLook.getAttribute('w:lastRow');
+        final firstColAttr = tblLook.getAttribute('w:firstColumn');
+        final lastColAttr = tblLook.getAttribute('w:lastColumn');
+        final noHBandAttr = tblLook.getAttribute('w:noHBand');
+        final noVBandAttr = tblLook.getAttribute('w:noVBand');
+
+        // If attributes exist, use them
+        if (firstRowAttr != null || noHBandAttr != null) {
+          look = DocxTableLook(
+            firstRow: firstRowAttr != '0',
+            lastRow: lastRowAttr == '1',
+            firstColumn: firstColAttr == '1',
+            lastColumn: lastColAttr == '1',
+            noHBand: noHBandAttr == '1',
+            noVBand: noVBandAttr == '1',
+          );
+        } else {
+          // Fallback: Decode from w:val hex value (older Word format)
+          final valAttr = tblLook.getAttribute('w:val');
+          if (valAttr != null) {
+            final val = int.tryParse(valAttr, radix: 16) ?? 0;
+            look = DocxTableLook(
+              firstRow: (val & 0x0020) != 0,
+              lastRow: (val & 0x0040) != 0,
+              firstColumn: (val & 0x0080) != 0,
+              lastColumn: (val & 0x0100) != 0,
+              noHBand: (val & 0x0200) != 0,
+              noVBand: (val & 0x0400) != 0,
+            );
+          }
+        }
       }
     }
 
@@ -143,12 +167,17 @@ class TableParser {
       if (child is XmlElement && child.name.local == 'tr') {
         final cells = <_TempCell>[];
         bool isHeader = false;
+        String? cnfStyle;
 
-        // Check for header row property
+        // Check for header row property and cnfStyle
         final trPr = child.getElement('w:trPr');
         if (trPr != null) {
           if (trPr.getElement('w:tblHeader') != null) {
             isHeader = true;
+          }
+          final cs = trPr.getElement('w:cnfStyle');
+          if (cs != null) {
+            cnfStyle = cs.getAttribute('w:val');
           }
         }
 
@@ -158,7 +187,11 @@ class TableParser {
           }
         }
         if (cells.isNotEmpty) {
-          rawRows.add(_TempRow(cells: cells, isHeader: isHeader));
+          rawRows.add(_TempRow(
+            cells: cells,
+            isHeader: isHeader,
+            cnfStyle: cnfStyle,
+          ));
         }
       }
     }
@@ -176,6 +209,7 @@ class TableParser {
     for (int i = 0; i < grid.length; i++) {
       final r = grid[i];
       final isHeaderRow = i < rawRows.length ? rawRows[i].isHeader : false;
+      final rowCnfStyle = i < rawRows.length ? rawRows[i].cnfStyle : null;
       final cells = <DocxTableCell>[];
       int colIndex = 0;
 
@@ -196,7 +230,7 @@ class TableParser {
           children: c.children,
           colSpan: c.gridSpan,
           rowSpan: c.finalRowSpan,
-          shadingFill: c.shadingFill ?? effectiveStyle.shadingFill,
+          shadingFill: c.shadingFill,
           width: cellWidth,
           borderTop: c.borderTop ?? effectiveStyle.borderTop,
           borderBottom: c.borderBottom ?? effectiveStyle.borderBottomSide,
@@ -205,20 +239,19 @@ class TableParser {
           verticalAlign: c.verticalAlign ??
               effectiveStyle.verticalAlign ??
               DocxVerticalAlign.top,
+          cnfStyle: c.cnfStyle,
         ));
         colIndex += c.gridSpan;
       }
-      finalRows.add(DocxTableRow(cells: cells, isHeader: isHeaderRow));
+      finalRows.add(DocxTableRow(
+        cells: cells,
+        isHeader: isHeaderRow,
+        cnfStyle: rowCnfStyle,
+      ));
     }
 
     // Determine if table has any header rows
     final hasHeader = finalRows.any((row) => row.isHeader);
-
-    // If grid columns are missing but we have percentage widths,
-    // we might need to distribute them.
-    // However, DocxTable.resolvedGridColumns logic handles simple distribution.
-    // If we want to support 'pct' properly for the whole table, we rely on the
-    // Exporter to interpret 'pct' type. Reader just stores it.
 
     return DocxTable(
       rows: finalRows,
@@ -245,6 +278,7 @@ class TableParser {
     DocxBorderSide? borderLeft;
     DocxBorderSide? borderRight;
     DocxVerticalAlign? verticalAlign;
+    String? cnfStyle;
 
     if (tcPr != null) {
       final gs = tcPr.getElement('w:gridSpan');
@@ -269,6 +303,7 @@ class TableParser {
             shadingFill = '#$shadingFill';
           }
         }
+        // TODO: Add themeFill, themeFillTint, themeFillShade to _TempCell when needed
       }
 
       // Parse vertical alignment
@@ -292,6 +327,11 @@ class TableParser {
         borderLeft = _parseBorderSide(tcBorders.getElement('w:left'));
         borderRight = _parseBorderSide(tcBorders.getElement('w:right'));
       }
+
+      final cs = tcPr.getElement('w:cnfStyle');
+      if (cs != null) {
+        cnfStyle = cs.getAttribute('w:val');
+      }
     }
 
     // Parse cell children (paragraphs, nested tables)
@@ -301,6 +341,21 @@ class TableParser {
         children.add(_parseFullParagraph(c));
       } else if (c is XmlElement && c.name.local == 'tbl') {
         children.add(parse(c)); // Recursive for nested tables
+      } else if (c is XmlElement &&
+          ['ins', 'del', 'smartTag', 'sdt'].contains(c.name.local)) {
+        // Handle block-level containers in cells
+        var contentNodes = c.children;
+        if (c.name.local == 'sdt') {
+          final content = c.findAllElements('w:sdtContent').firstOrNull;
+          if (content != null) contentNodes = content.children;
+        }
+        for (var child in contentNodes) {
+          if (child is XmlElement && child.name.local == 'p') {
+            children.add(_parseFullParagraph(child));
+          } else if (child is XmlElement && child.name.local == 'tbl') {
+            children.add(parse(child));
+          }
+        }
       }
     }
 
@@ -315,6 +370,7 @@ class TableParser {
       borderLeft: borderLeft,
       borderRight: borderRight,
       verticalAlign: verticalAlign,
+      cnfStyle: cnfStyle,
     );
   }
 
@@ -323,6 +379,7 @@ class TableParser {
     String? pStyle;
     DocxAlign? align;
     String? shadingFill;
+    String? cnfStyle;
 
     // Parse paragraph properties
     final pPr = xml.getElement('w:pPr');
@@ -349,6 +406,11 @@ class TableParser {
         shadingFill = shdElem.getAttribute('w:fill');
         if (shadingFill == 'auto') shadingFill = null;
       }
+
+      final cs = pPr.getElement('w:cnfStyle');
+      if (cs != null) {
+        cnfStyle = cs.getAttribute('w:val');
+      }
     }
 
     // Resolve style for inheritance
@@ -362,14 +424,16 @@ class TableParser {
       children: children,
       styleId: pStyle,
       align: align ?? effectiveStyle.align ?? DocxAlign.left,
-      shadingFill: shadingFill ?? effectiveStyle.shadingFill,
+      shadingFill: shadingFill,
+      cnfStyle: cnfStyle,
     );
   }
 
   DocxBorderSide? _parseBorderSide(XmlElement? borderElem) {
     if (borderElem == null) return null;
     final val = borderElem.getAttribute('w:val');
-    if (val == null || val == 'none' || val == 'nil') return null;
+    if (val == 'none' || val == 'nil') return const DocxBorderSide.none();
+    if (val == null) return null;
 
     int size = 4;
     final szAttr = borderElem.getAttribute('w:sz');
@@ -378,34 +442,56 @@ class TableParser {
       if (s != null) size = s;
     }
 
+    int space = 0;
+    final spaceAttr = borderElem.getAttribute('w:space');
+    if (spaceAttr != null) {
+      final s = int.tryParse(spaceAttr);
+      if (s != null) space = s;
+    }
+
     var color = DocxColor.black;
     final colorAttr = borderElem.getAttribute('w:color');
     if (colorAttr != null && colorAttr != 'auto') {
       color = DocxColor(colorAttr);
     }
 
+    final themeColor = borderElem.getAttribute('w:themeColor');
+    final themeTint = borderElem.getAttribute('w:themeTint');
+    final themeShade = borderElem.getAttribute('w:themeShade');
+
     var style = DocxBorder.single;
+    String? rawVal;
+    bool found = false;
+
     for (var b in DocxBorder.values) {
       if (b.xmlValue == val) {
         style = b;
+        found = true;
         break;
       }
     }
+    if (!found) {
+      rawVal = val;
+    }
 
-    return DocxBorderSide(style: style, size: size, color: color);
+    return DocxBorderSide(
+      style: style,
+      size: size,
+      space: space,
+      color: color,
+      themeColor: themeColor,
+      themeTint: themeTint,
+      themeShade: themeShade,
+      rawVal: rawVal,
+    );
   }
 
   /// Resolves row spans (vMerge) by tracking grid columns.
-  ///
-  /// This implementation maps each cell to its grid column index (accounting for
-  /// gridSpan) to correctly align vertical merges even when rows have different
-  /// cell counts or spans.
   List<List<_TempCell>> _resolveRowSpans(List<_TempRow> rows) {
     if (rows.isEmpty) return [];
 
     final result = <List<_TempCell>>[];
     // Track the source cell for active vertical merges per grid column
-    // Maps gridColumnIndex -> _TempCell (the restarting cell)
     final activeMerges = <int, _TempCell>{};
     // Track the row index where the merge started
     final mergeStartRows = <int, int>{};
@@ -416,16 +502,12 @@ class TableParser {
       int currentGridCol = 0;
 
       for (var cell in inputRow.cells) {
-        // Calculate the range of grid columns this cell covers
         final gridSpan = cell.gridSpan;
         bool isContinue = cell.vMerge == 'continue' || cell.vMerge == '';
         bool isRestart = cell.vMerge == 'restart';
 
-        // Check if we strictly have a merge instruction
         if (cell.vMerge != null) {
           if (isRestart) {
-            // Start a new merge
-            // Update active merges for ALL grid columns covered by this cell
             final newCell = cell.copyWith(finalRowSpan: 1);
             for (int i = 0; i < gridSpan; i++) {
               activeMerges[currentGridCol + i] = newCell;
@@ -433,54 +515,26 @@ class TableParser {
             }
             outputRow.add(newCell);
           } else if (isContinue) {
-            // Continue existing merge
-            // We need to find the cell that started this merge
-            // We assume the first grid column of this cell aligns with the merge
             if (activeMerges.containsKey(currentGridCol)) {
-              // Updates are done on the ORIGINAL cell object in the result list
-              // We need to find that object reference.
-              // Since we are building 'result' progressively, we can look back.
               final startRowIndex = mergeStartRows[currentGridCol]!;
 
-              // Increment row span of the start cell
-              // Note: We need to replace the cell in the previous row's list
-              // with a new copy having incremented span.
-              // But 'result' stores List<_TempCell>.
-              // This is complex because we need to mutate the previously added cell.
-              // Let's use a simplified approach:
-              // 1. Just don't add this cell to outputRow (it's merged into above)
-              // 2. Increment the span of the *active merge source*
-
-              // Find where the start cell IS in the result structure
-              // It's in result[startRowIndex]. We need to find which cell it is.
-              // We can rely on the fact that we stored the object reference in activeMerges?
-              // No, copyWith creates new objects.
-              // Let's store a reference to the Mutable wrapper or similar?
-              // Or just traverse result[startRowIndex] to find the matching cell?
-              // Optimization: Store (RowIndex, CellIndex) in activeMerges?
-
-              // Let's iterate result[startRowIndex] to find the cell that covers currentGridCol
               var targetRow = result[startRowIndex];
               int checkCol = 0;
               for (int cIdx = 0; cIdx < targetRow.length; cIdx++) {
                 final c = targetRow[cIdx];
                 if (currentGridCol >= checkCol &&
                     currentGridCol < checkCol + c.gridSpan) {
-                  // Found it. Update its span.
                   targetRow[cIdx] =
                       c.copyWith(finalRowSpan: c.finalRowSpan + 1);
-                  // Update activeMerges reference for next iteration (though technically not needed if we look up by index)
                   break;
                 }
                 checkCol += c.gridSpan;
               }
             } else {
-              // 'continue' without specific start (malformed), treat as simple cell
               outputRow.add(cell.copyWith(finalRowSpan: 1));
             }
           }
         } else {
-          // No vertical merge - clear any active merges for these columns
           final newCell = cell.copyWith(finalRowSpan: 1);
           for (int i = 0; i < gridSpan; i++) {
             activeMerges.remove(currentGridCol + i);
@@ -505,16 +559,13 @@ class TableParser {
     // Banding (Horizontal) - default Odd/Even assumption
     if (!look.noHBand) {
       if (row % 2 == 0) {
-        // Odd Row (Index 0, 2, 4...) -> Band 1
         style = style
             .merge(base.tableConditionals['band1Horz'] ?? DocxStyle.empty());
       } else {
-        // Even Row -> Band 2
         style = style
             .merge(base.tableConditionals['band2Horz'] ?? DocxStyle.empty());
       }
     }
-    // Banding (Vertical)
     if (!look.noVBand) {
       if (col % 2 == 0) {
         style = style
@@ -525,7 +576,6 @@ class TableParser {
       }
     }
 
-    // First/Last Row/Col
     if (look.firstRow && row == 0) {
       style =
           style.merge(base.tableConditionals['firstRow'] ?? DocxStyle.empty());
@@ -543,7 +593,6 @@ class TableParser {
           style.merge(base.tableConditionals['lastCol'] ?? DocxStyle.empty());
     }
 
-    // Corners
     if (look.firstRow && look.firstColumn && row == 0 && col == 0) {
       style =
           style.merge(base.tableConditionals['nwCell'] ?? DocxStyle.empty());
@@ -581,6 +630,7 @@ class _TempCell {
   final DocxBorderSide? borderRight;
   final DocxVerticalAlign? verticalAlign;
   final int finalRowSpan;
+  final String? cnfStyle;
 
   _TempCell({
     required this.children,
@@ -594,6 +644,7 @@ class _TempCell {
     this.borderRight,
     this.verticalAlign,
     this.finalRowSpan = 1,
+    this.cnfStyle,
   });
 
   _TempCell copyWith({int? finalRowSpan}) {
@@ -609,6 +660,7 @@ class _TempCell {
       borderRight: borderRight,
       verticalAlign: verticalAlign,
       finalRowSpan: finalRowSpan ?? this.finalRowSpan,
+      cnfStyle: cnfStyle,
     );
   }
 }
@@ -617,6 +669,7 @@ class _TempCell {
 class _TempRow {
   final List<_TempCell> cells;
   final bool isHeader;
+  final String? cnfStyle;
 
-  _TempRow({required this.cells, this.isHeader = false});
+  _TempRow({required this.cells, this.isHeader = false, this.cnfStyle});
 }

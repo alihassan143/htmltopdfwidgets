@@ -1,7 +1,6 @@
 import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
-import '../../core/xml_extension.dart';
 import '../models/docx_style.dart';
 import '../reader_context.dart';
 
@@ -98,15 +97,25 @@ class InlineParser {
     // Extract text
     final textElem = run.getElement('w:t');
     if (textElem != null) {
+      // For font properties, only use direct + character style, not paragraph style
+      DocxStyle? charStyle;
+      if (rStyle != null) {
+        charStyle = context.resolveStyle(rStyle);
+      }
+      final runFontSize = parsedProps.fontSize ?? charStyle?.fontSize;
+      final runFonts = parsedProps.fonts ?? charStyle?.fonts;
+      final runFontFamily = parsedProps.fontFamily ?? charStyle?.fontFamily;
+
       return DocxText(
         textElem.innerText,
         fontWeight: finalProps.fontWeight ?? DocxFontWeight.normal,
         fontStyle: finalProps.fontStyle ?? DocxFontStyle.normal,
         decoration: finalProps.decoration ?? DocxTextDecoration.none,
         color: finalProps.color,
-        shadingFill: finalProps.shadingFill,
-        fontSize: finalProps.fontSize,
-        fontFamily: finalProps.fontFamily,
+        shadingFill: parsedProps.shadingFill, // Only direct shading
+        fontSize: runFontSize,
+        fontFamily: runFontFamily,
+        fonts: runFonts,
         highlight: finalProps.highlight ?? DocxHighlight.none,
         isSuperscript: finalProps.isSuperscript ?? false,
         isSubscript: finalProps.isSubscript ?? false,

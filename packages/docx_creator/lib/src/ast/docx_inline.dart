@@ -1,6 +1,7 @@
 import 'package:xml/xml.dart';
 
 import '../core/enums.dart';
+import '../reader/models/docx_font.dart';
 import 'docx_node.dart';
 
 /// A styled text run within a paragraph.
@@ -26,7 +27,12 @@ class DocxText extends DocxInline {
   final DocxHighlight highlight;
   final String? shadingFill; // Background color hex
   final double? fontSize;
+
+  /// Legacy font family (single string). Use [fonts] for granular control.
   final String? fontFamily;
+
+  /// granular font properties.
+  final DocxFont? fonts;
   final double? characterSpacing;
   final String? href;
 
@@ -53,6 +59,7 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     this.characterSpacing,
     this.href,
     this.isSuperscript = false,
@@ -80,6 +87,7 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     super.id,
   })  : fontWeight = DocxFontWeight.bold,
         fontStyle = DocxFontStyle.normal,
@@ -105,6 +113,7 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.italic,
@@ -130,6 +139,7 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     super.id,
   })  : fontWeight = DocxFontWeight.bold,
         fontStyle = DocxFontStyle.italic,
@@ -155,6 +165,7 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -180,6 +191,7 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -203,6 +215,7 @@ class DocxText extends DocxInline {
     required this.href,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     this.shadingFill,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
@@ -230,6 +243,7 @@ class DocxText extends DocxInline {
         decoration = DocxTextDecoration.none,
         highlight = DocxHighlight.none,
         fontFamily = 'Courier New',
+        fonts = null,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -250,6 +264,7 @@ class DocxText extends DocxInline {
     this.shadingFill,
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     this.color = DocxColor.black,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
@@ -277,6 +292,7 @@ class DocxText extends DocxInline {
         color = null,
         highlight = DocxHighlight.none,
         fontFamily = null,
+        fonts = null,
         characterSpacing = null,
         href = null,
         isSuperscript = true,
@@ -299,6 +315,7 @@ class DocxText extends DocxInline {
         color = null,
         highlight = DocxHighlight.none,
         fontFamily = null,
+        fonts = null,
         characterSpacing = null,
         href = null,
         isSuperscript = false,
@@ -317,6 +334,7 @@ class DocxText extends DocxInline {
     this.content, {
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     this.shadingFill,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
@@ -342,6 +360,7 @@ class DocxText extends DocxInline {
     this.content, {
     this.fontSize,
     this.fontFamily,
+    this.fonts,
     this.shadingFill,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
@@ -376,6 +395,7 @@ class DocxText extends DocxInline {
     String? shadingFill,
     double? fontSize,
     String? fontFamily,
+    DocxFont? fonts,
     double? characterSpacing,
     String? href,
     bool? isSuperscript,
@@ -399,6 +419,7 @@ class DocxText extends DocxInline {
       shadingFill: shadingFill ?? this.shadingFill,
       fontSize: fontSize ?? this.fontSize,
       fontFamily: fontFamily ?? this.fontFamily,
+      fonts: fonts ?? this.fonts,
       characterSpacing: characterSpacing ?? this.characterSpacing,
       href: href ?? this.href,
       isSuperscript: isSuperscript ?? this.isSuperscript,
@@ -500,13 +521,42 @@ class DocxText extends DocxInline {
                   },
                 );
               }
-              if (fontFamily != null) {
+              final effectiveFonts = fonts ??
+                  (fontFamily != null ? DocxFont.family(fontFamily!) : null);
+              if (effectiveFonts != null) {
                 builder.element(
                   'w:rFonts',
                   nest: () {
-                    builder.attribute('w:ascii', fontFamily!);
-                    builder.attribute('w:hAnsi', fontFamily!);
-                    builder.attribute('w:cs', fontFamily!);
+                    if (effectiveFonts.ascii != null) {
+                      builder.attribute('w:ascii', effectiveFonts.ascii!);
+                    }
+                    if (effectiveFonts.hAnsi != null) {
+                      builder.attribute('w:hAnsi', effectiveFonts.hAnsi!);
+                    }
+                    if (effectiveFonts.cs != null) {
+                      builder.attribute('w:cs', effectiveFonts.cs!);
+                    }
+                    if (effectiveFonts.eastAsia != null) {
+                      builder.attribute('w:eastAsia', effectiveFonts.eastAsia!);
+                    }
+                    if (effectiveFonts.hint != null) {
+                      builder.attribute('w:hint', effectiveFonts.hint!);
+                    }
+                    if (effectiveFonts.asciiTheme != null) {
+                      builder.attribute(
+                          'w:asciiTheme', effectiveFonts.asciiTheme!);
+                    }
+                    if (effectiveFonts.hAnsiTheme != null) {
+                      builder.attribute(
+                          'w:hAnsiTheme', effectiveFonts.hAnsiTheme!);
+                    }
+                    if (effectiveFonts.csTheme != null) {
+                      builder.attribute('w:csTheme', effectiveFonts.csTheme!);
+                    }
+                    if (effectiveFonts.eastAsiaTheme != null) {
+                      builder.attribute(
+                          'w:eastAsiaTheme', effectiveFonts.eastAsiaTheme!);
+                    }
                   },
                 );
               }
@@ -585,6 +635,7 @@ class DocxText extends DocxInline {
       effectiveColorHex != null ||
       fontSize != null ||
       fontFamily != null ||
+      fonts != null ||
       highlight != DocxHighlight.none ||
       characterSpacing != null ||
       textBorder != null;

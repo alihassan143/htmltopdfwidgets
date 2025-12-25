@@ -116,18 +116,40 @@ class DocxBorderSide {
   final int size;
   final int space;
 
+  /// Theme color reference (e.g. 'accent1').
+  final String? themeColor;
+
+  /// Theme color tint (e.g. '66' for 40% lighter).
+  final String? themeTint;
+
+  /// Theme color shade (e.g. '80' for 20% darker).
+  final String? themeShade;
+
+  /// Raw XML value for border style if it doesn't match [DocxBorder] enum.
+  final String? rawVal;
+
   const DocxBorderSide({
     this.style = DocxBorder.single,
     this.color = DocxColor.black,
     this.size = 4,
     this.space = 0,
+    this.themeColor,
+    this.themeTint,
+    this.themeShade,
+    this.rawVal,
   });
 
   const DocxBorderSide.none()
       : style = DocxBorder.none,
         color = DocxColor.auto,
         size = 0,
-        space = 0;
+        space = 0,
+        themeColor = null,
+        themeTint = null,
+        themeShade = null,
+        rawVal = null;
+
+  String get xmlStyle => rawVal ?? style.xmlValue;
 }
 
 // ============================================================

@@ -1,6 +1,7 @@
 import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
+import 'docx_font.dart';
 
 /// Represents parsed style properties from styles.xml.
 ///
@@ -35,7 +36,8 @@ class DocxStyle {
   final DocxTextDecoration? decoration;
   final DocxColor? color;
   final double? fontSize;
-  final String? fontFamily;
+  final DocxFont? fonts;
+  String? get fontFamily => fonts?.family;
   final DocxHighlight? highlight;
   final bool? isSuperscript;
   final bool? isSubscript;
@@ -77,7 +79,7 @@ class DocxStyle {
     this.decoration,
     this.color,
     this.fontSize,
-    this.fontFamily,
+    this.fonts,
     this.highlight,
     this.isSuperscript,
     this.isSubscript,
@@ -136,7 +138,7 @@ class DocxStyle {
       decoration: rProps.decoration,
       color: rProps.color,
       fontSize: rProps.fontSize,
-      fontFamily: rProps.fontFamily,
+      fonts: rProps.fonts,
       highlight: rProps.highlight,
       isSuperscript: rProps.isSuperscript,
       isSubscript: rProps.isSubscript,
@@ -183,7 +185,7 @@ class DocxStyle {
       decoration: other.decoration ?? decoration,
       color: other.color ?? color,
       fontSize: other.fontSize ?? fontSize,
-      fontFamily: other.fontFamily ?? fontFamily,
+      fonts: fonts?.merge(other.fonts) ?? other.fonts,
       highlight: other.highlight ?? highlight,
       isSuperscript: other.isSuperscript ?? isSuperscript,
       isSubscript: other.isSubscript ?? isSubscript,
@@ -337,7 +339,7 @@ class DocxStyle {
     DocxColor? color;
     String? shadingFill;
     double? fontSize;
-    String? fontFamily;
+    DocxFont? fonts;
     DocxHighlight? highlight;
     bool? isSuperscript;
     bool? isSubscript;
@@ -382,7 +384,15 @@ class DocxStyle {
       }
 
       final rFonts = rPr.getElement('w:rFonts');
-      if (rFonts != null) fontFamily = rFonts.getAttribute('w:ascii');
+      if (rFonts != null) {
+        fonts = DocxFont(
+          ascii: rFonts.getAttribute('w:ascii'),
+          hAnsi: rFonts.getAttribute('w:hAnsi'),
+          cs: rFonts.getAttribute('w:cs'),
+          eastAsia: rFonts.getAttribute('w:eastAsia'),
+          hint: rFonts.getAttribute('w:hint'),
+        );
+      }
 
       final highlightElem = rPr.getElement('w:highlight');
       if (highlightElem != null) {
@@ -443,9 +453,6 @@ class DocxStyle {
         if (val == 'center') verticalAlign = DocxVerticalAlign.center;
         if (val == 'bottom') verticalAlign = DocxVerticalAlign.bottom;
       }
-
-      // TODO: Parse cell borders (w:tcBorders) here if needed for Style Resolver
-      // (Borders are currently on DocxTableStyle, but styles.xml defines them in w:tcBorders inside w:tcPr)
     }
 
     return DocxStyle(
@@ -456,7 +463,7 @@ class DocxStyle {
       color: color,
       shadingFill: shadingFill,
       fontSize: fontSize,
-      fontFamily: fontFamily,
+      fonts: fonts,
       highlight: highlight,
       isSuperscript: isSuperscript,
       isSubscript: isSubscript,
