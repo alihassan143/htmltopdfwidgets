@@ -10,6 +10,7 @@ import '../core/font_manager.dart';
 import 'handlers/relationship_manager.dart';
 import 'models/docx_relationship.dart';
 import 'parsers/block_parser.dart';
+import 'parsers/numbering_parser.dart';
 import 'parsers/section_parser.dart';
 import 'parsers/style_parser.dart';
 import 'reader_context.dart';
