@@ -260,7 +260,15 @@ class DocxStyle {
       if (right != null) indentRight = int.tryParse(right);
 
       final firstLine = indElem.getAttribute('w:firstLine');
-      if (firstLine != null) indentFirstLine = int.tryParse(firstLine);
+      if (firstLine != null) {
+        indentFirstLine = int.tryParse(firstLine);
+      } else {
+        final hanging = indElem.getAttribute('w:hanging');
+        if (hanging != null) {
+          final hVal = int.tryParse(hanging);
+          if (hVal != null) indentFirstLine = -hVal;
+        }
+      }
     }
 
     // Shading

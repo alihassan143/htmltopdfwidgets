@@ -16,6 +16,9 @@ class BlockParser {
       : inlineParser = InlineParser(context),
         tableParser = TableParser(context, InlineParser(context));
 
+  /// Tracks the number of items encountered for each numId to enable list continuity.
+  final Map<int, int> _numIdItemCounts = {};
+
   /// Parse body element into list of DocxNodes.
   List<DocxNode> parseBody(XmlElement body) {
     return parseBlocks(body.children);
@@ -80,8 +83,31 @@ class BlockParser {
           // Handle block-level containers (Track Changes, etc.)
           var contentNodes = child.children;
           if (child.name.local == 'sdt') {
-            final content = child.findAllElements('w:sdtContent').firstOrNull;
-            if (content != null) contentNodes = content.children;
+            final sdtPr = child.getElement('w:sdtPr');
+            final gallery = sdtPr
+                ?.getElement('w:docPartObj')
+                ?.getElement('w:docPartGallery');
+            final isTOC = gallery?.getAttribute('w:val') == 'Table of Contents';
+
+            if (isTOC) {
+              final content = child.getElement('w:sdtContent');
+              if (content != null) {
+                // Parse TOC content (cached items)
+                final tocContent = parseBlocks(content.children);
+                // Extract instruction from content (first paragraph usually has field code)
+                String instruction = 'TOC \\o "1-3" \\h \\z \\u'; // Default
+                // Try to find instruction in children...
+                // (Simplified: Just use default or try to extract if critical)
+                result.add(DocxTableOfContents(
+                  cachedContent: tocContent.whereType<DocxBlock>().toList(),
+                  instruction: instruction,
+                ));
+                continue; // Skip the generic processing
+              }
+            } else {
+              final content = child.findAllElements('w:sdtContent').firstOrNull;
+              if (content != null) contentNodes = content.children;
+            }
           }
           result.addAll(parseBlocks(contentNodes));
         }
@@ -150,9 +176,21 @@ class BlockParser {
             ))
         .toList();
 
+    // Calculate start index for continuity
+    int start = 1;
+    if (_numIdItemCounts.containsKey(numId)) {
+      // If we've seen this numId before, continue from where we left off
+      start = _numIdItemCounts[numId]! + 1;
+    }
+
+    // Update the count for this numId
+    _numIdItemCounts[numId] = (start - 1) + items.length;
+
     return DocxList(
       items: items,
       isOrdered: _isOrderedList(numId),
+      startIndex: start,
+      numId: numId,
     );
   }
 

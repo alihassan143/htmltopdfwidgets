@@ -125,6 +125,7 @@ class DocxList extends DocxBlock {
   final List<DocxListItem> items;
   final bool isOrdered;
   final DocxListStyle style;
+  final int startIndex;
 
   int? numId;
 
@@ -132,6 +133,8 @@ class DocxList extends DocxBlock {
     required this.items,
     this.isOrdered = false,
     this.style = const DocxListStyle(),
+    this.startIndex = 1,
+    this.numId,
     super.id,
   });
 
@@ -151,10 +154,12 @@ class DocxList extends DocxBlock {
   factory DocxList.numbered(
     List<String> texts, {
     DocxListStyle style = const DocxListStyle(),
+    int start = 1,
   }) {
     return DocxList(
       isOrdered: true,
       style: style,
+      startIndex: start,
       items: texts.map((t) => DocxListItem.text(t)).toList(),
     );
   }
@@ -164,8 +169,10 @@ class DocxList extends DocxBlock {
     List<DocxListItem> items, {
     bool ordered = false,
     DocxListStyle style = const DocxListStyle(),
+    int start = 1,
   }) {
-    return DocxList(items: items, isOrdered: ordered, style: style);
+    return DocxList(
+        items: items, isOrdered: ordered, style: style, startIndex: start);
   }
 
   DocxList copyWith({
@@ -173,11 +180,13 @@ class DocxList extends DocxBlock {
     bool? isOrdered,
     DocxListStyle? style,
     int? numId,
+    int? startIndex,
   }) {
     final list = DocxList(
       items: items ?? this.items,
       isOrdered: isOrdered ?? this.isOrdered,
       style: style ?? this.style,
+      startIndex: startIndex ?? this.startIndex,
       id: id,
     );
     list.numId = numId ?? this.numId;

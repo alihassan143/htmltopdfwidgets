@@ -8,6 +8,7 @@ import 'package:xml/xml.dart';
 import '../../docx_creator.dart';
 import '../core/font_manager.dart';
 import 'handlers/relationship_manager.dart';
+import 'models/docx_relationship.dart';
 import 'parsers/block_parser.dart';
 import 'parsers/section_parser.dart';
 import 'parsers/style_parser.dart';
@@ -81,6 +82,28 @@ class _DocxReaderOrchestrator {
     // 4. Load and parse numbering for list detection
     final numberingXml = context.readContent('word/numbering.xml');
     context.numberingXml = numberingXml;
+
+    // Parse numbering relationships for image bullets
+    final numberingRelsXml =
+        context.readContent('word/_rels/numbering.xml.rels');
+    if (numberingRelsXml != null) {
+      try {
+        final relsDoc = XmlDocument.parse(numberingRelsXml);
+        for (var rel in relsDoc.findAllElements('Relationship')) {
+          final rId = rel.getAttribute('Id');
+          final target = rel.getAttribute('Target');
+          final type = rel.getAttribute('Type');
+          if (rId != null && target != null) {
+            context.numberingRelationships[rId] = DocxRelationship(
+              id: rId,
+              type: type ?? '',
+              target: target,
+            );
+          }
+        }
+      } catch (_) {}
+    }
+
     if (numberingXml != null) {
       final numberingParser = NumberingParser(context);
       numberingParser.parse(numberingXml);

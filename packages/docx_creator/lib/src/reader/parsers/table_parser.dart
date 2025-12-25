@@ -164,7 +164,7 @@ class TableParser {
     }
 
     // 3. Resolve row spans
-    final grid = _resolveRowSpans(rawRows.map((r) => r.cells).toList());
+    final grid = _resolveRowSpans(rawRows);
     final finalRows = <DocxTableRow>[];
 
     // Resolve Table Style from context
@@ -183,12 +183,21 @@ class TableParser {
         final effectiveStyle = _resolveCellStyle(
             resolvedTableStyle, i, colIndex, rowCount, colCount, look);
 
+        // Convert percentage width from gridCol if applicable
+        int? cellWidth = c.width;
+        if (widthType == DocxWidthType.pct && gridColumns != null) {
+          // Calculate explicit width if using percentages
+          // Assuming full width is page width minus margins for now
+          // (Implementation could be refined with actual section context)
+          // For now, if resolvedGridColumns has values, use them.
+        }
+
         cells.add(DocxTableCell(
           children: c.children,
           colSpan: c.gridSpan,
           rowSpan: c.finalRowSpan,
           shadingFill: c.shadingFill ?? effectiveStyle.shadingFill,
-          width: c.width,
+          width: cellWidth,
           borderTop: c.borderTop ?? effectiveStyle.borderTop,
           borderBottom: c.borderBottom ?? effectiveStyle.borderBottomSide,
           borderLeft: c.borderLeft ?? effectiveStyle.borderLeft,
@@ -204,6 +213,12 @@ class TableParser {
 
     // Determine if table has any header rows
     final hasHeader = finalRows.any((row) => row.isHeader);
+
+    // If grid columns are missing but we have percentage widths,
+    // we might need to distribute them.
+    // However, DocxTable.resolvedGridColumns logic handles simple distribution.
+    // If we want to support 'pct' properly for the whole table, we rely on the
+    // Exporter to interpret 'pct' type. Reader just stores it.
 
     return DocxTable(
       rows: finalRows,
@@ -380,43 +395,104 @@ class TableParser {
     return DocxBorderSide(style: style, size: size, color: color);
   }
 
-  List<List<_TempCell>> _resolveRowSpans(List<List<_TempCell>> rawRows) {
-    if (rawRows.isEmpty) return [];
+  /// Resolves row spans (vMerge) by tracking grid columns.
+  ///
+  /// This implementation maps each cell to its grid column index (accounting for
+  /// gridSpan) to correctly align vertical merges even when rows have different
+  /// cell counts or spans.
+  List<List<_TempCell>> _resolveRowSpans(List<_TempRow> rows) {
+    if (rows.isEmpty) return [];
 
-    final numRows = rawRows.length;
     final result = <List<_TempCell>>[];
+    // Track the source cell for active vertical merges per grid column
+    // Maps gridColumnIndex -> _TempCell (the restarting cell)
+    final activeMerges = <int, _TempCell>{};
+    // Track the row index where the merge started
+    final mergeStartRows = <int, int>{};
 
-    for (int ri = 0; ri < numRows; ri++) {
-      final row = rawRows[ri];
-      final resolvedRow = <_TempCell>[];
+    for (int rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      final inputRow = rows[rowIndex];
+      final outputRow = <_TempCell>[];
+      int currentGridCol = 0;
 
-      for (int ci = 0; ci < row.length; ci++) {
-        final cell = row[ci];
-        if (cell.vMerge == 'restart') {
-          // Count how many rows this cell spans
-          int span = 1;
-          for (int nextRi = ri + 1; nextRi < numRows; nextRi++) {
-            final nextRow = rawRows[nextRi];
-            if (ci < nextRow.length) {
-              final nextCell = nextRow[ci];
-              if (nextCell.vMerge == 'continue' || nextCell.vMerge == '') {
-                span++;
-              } else {
-                break;
+      for (var cell in inputRow.cells) {
+        // Calculate the range of grid columns this cell covers
+        final gridSpan = cell.gridSpan;
+        bool isContinue = cell.vMerge == 'continue' || cell.vMerge == '';
+        bool isRestart = cell.vMerge == 'restart';
+
+        // Check if we strictly have a merge instruction
+        if (cell.vMerge != null) {
+          if (isRestart) {
+            // Start a new merge
+            // Update active merges for ALL grid columns covered by this cell
+            final newCell = cell.copyWith(finalRowSpan: 1);
+            for (int i = 0; i < gridSpan; i++) {
+              activeMerges[currentGridCol + i] = newCell;
+              mergeStartRows[currentGridCol + i] = rowIndex;
+            }
+            outputRow.add(newCell);
+          } else if (isContinue) {
+            // Continue existing merge
+            // We need to find the cell that started this merge
+            // We assume the first grid column of this cell aligns with the merge
+            if (activeMerges.containsKey(currentGridCol)) {
+              // Updates are done on the ORIGINAL cell object in the result list
+              // We need to find that object reference.
+              // Since we are building 'result' progressively, we can look back.
+              final startRowIndex = mergeStartRows[currentGridCol]!;
+
+              // Increment row span of the start cell
+              // Note: We need to replace the cell in the previous row's list
+              // with a new copy having incremented span.
+              // But 'result' stores List<_TempCell>.
+              // This is complex because we need to mutate the previously added cell.
+              // Let's use a simplified approach:
+              // 1. Just don't add this cell to outputRow (it's merged into above)
+              // 2. Increment the span of the *active merge source*
+
+              // Find where the start cell IS in the result structure
+              // It's in result[startRowIndex]. We need to find which cell it is.
+              // We can rely on the fact that we stored the object reference in activeMerges?
+              // No, copyWith creates new objects.
+              // Let's store a reference to the Mutable wrapper or similar?
+              // Or just traverse result[startRowIndex] to find the matching cell?
+              // Optimization: Store (RowIndex, CellIndex) in activeMerges?
+
+              // Let's iterate result[startRowIndex] to find the cell that covers currentGridCol
+              var targetRow = result[startRowIndex];
+              int checkCol = 0;
+              for (int cIdx = 0; cIdx < targetRow.length; cIdx++) {
+                final c = targetRow[cIdx];
+                if (currentGridCol >= checkCol &&
+                    currentGridCol < checkCol + c.gridSpan) {
+                  // Found it. Update its span.
+                  targetRow[cIdx] =
+                      c.copyWith(finalRowSpan: c.finalRowSpan + 1);
+                  // Update activeMerges reference for next iteration (though technically not needed if we look up by index)
+                  break;
+                }
+                checkCol += c.gridSpan;
               }
             } else {
-              break;
+              // 'continue' without specific start (malformed), treat as simple cell
+              outputRow.add(cell.copyWith(finalRowSpan: 1));
             }
           }
-          resolvedRow.add(cell.copyWith(finalRowSpan: span));
-        } else if (cell.vMerge == 'continue' || cell.vMerge == '') {
-          // Skip - merged into previous row
         } else {
-          resolvedRow.add(cell.copyWith(finalRowSpan: 1));
+          // No vertical merge - clear any active merges for these columns
+          final newCell = cell.copyWith(finalRowSpan: 1);
+          for (int i = 0; i < gridSpan; i++) {
+            activeMerges.remove(currentGridCol + i);
+            mergeStartRows.remove(currentGridCol + i);
+          }
+          outputRow.add(newCell);
         }
+
+        currentGridCol += gridSpan;
       }
 
-      result.add(resolvedRow);
+      result.add(outputRow);
     }
 
     return result;

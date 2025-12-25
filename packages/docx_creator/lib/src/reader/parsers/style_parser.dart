@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
@@ -260,17 +262,26 @@ class NumberingParser {
   /// Parsed numbering instances.
   final Map<int, DocxNumberingDef> _numberings = {};
 
+  /// Parsed picture bullet definitions (numPicBulletId -> rId).
+  final Map<int, String> _pictureBullets = {};
+
   NumberingParser(this.context);
 
   /// Gets parsed numbering definitions.
   Map<int, DocxNumberingDef> get numberings => Map.unmodifiable(_numberings);
+
+  /// Gets parsed picture bullets.
+  Map<int, String> get pictureBullets => Map.unmodifiable(_pictureBullets);
 
   /// Parse numbering.xml content.
   void parse(String xmlContent) {
     try {
       final xml = XmlDocument.parse(xmlContent);
 
-      // First pass: parse abstract numbering definitions
+      // First pass: parse picture bullet definitions
+      _parsePictureBullets(xml);
+
+      // Second pass: parse abstract numbering definitions
       for (var abstractNum in xml.findAllElements('w:abstractNum')) {
         final abstractNumId =
             int.tryParse(abstractNum.getAttribute('w:abstractNumId') ?? '');
@@ -284,7 +295,7 @@ class NumberingParser {
         _abstractNums[abstractNumId] = levels;
       }
 
-      // Second pass: parse numbering instances
+      // Third pass: parse numbering instances
       for (var num in xml.findAllElements('w:num')) {
         final numId = int.tryParse(num.getAttribute('w:numId') ?? '');
         if (numId == null) continue;
@@ -302,6 +313,31 @@ class NumberingParser {
       }
     } catch (e) {
       print('Error parsing numbering: $e');
+    }
+  }
+
+  /// Parse picture bullet definitions from <w:numPicBullet> elements.
+  void _parsePictureBullets(XmlDocument xml) {
+    for (var picBullet in xml.findAllElements('w:numPicBullet')) {
+      final id = int.tryParse(picBullet.getAttribute('w:numPicBulletId') ?? '');
+      if (id == null) continue;
+
+      // Find the image relationship ID
+      // Path: w:numPicBullet -> w:pict -> v:shape -> v:imagedata[@r:id]
+      final pict = picBullet.getElement('w:pict');
+      if (pict == null) continue;
+
+      final shape = pict.getElement('v:shape');
+      if (shape == null) continue;
+
+      final imageData = shape.getElement('v:imagedata');
+      if (imageData == null) continue;
+
+      final rId = imageData.getAttribute('r:id');
+      if (rId != null) {
+        _pictureBullets[id] = rId;
+        context.pictureBullets[id] = rId;
+      }
     }
   }
 
@@ -341,6 +377,33 @@ class NumberingParser {
       }
     }
 
+    // Parse picture bullet reference
+    int? picBulletId;
+    Uint8List? picBulletImage;
+    final lvlPicBulletId = lvl.getElement('w:lvlPicBulletId');
+    if (lvlPicBulletId != null) {
+      picBulletId = int.tryParse(lvlPicBulletId.getAttribute('w:val') ?? '');
+
+      // Resolve the image bytes if possible
+      if (picBulletId != null) {
+        final rId = _pictureBullets[picBulletId];
+        if (rId != null) {
+          final rel = context.numberingRelationships[rId];
+          if (rel != null) {
+            // Read image from word/media/...
+            // Handle both relative paths (media/...) and absolute paths
+            final target = rel.target;
+            final imagePath = target.startsWith('media/')
+                ? 'word/$target'
+                : target.startsWith('/word/')
+                    ? target.substring(1)
+                    : 'word/$target';
+            picBulletImage = context.readBytes(imagePath);
+          }
+        }
+      }
+    }
+
     return DocxNumberingLevel(
       level: ilvl,
       numFmt: numFmt,
@@ -350,6 +413,8 @@ class NumberingParser {
       hanging: hanging,
       bulletChar: bulletChar,
       bulletFont: bulletFont,
+      picBulletId: picBulletId,
+      picBulletImage: picBulletImage,
     );
   }
 

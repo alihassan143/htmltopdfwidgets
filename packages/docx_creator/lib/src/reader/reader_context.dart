@@ -33,6 +33,12 @@ class ReaderContext {
   /// Parsed numbering definitions (numId -> DocxNumberingDef)
   Map<int, DocxNumberingDef> parsedNumberings = {};
 
+  /// Picture bullets (numPicBulletId -> relationship ID for image)
+  final Map<int, String> pictureBullets = {};
+
+  /// Relationships from numbering.xml.rels
+  final Map<String, DocxRelationship> numberingRelationships = {};
+
   ReaderContext(this.archive);
 
   /// Read file content from the archive as a string.

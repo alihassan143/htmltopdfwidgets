@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../docx_creator.dart';
 import 'docx_style.dart';
 
@@ -246,6 +248,12 @@ class DocxNumberingLevel {
   /// Font for bullet character.
   final String? bulletFont;
 
+  /// Picture bullet ID (references a numPicBullet definition).
+  final int? picBulletId;
+
+  /// Picture bullet image bytes (resolved from media folder).
+  final Uint8List? picBulletImage;
+
   const DocxNumberingLevel({
     required this.level,
     required this.numFmt,
@@ -255,6 +263,8 @@ class DocxNumberingLevel {
     this.hanging,
     this.bulletChar,
     this.bulletFont,
+    this.picBulletId,
+    this.picBulletImage,
   });
 
   /// Returns true if this is a bullet level.
@@ -262,6 +272,9 @@ class DocxNumberingLevel {
 
   /// Returns true if this is a numbered level.
   bool get isNumbered => !isBullet;
+
+  /// Returns true if this is an image bullet level.
+  bool get isImageBullet => picBulletId != null || picBulletImage != null;
 }
 
 /// Section properties from document.xml.

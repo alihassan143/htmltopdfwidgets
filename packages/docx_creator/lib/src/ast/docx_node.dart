@@ -1,6 +1,7 @@
 import 'package:xml/xml.dart';
 
 export 'docx_raw_xml.dart';
+export 'docx_toc.dart';
 
 /// Abstract base class for all nodes in the document AST.
 ///
@@ -68,6 +69,7 @@ abstract class DocxVisitor {
   void visitRawInline(covariant DocxNode rawInline);
   void visitShape(covariant DocxInline shape);
   void visitShapeBlock(covariant DocxBlock shapeBlock);
+  void visitTableOfContents(covariant DocxBlock toc);
 }
 
 /// Base class for inline elements (text, inline images, etc.).

@@ -19,6 +19,8 @@ class DocxExporter {
   final Map<int, int> _listAbstractNumMap = {}; // numId -> abstractNumId
   final Map<int, int> _abstractNumImageBulletMap =
       {}; // abstractNumId -> imageBulletIndex
+  final Map<int, int> _preservedNumIds = {}; // sourceNumId -> exportedNumId
+  final Map<int, int> _listStartOverrides = {}; // exportedNumId -> startIndex
   DocxBackgroundImage? _backgroundImage;
   final FontManager fontManager = FontManager();
 
@@ -69,6 +71,8 @@ class DocxExporter {
     _listAbstractNumMap.clear();
     _imageBullets.clear();
     _abstractNumImageBulletMap.clear();
+    _preservedNumIds.clear();
+    _listStartOverrides.clear();
     _backgroundImage = null;
 
     // Register document fonts
@@ -98,20 +102,38 @@ class DocxExporter {
     int abstractNumIdCounter = 2; // 0 and 1 are reserved for default styles
 
     for (var list in allLists) {
-      list.numId = _numIdCounter++;
+      int exportedNumId;
+      final sourceNumId = list.numId;
 
-      if (list.style.imageBulletBytes != null) {
-        // Image Bullet List
-        final bulletIndex = _imageBullets.length;
-        _imageBullets.add(list.style.imageBulletBytes!);
-
-        final absId = abstractNumIdCounter++;
-        _abstractNumImageBulletMap[absId] = bulletIndex;
-        _listAbstractNumMap[list.numId!] = absId;
+      if (sourceNumId != null && _preservedNumIds.containsKey(sourceNumId)) {
+        // Reuse existing exported ID for continuity
+        exportedNumId = _preservedNumIds[sourceNumId]!;
       } else {
-        // Standard List
-        _listAbstractNumMap[list.numId!] = list.isOrdered ? 1 : 0;
+        // Create new exported ID
+        exportedNumId = _numIdCounter++;
+        if (sourceNumId != null) {
+          _preservedNumIds[sourceNumId] = exportedNumId;
+        }
+
+        if (list.style.imageBulletBytes != null) {
+          // Image Bullet List
+          final bulletIndex = _imageBullets.length;
+          _imageBullets.add(list.style.imageBulletBytes!);
+
+          final absId = abstractNumIdCounter++;
+          _abstractNumImageBulletMap[absId] = bulletIndex;
+          _listAbstractNumMap[exportedNumId] = absId;
+        } else {
+          // Standard List
+          _listAbstractNumMap[exportedNumId] = list.isOrdered ? 1 : 0;
+          // Only apply start override if this is the start of the chain (new ID)
+          if (list.isOrdered && list.startIndex > 1) {
+            _listStartOverrides[exportedNumId] = list.startIndex;
+          }
+        }
       }
+
+      list.numId = exportedNumId;
     }
 
     final archive = Archive();
@@ -1416,9 +1438,16 @@ class DocxExporter {
 
     // Generate num instances linking to correct abstractNumId
     _listAbstractNumMap.forEach((numId, absId) {
-      buffer.writeln(
-        '  <w:num w:numId="$numId"><w:abstractNumId w:val="$absId"/></w:num>',
+      buffer.write(
+        '  <w:num w:numId="$numId"><w:abstractNumId w:val="$absId"/>',
       );
+      if (_listStartOverrides.containsKey(numId)) {
+        final start = _listStartOverrides[numId];
+        buffer.write(
+          '<w:lvlOverride w:ilvl="0"><w:startOverride w:val="$start"/></w:lvlOverride>',
+        );
+      }
+      buffer.writeln('</w:num>');
     });
 
     buffer.writeln('</w:numbering>');
