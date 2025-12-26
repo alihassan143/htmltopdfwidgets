@@ -56,6 +56,9 @@ class DocxParagraph extends DocxBlock {
   /// Line spacing in twips (240 = single, 360 = 1.5, 480 = double).
   final int? lineSpacing;
 
+  /// Line spacing rule ('auto', 'exact', 'atLeast').
+  final String? lineRule;
+
   /// Left indentation in twips.
   final int? indentLeft;
 
@@ -102,6 +105,7 @@ class DocxParagraph extends DocxBlock {
     this.spacingAfter,
     this.spacingBefore,
     this.lineSpacing,
+    this.lineRule,
     this.indentLeft,
     this.indentRight,
     this.indentFirstLine,
@@ -248,6 +252,7 @@ class DocxParagraph extends DocxBlock {
     int? spacingAfter,
     int? spacingBefore,
     int? lineSpacing,
+    String? lineRule,
     int? indentLeft,
     int? indentRight,
     int? indentFirstLine,
@@ -271,6 +276,7 @@ class DocxParagraph extends DocxBlock {
       spacingAfter: spacingAfter ?? this.spacingAfter,
       spacingBefore: spacingBefore ?? this.spacingBefore,
       lineSpacing: lineSpacing ?? this.lineSpacing,
+      lineRule: lineRule ?? this.lineRule,
       indentLeft: indentLeft ?? this.indentLeft,
       indentRight: indentRight ?? this.indentRight,
       indentFirstLine: indentFirstLine ?? this.indentFirstLine,
@@ -343,6 +349,9 @@ class DocxParagraph extends DocxBlock {
                     }
                     if (lineSpacing != null) {
                       builder.attribute('w:line', lineSpacing.toString());
+                    }
+                    if (lineRule != null) {
+                      builder.attribute('w:lineRule', lineRule!);
                     }
                   },
                 );
@@ -470,6 +479,7 @@ class DocxParagraph extends DocxBlock {
       spacingAfter != null ||
       spacingBefore != null ||
       lineSpacing != null ||
+      lineRule != null ||
       indentLeft != null ||
       indentRight != null ||
       indentFirstLine != null ||

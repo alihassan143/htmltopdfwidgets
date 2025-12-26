@@ -215,6 +215,7 @@ class _DocxReaderOrchestrator {
       numberingImages: numberingImages,
       settingsXml: settingsXml,
       fontTableXml: fontTableXml,
+      fontTableRelsXml: fontTableRelsXml,
       contentTypesXml: contentTypesXml,
       headerBgXml: headerBgXml,
       headerBgRelsXml: headerBgRelsXml,
@@ -313,6 +314,18 @@ class _DocxReaderOrchestrator {
                 familyName: name,
                 obfuscatedBytes: Uint8List.fromList(file.content as List<int>),
                 obfuscationKey: cleanKey,
+                // The filename matters for matching the PRESERVED fontTable.xml.rels
+                // target usually includes 'fonts/' or similar.
+                // We should store the EXACT filename used in the archive so we can recreate it.
+                // But wait, the RELS file contains 'fonts/foo.odttf'.
+                // If we preserved RELS, we must output file at 'word/fonts/foo.odttf'.
+                // So preservedFilename should be the target path inside 'word/'.
+                // Let's store just the filename part or relative path?
+                // The exporter will prepend 'word/'.
+                // If 'target' is 'fonts/foo.odttf', we want to store 'fonts/foo.odttf'.
+                preservedFilename: target.startsWith('word/')
+                    ? target.substring(5)
+                    : (target.startsWith('/') ? target.substring(1) : target),
               ));
             }
           }

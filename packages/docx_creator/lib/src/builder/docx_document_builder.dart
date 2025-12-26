@@ -252,6 +252,7 @@ class DocxBuiltDocument {
   final String? numberingXml;
   final String? settingsXml;
   final String? fontTableXml;
+  final String? fontTableRelsXml;
   final String? themeXml;
   final String? contentTypesXml;
   final String? rootRelsXml;
@@ -275,6 +276,7 @@ class DocxBuiltDocument {
     this.numberingXml,
     this.settingsXml,
     this.fontTableXml,
+    this.fontTableRelsXml,
     this.themeXml,
     this.contentTypesXml,
     this.rootRelsXml,

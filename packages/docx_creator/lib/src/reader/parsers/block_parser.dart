@@ -154,6 +154,7 @@ class BlockParser {
       spacingAfter: finalProps.spacingAfter,
       spacingBefore: finalProps.spacingBefore,
       lineSpacing: finalProps.lineSpacing,
+      lineRule: finalProps.lineRule,
       indentLeft: finalProps.indentLeft,
       indentRight: finalProps.indentRight,
       indentFirstLine: finalProps.indentFirstLine,

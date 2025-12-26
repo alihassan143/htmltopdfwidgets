@@ -1,3 +1,18 @@
+## 1.0.5
+
+### Fixed
+- **Font Fidelity**: Fixed critical issue where embedded fonts were lost during the read-export cycle due to mismatched relationship IDs and filenames.
+  - Preserved exact filenames and relationship IDs from the original document.
+  - Updated `fontTable.xml.rels` handling to ensure valid links to embedded font files.
+- **Line Spacing Fidelity**: Fixed issue where specific line spacing rules (e.g., 'Exactly' vs 'At Least') were ignored.
+  - Added support for parsing and exporting `w:lineRule` attribute in paragraphs and styles.
+  - Ensures visual vertical spacing matches the original document precisely.
+- **Style Inheritance**: Fixed issue where paragraph styles (like 'Heading 1') were lost on export.
+  - Added parsing for `w:pStyle` property in `DocxStyle` and `DocxParagraph`.
+- **Inline Font Merging**: Fixed logic where direct font formatting (e.g., hints) completely overwrote character style fonts.
+  - Implemented proper merging of direct font properties with underlying character style fonts.
+- **Theme Support**: Added parsing for theme-related font attributes (`w:asciiTheme`, `w:eastAsiaTheme`, etc.) to preserve theme-based font selection.
+
 ## 1.0.4
 
 ### Added

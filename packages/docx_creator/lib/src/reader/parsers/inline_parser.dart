@@ -103,7 +103,8 @@ class InlineParser {
         charStyle = context.resolveStyle(rStyle);
       }
       final runFontSize = parsedProps.fontSize ?? charStyle?.fontSize;
-      final runFonts = parsedProps.fonts ?? charStyle?.fonts;
+      final runFonts =
+          charStyle?.fonts?.merge(parsedProps.fonts) ?? parsedProps.fonts;
       final runFontFamily = parsedProps.fontFamily ?? charStyle?.fontFamily;
 
       return DocxText(

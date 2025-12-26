@@ -13,6 +13,7 @@ class DocxStyle {
   final String? basedOn;
 
   // Paragraph Properties
+  final String? pStyleId;
   final DocxAlign? align;
   final String? shadingFill;
   final int? numId;
@@ -20,6 +21,7 @@ class DocxStyle {
   final int? spacingAfter;
   final int? spacingBefore;
   final int? lineSpacing;
+  final String? lineRule; // 'auto', 'exact', 'atLeast'
   final int? indentLeft;
   final int? indentRight;
   final int? indentFirstLine;
@@ -58,6 +60,7 @@ class DocxStyle {
     required this.id,
     this.type,
     this.basedOn,
+    this.pStyleId,
     this.align,
     this.shadingFill,
     this.numId,
@@ -65,6 +68,7 @@ class DocxStyle {
     this.spacingAfter,
     this.spacingBefore,
     this.lineSpacing,
+    this.lineRule,
     this.indentLeft,
     this.indentRight,
     this.indentFirstLine,
@@ -116,6 +120,7 @@ class DocxStyle {
       type: type,
       basedOn: basedOn,
       // P props
+      pStyleId: pProps.pStyleId,
       align: pProps.align,
       shadingFill: pProps.shadingFill ?? rProps.shadingFill,
       numId: pProps.numId,
@@ -123,6 +128,7 @@ class DocxStyle {
       spacingAfter: pProps.spacingAfter,
       spacingBefore: pProps.spacingBefore,
       lineSpacing: pProps.lineSpacing,
+      lineRule: pProps.lineRule,
       indentLeft: pProps.indentLeft,
       indentRight: pProps.indentRight,
       indentFirstLine: pProps.indentFirstLine,
@@ -170,6 +176,7 @@ class DocxStyle {
       spacingAfter: other.spacingAfter ?? spacingAfter,
       spacingBefore: other.spacingBefore ?? spacingBefore,
       lineSpacing: other.lineSpacing ?? lineSpacing,
+      lineRule: other.lineRule ?? lineRule,
       indentLeft: other.indentLeft ?? indentLeft,
       indentRight: other.indentRight ?? indentRight,
       indentFirstLine: other.indentFirstLine ?? indentFirstLine,
@@ -218,6 +225,7 @@ class DocxStyle {
     int? spacingAfter;
     int? spacingBefore;
     int? lineSpacing;
+    String? lineRule;
     int? indentLeft;
     int? indentRight;
     int? indentFirstLine;
@@ -226,6 +234,13 @@ class DocxStyle {
     DocxBorderSide? borderLeft;
     DocxBorderSide? borderRight;
     DocxBorderSide? borderBetween;
+
+    // Style ID
+    String? styleId;
+    final pStyle = pPr.getElement('w:pStyle');
+    if (pStyle != null) {
+      styleId = pStyle.getAttribute('w:val');
+    }
 
     // Alignment
     final jcElem = pPr.getElement('w:jc');
@@ -248,6 +263,9 @@ class DocxStyle {
 
       final line = spacingElem.getAttribute('w:line');
       if (line != null) lineSpacing = int.tryParse(line);
+
+      final rule = spacingElem.getAttribute('w:lineRule');
+      if (rule != null) lineRule = rule;
     }
 
     // Indentation
@@ -306,6 +324,7 @@ class DocxStyle {
 
     return DocxStyle(
       id: 'temp',
+      pStyleId: styleId,
       align: align,
       shadingFill: shadingFill,
       numId: numId,
@@ -313,6 +332,7 @@ class DocxStyle {
       spacingAfter: spacingAfter,
       spacingBefore: spacingBefore,
       lineSpacing: lineSpacing,
+      lineRule: lineRule,
       indentLeft: indentLeft,
       indentRight: indentRight,
       indentFirstLine: indentFirstLine,
@@ -391,6 +411,10 @@ class DocxStyle {
           cs: rFonts.getAttribute('w:cs'),
           eastAsia: rFonts.getAttribute('w:eastAsia'),
           hint: rFonts.getAttribute('w:hint'),
+          asciiTheme: rFonts.getAttribute('w:asciiTheme'),
+          hAnsiTheme: rFonts.getAttribute('w:hAnsiTheme'),
+          csTheme: rFonts.getAttribute('w:csTheme'),
+          eastAsiaTheme: rFonts.getAttribute('w:eastAsiaTheme'),
         );
       }
 

@@ -47,12 +47,14 @@ class FontManager {
 class EmbeddedFont {
   final String familyName;
   final Uint8List bytes;
-  final String obfuscationKey;
+  final String? preservedFilename;
+  final String obfuscationKey; // Re-add this!
 
   EmbeddedFont({
     required this.familyName,
     required this.bytes,
     required this.obfuscationKey,
+    this.preservedFilename,
   });
 
   /// Create from obfuscated data (de-obfuscates).
@@ -60,6 +62,7 @@ class EmbeddedFont {
     required String familyName,
     required Uint8List obfuscatedBytes,
     required String obfuscationKey,
+    String? preservedFilename,
   }) {
     final keyBytes = _parseGuid(obfuscationKey);
     final data = Uint8List.fromList(obfuscatedBytes);
@@ -70,6 +73,7 @@ class EmbeddedFont {
       familyName: familyName,
       bytes: data,
       obfuscationKey: obfuscationKey,
+      preservedFilename: preservedFilename,
     );
   }
 

@@ -175,7 +175,9 @@ class DocxExporter {
 
     // Process fonts
     for (var font in fontManager.fonts) {
-      final filename = 'word/fonts/${font.obfuscationKey}.odttf';
+      final filename = font.preservedFilename != null
+          ? 'word/${font.preservedFilename}'
+          : 'word/fonts/${font.obfuscationKey}.odttf';
       archive.addFile(ArchiveFile(
           filename, font.obfuscatedBytes.length, font.obfuscatedBytes));
     }
@@ -1249,6 +1251,13 @@ class DocxExporter {
   }
 
   ArchiveFile _createFontTableRels(DocxBuiltDocument doc) {
+    if (doc.fontTableRelsXml != null) {
+      return ArchiveFile(
+        'word/_rels/fontTable.xml.rels',
+        utf8.encode(doc.fontTableRelsXml!).length,
+        utf8.encode(doc.fontTableRelsXml!),
+      );
+    }
     final builder = XmlBuilder();
     builder.processing(
         'xml', 'version="1.0" encoding="UTF-8" standalone="yes"');
