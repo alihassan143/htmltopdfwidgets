@@ -107,7 +107,7 @@ class TableBuilder {
     }
 
     buffer.writeln(
-        '<table style="border-collapse: collapse; width: $tableWidth; $tableBackground">');
+        '<table style="border-collapse: collapse; width: $tableWidth; $tableBackground margin-left: auto; margin-right: auto;">');
 
     // Use table look flags
     final look = table.look;
@@ -187,9 +187,13 @@ class TableBuilder {
   }) {
     final styles = <String>[];
 
-    // Cell padding
-    final padding = tableStyle.cellPadding / 15.0; // Convert twips to pixels
-    styles.add('padding: ${padding.clamp(2, 20)}px');
+    // Cell padding - apply default if not specified
+    if (tableStyle.cellPadding != null) {
+      final padding = tableStyle.cellPadding! / 15.0; // Convert twips to pixels
+      styles.add('padding: ${padding.clamp(2, 20)}px');
+    } else {
+      styles.add('padding: 4px'); // Default padding for readability
+    }
 
     // Vertical alignment
     switch (cell.verticalAlign) {
@@ -236,27 +240,31 @@ class TableBuilder {
       }
     }
 
-    // Cell borders logic for border-collapse
-    // In collapsed mode, borders are shared.
-    // If we define all 4 borders for every cell, simple HTML renderers might double them up or draw them adjacent.
-    // To mimic standard behavior, we ensure precise border definitions.
-    // However, with HtmlWidget's border-collapse: collapse, defining all borders is usually safe *if* they are identical.
-    // The visual artifact might be due to default border width or color mismatches.
+    // Cell borders - use cell-specific or fall back to table defaults
+    final defaultBorder = '${defaultBorderWidth}px solid #$defaultBorderColor';
 
     if (cell.borderTop != null) {
       styles.add('border-top: ${_borderSideToCSS(cell.borderTop!)}');
+    } else if (tableStyle.border != DocxBorder.none) {
+      styles.add('border-top: $defaultBorder');
     }
 
     if (cell.borderBottom != null) {
       styles.add('border-bottom: ${_borderSideToCSS(cell.borderBottom!)}');
+    } else if (tableStyle.border != DocxBorder.none) {
+      styles.add('border-bottom: $defaultBorder');
     }
 
     if (cell.borderLeft != null) {
       styles.add('border-left: ${_borderSideToCSS(cell.borderLeft!)}');
+    } else if (tableStyle.border != DocxBorder.none) {
+      styles.add('border-left: $defaultBorder');
     }
 
     if (cell.borderRight != null) {
       styles.add('border-right: ${_borderSideToCSS(cell.borderRight!)}');
+    } else if (tableStyle.border != DocxBorder.none) {
+      styles.add('border-right: $defaultBorder');
     }
 
     // Cell width if specified
@@ -301,10 +309,41 @@ class TableBuilder {
     for (final child in cell.children) {
       if (child is DocxParagraph) {
         buffer.write(_paragraphToHtml(child));
+      } else if (child is DocxTable) {
+        // Recursive table rendering
+        buffer.write(_tableToHtml(child));
+      } else if (child is DocxList) {
+        buffer.write(_listToHtml(child));
       }
     }
 
     return buffer.isEmpty ? '&nbsp;' : buffer.toString();
+  }
+
+  /// Convert DocxList to HTML string.
+  String _listToHtml(DocxList list) {
+    final buffer = StringBuffer();
+    final tag = list.isOrdered ? 'ol' : 'ul';
+
+    String listStyle = 'margin: 0; padding-left: 20px;';
+    if (!list.isOrdered && list.style.imageBulletBytes != null) {
+      final b64 = base64Encode(list.style.imageBulletBytes!);
+      listStyle += " list-style-image: url('data:image/png;base64,$b64');";
+    }
+
+    buffer.write('<$tag style="$listStyle">');
+
+    for (final item in list.items) {
+      buffer.write('<li>');
+      // List items are paragraphs in AST mostly
+      final itemContent =
+          item.children.whereType<DocxText>().map((t) => _textToHtml(t)).join();
+      buffer.write(itemContent.isEmpty ? '&nbsp;' : itemContent);
+      buffer.write('</li>');
+    }
+
+    buffer.write('</$tag>');
+    return buffer.toString();
   }
 
   /// Convert paragraph to HTML string.

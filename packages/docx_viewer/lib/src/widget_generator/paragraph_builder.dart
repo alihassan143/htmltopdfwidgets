@@ -15,6 +15,8 @@ class ParagraphBuilder {
   final DocxViewTheme theme;
   final DocxViewConfig config;
   final DocxSearchController? searchController;
+  final void Function(int id)? onFootnoteTap;
+  final void Function(int id)? onEndnoteTap;
   // Used for search highlighting - currently reserved for future use
   // ignore: unused_field
   int _blockIndex = 0;
@@ -23,6 +25,8 @@ class ParagraphBuilder {
     required this.theme,
     required this.config,
     this.searchController,
+    this.onFootnoteTap,
+    this.onEndnoteTap,
   });
 
   /// Set the current block index for search highlighting.
@@ -38,19 +42,35 @@ class ParagraphBuilder {
 
   /// Native Flutter builder for standard paragraphs.
   Widget _buildNativeParagraph(DocxParagraph paragraph) {
-    // Check for floating images to use specific wrapping layout
-    DocxInlineImage? leftFloatingImage;
-    DocxInlineImage? rightFloatingImage;
+    // Check for floating elements (images or shapes) to use specific wrapping layout
+    DocxInline? leftFloatingElement;
+    DocxInline? rightFloatingElement;
     List<DocxInline> textChildren = [];
 
     // Separate content
     for (var child in paragraph.children) {
+      bool isFloating = false;
+      DocxAlign align = DocxAlign.left; // Default logic
+
       if (child is DocxInlineImage &&
           child.positionMode == DocxDrawingPosition.floating) {
-        if (child.hAlign == DrawingHAlign.right) {
-          rightFloatingImage = child;
+        isFloating = true;
+        align = child.hAlign == DrawingHAlign.right
+            ? DocxAlign.right
+            : DocxAlign.left;
+      } else if (child is DocxShape &&
+          child.position == DocxDrawingPosition.floating) {
+        isFloating = true;
+        align = child.horizontalAlign == DrawingHAlign.right
+            ? DocxAlign.right
+            : DocxAlign.left;
+      }
+
+      if (isFloating) {
+        if (align == DocxAlign.right) {
+          rightFloatingElement = child;
         } else {
-          leftFloatingImage = child;
+          leftFloatingElement = child;
         }
       } else {
         textChildren.add(child);
@@ -58,8 +78,6 @@ class ParagraphBuilder {
     }
 
     // Build the text spans
-    // Note: We need the Style/TextSpan to measure.
-    // Calculate line height from lineSpacing
     double? lineHeightScale;
     if (paragraph.lineSpacing != null) {
       lineHeightScale = paragraph.lineSpacing! / 240.0;
@@ -69,15 +87,14 @@ class ParagraphBuilder {
     final fullTextSpan = TextSpan(children: spans);
     final textAlign = _convertAlign(paragraph.align);
 
-    // If we have floating images, we need to manually layout and slice the text to wrap around them.
-    // This provides the "text starting from next line" behavior (flowing under the float).
-    if (leftFloatingImage != null || rightFloatingImage != null) {
+    // If we have floating elements, build wrap layout
+    if (leftFloatingElement != null || rightFloatingElement != null) {
       return _wrapWithParagraphStyle(
           paragraph,
           _buildFloatingLayout(
             textSpan: fullTextSpan,
-            leftImage: leftFloatingImage,
-            rightImage: rightFloatingImage,
+            leftElement: leftFloatingElement,
+            rightElement: rightFloatingElement,
             textAlign: textAlign,
             lineHeightScale: lineHeightScale,
           ));
@@ -103,46 +120,62 @@ class ParagraphBuilder {
     return _wrapWithParagraphStyle(paragraph, textContent);
   }
 
-  /// Builds a layout that wraps text around left and/or right floating images.
+  /// Builds a layout that wraps text around left and/or right floating elements.
   Widget _buildFloatingLayout({
     required TextSpan textSpan,
-    DocxInlineImage? leftImage,
-    DocxInlineImage? rightImage,
+    DocxInline? leftElement,
+    DocxInline? rightElement,
     required TextAlign textAlign,
     double? lineHeightScale,
   }) {
     return LayoutBuilder(builder: (context, constraints) {
-      // 1. Measure images
+      // 1. Measure elements
       double lWidth = 0, lHeight = 0;
       double rWidth = 0, rHeight = 0;
 
       Widget? lWidget, rWidget;
 
-      if (leftImage != null) {
-        lWidth = leftImage.width;
-        lHeight = leftImage.height;
-        lWidget = Image.memory(leftImage.bytes,
-            width: lWidth, height: lHeight, fit: BoxFit.contain);
+      if (leftElement != null) {
+        if (leftElement is DocxInlineImage) {
+          lWidth = leftElement.width;
+          lHeight = leftElement.height;
+          lWidget = Image.memory(leftElement.bytes,
+              width: lWidth, height: lHeight, fit: BoxFit.contain);
+        } else if (leftElement is DocxShape) {
+          lWidth = leftElement.width;
+          lHeight = leftElement.height;
+          lWidget = _buildInlineShape(leftElement);
+        }
+
         // Add padding
-        lWidth += 12.0;
-        lWidget = Padding(
-            padding: const EdgeInsets.only(right: 12.0), child: lWidget);
+        if (lWidget != null) {
+          lWidth += 12.0;
+          lWidget = Padding(
+              padding: const EdgeInsets.only(right: 12.0), child: lWidget);
+        }
       }
 
-      if (rightImage != null) {
-        rWidth = rightImage.width;
-        rHeight = rightImage.height;
-        rWidget = Image.memory(rightImage.bytes,
-            width: rWidth, height: rHeight, fit: BoxFit.contain);
-        rWidth += 12.0;
-        rWidget =
-            Padding(padding: const EdgeInsets.only(left: 12.0), child: rWidget);
+      if (rightElement != null) {
+        if (rightElement is DocxInlineImage) {
+          rWidth = rightElement.width;
+          rHeight = rightElement.height;
+          rWidget = Image.memory(rightElement.bytes,
+              width: rWidth, height: rHeight, fit: BoxFit.contain);
+        } else if (rightElement is DocxShape) {
+          rWidth = rightElement.width;
+          rHeight = rightElement.height;
+          rWidget = _buildInlineShape(rightElement);
+        }
+
+        if (rWidget != null) {
+          rWidth += 12.0;
+          rWidget = Padding(
+              padding: const EdgeInsets.only(left: 12.0), child: rWidget);
+        }
       }
 
       final floatHeight =
           max(lHeight, rHeight); // We wrap under the tallest one
-      // Note: complex mixed heights would require efficient line-by-line sizing (complex).
-      // We assume "shared" float height for the row.
 
       final availableWidth = constraints.maxWidth - lWidth - rWidth;
       if (availableWidth <= 0) return const SizedBox(); // Too narrow
@@ -162,9 +195,8 @@ class ParagraphBuilder {
 
       textPainter.layout(
           maxWidth: constraints.maxWidth); // First to get line height
-      // Use default line height if calculated is weird, but try to use preference
+
       double lineHeight = textPainter.preferredLineHeight;
-      // If empty text?
       if (lineHeight == 0) lineHeight = 14.0;
 
       int rows = (floatHeight / lineHeight).ceil();
@@ -177,8 +209,6 @@ class ParagraphBuilder {
       int breakIndex = 0;
       if (!textPainter.didExceedMaxLines) {
         // Fits completely
-        // To get length we need to traverse
-        // Or just render all in the row
         breakIndex = -1; // Flag for all
       } else {
         // Get exact break
@@ -193,9 +223,6 @@ class ParagraphBuilder {
       if (breakIndex == -1) {
         span1 = textSpan;
       } else {
-        // We need the helper from DropCapText. Ideally it should be shared.
-        // Since it's private in DropCapText, I will implement a local one or make it public.
-        // For now, implement local helper to be safe.
         span1 = _sliceSpan(textSpan, 0, breakIndex);
         span2 = _sliceSpan(textSpan, breakIndex);
       }
@@ -212,7 +239,7 @@ class ParagraphBuilder {
                 child: SizedBox(
                   height: floatHeight > 0
                       ? floatHeight
-                      : null, // Force height match
+                      : null, // Force height match if not empty
                   child: RichText(
                     text: span1 ?? const TextSpan(text: ''),
                     textAlign: textAlign,
@@ -674,7 +701,12 @@ class ParagraphBuilder {
     if (dropCap.fontSize != null) {
       fontSizePx = dropCap.fontSize! * pointToPx;
     } else {
-      fontSizePx = dropCap.lines * defaultFontSize;
+      // Estimate font size based on number of lines
+      // Standard line height is usually ~1.2 * fontSize.
+      // We want the cap to span 'lines' text lines.
+      // Height ≈ lines * (fontSize * 1.2)
+      // So fontSize of cap ≈ Height (since height: 1.0)
+      fontSizePx = dropCap.lines * defaultFontSize * 1.2;
     }
 
     final color = theme.defaultTextStyle.color ?? Colors.black;
@@ -701,10 +733,18 @@ class ParagraphBuilder {
     final spans = _buildTextSpans(dropCap.restOfParagraph);
     final fullTextSpan = TextSpan(children: spans);
 
+    // Extract plain text for DropCapText's data parameter (required for sizing)
+    String restPlainText = '';
+    for (final inline in dropCap.restOfParagraph) {
+      if (inline is DocxText) {
+        restPlainText += inline.content;
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: DropCapText(
-        '',
+        restPlainText, // Non-empty data required for proper layout
         textSpan: fullTextSpan,
         dropCap: DropCap(
           width: dcWidth,
@@ -728,9 +768,7 @@ class ParagraphBuilder {
       ),
       recognizer: TapGestureRecognizer()
         ..onTap = () {
-          // TODO: Show footnote content
-          // logic could be added to show a dialog or toast
-          debugPrint('Footnote ${ref.footnoteId} clicked');
+          onFootnoteTap?.call(ref.footnoteId);
         },
     );
   }
@@ -745,8 +783,7 @@ class ParagraphBuilder {
       ),
       recognizer: TapGestureRecognizer()
         ..onTap = () {
-          // TODO: Show endnote content
-          debugPrint('Endnote ${ref.endnoteId} clicked');
+          onEndnoteTap?.call(ref.endnoteId);
         },
     );
   }

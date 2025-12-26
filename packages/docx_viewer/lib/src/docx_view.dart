@@ -176,18 +176,26 @@ class _DocxViewState extends State<DocxView> {
         );
       }
 
+      // Pre-process notes for quick lookup
+      final footnoteMap = {for (var f in doc.footnotes ?? []) f.footnoteId: f};
+      final endnoteMap = {for (var e in doc.endnotes ?? []) e.endnoteId: e};
+
       // Initialize widget generator
       _generator = DocxWidgetGenerator(
         config: widget.config,
         theme: widget.config.theme,
         searchController: widget.config.enableSearch ? _searchController : null,
+        onFootnoteTap: (id) =>
+            _showNoteContent('Footnote', footnoteMap[id]?.content),
+        onEndnoteTap: (id) =>
+            _showNoteContent('Endnote', endnoteMap[id]?.content),
       );
 
       // Generate widgets
-      final widgets = _generator.generateWidgets(doc.elements);
+      final widgets = _generator.generateWidgets(doc);
 
       // Build search index
-      final textIndex = _generator.extractTextForSearch(doc.elements);
+      final textIndex = _generator.extractTextForSearch(doc);
 
       setState(() {
         _widgets = widgets;
@@ -203,6 +211,44 @@ class _DocxViewState extends State<DocxView> {
       });
       widget.onError?.call(e);
     }
+  }
+
+  void _showNoteContent(String title, List<DocxBlock>? content) {
+    if (content == null || content.isEmpty || !mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        // Generate widgets for the note content
+        // We use a temporary generator just for this content
+        final noteWidgets = _generator.generateWidgets(DocxBuiltDocument(
+          elements: content,
+          // Empty dummy section/etc
+          section: const DocxSectionDef(),
+        ));
+
+        // Filter out dividers/headers/etc that handle method might add?
+        // generateWidgets handles 'doc' which includes section logic.
+        // If we pass content as 'elements', it will be in the body. That's fine.
+
+        return AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: noteWidgets,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _onSearchChanged() {

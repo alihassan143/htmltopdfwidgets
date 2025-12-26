@@ -82,14 +82,6 @@ class ListBuilder {
       // Here we just accept that 'indent' is the start of content.
     }
 
-    // Build marker based on list type and style
-    String marker;
-    if (list.isOrdered) {
-      marker = _getOrderedMarker(number, level, style.numberFormat);
-    } else {
-      marker = _getBulletMarker(level, style);
-    }
-
     // Build content from all inline children
     final spans = _buildInlineSpans(item.children);
 
@@ -106,6 +98,25 @@ class ListBuilder {
           theme.defaultTextStyle.fontFamily, // Ensure matching font family
     );
 
+    // Build marker widget
+    Widget markerWidget;
+    if (!list.isOrdered && style.imageBulletBytes != null) {
+      markerWidget = Image.memory(
+        style.imageBulletBytes!,
+        width: 12,
+        height: 12,
+        fit: BoxFit.contain,
+      );
+    } else {
+      String markerText;
+      if (list.isOrdered) {
+        markerText = _getOrderedMarker(number, level, style.numberFormat);
+      } else {
+        markerText = _getBulletMarker(level, style);
+      }
+      markerWidget = Text(markerText, style: markerStyle);
+    }
+
     return Padding(
       padding: EdgeInsets.only(left: indent, top: 2, bottom: 2),
       child: Row(
@@ -113,7 +124,7 @@ class ListBuilder {
         children: [
           SizedBox(
             width: 24,
-            child: Text(marker, style: markerStyle),
+            child: markerWidget,
           ),
           Expanded(
             child: config.enableSelection

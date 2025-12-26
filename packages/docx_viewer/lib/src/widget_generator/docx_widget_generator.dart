@@ -18,6 +18,9 @@ class DocxWidgetGenerator {
   final DocxViewTheme theme;
   final DocxSearchController? searchController;
 
+  final void Function(int id)? onFootnoteTap;
+  final void Function(int id)? onEndnoteTap;
+
   /// Paragraph builder for text rendering.
   late final ParagraphBuilder _paragraphBuilder;
 
@@ -37,11 +40,15 @@ class DocxWidgetGenerator {
     required this.config,
     DocxViewTheme? theme,
     this.searchController,
+    this.onFootnoteTap,
+    this.onEndnoteTap,
   }) : theme = theme ?? DocxViewTheme.light() {
     _paragraphBuilder = ParagraphBuilder(
       theme: this.theme,
       config: config,
       searchController: searchController,
+      onFootnoteTap: onFootnoteTap,
+      onEndnoteTap: onEndnoteTap,
     );
     _tableBuilder = TableBuilder(
       theme: this.theme,
@@ -57,11 +64,93 @@ class DocxWidgetGenerator {
     _shapeBuilder = ShapeBuilder(config: config);
   }
 
-  /// Generate a list of widgets from document elements.
-  ///
-  /// This method also handles layout orchestration for floating elements:
-  /// - Floating tables are grouped with following paragraphs into Row layouts
-  List<Widget> generateWidgets(List<DocxNode> elements) {
+  /// Generate a list of widgets from a parsed document.
+  List<Widget> generateWidgets(DocxBuiltDocument doc) {
+    final widgets = <Widget>[];
+
+    // 1. Header
+    if (doc.section?.header != null) {
+      widgets.addAll(_generateBlockWidgets(doc.section!.header!.children));
+      // Add visual separation for header
+      widgets.add(const Divider(height: 32, thickness: 1, color: Colors.grey));
+    }
+
+    // 2. Body
+    widgets.addAll(_generateBlockWidgets(doc.elements));
+
+    // 3. Footnotes (Appended to end for continuous view)
+    if (doc.footnotes != null && doc.footnotes!.isNotEmpty) {
+      widgets.add(const Divider(height: 32, thickness: 1));
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Text('Footnotes',
+            style: theme.defaultTextStyle
+                .copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+      ));
+
+      for (var footnote in doc.footnotes!) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${footnote.footnoteId}. ',
+                  style: theme.defaultTextStyle
+                      .copyWith(fontSize: 12, fontWeight: FontWeight.bold)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _generateBlockWidgets(footnote.content),
+                ),
+              ),
+            ],
+          ),
+        ));
+      }
+    }
+
+    // 4. Endnotes
+    if (doc.endnotes != null && doc.endnotes!.isNotEmpty) {
+      widgets.add(const Divider(height: 32, thickness: 1));
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Text('Endnotes',
+            style: theme.defaultTextStyle
+                .copyWith(fontWeight: FontWeight.bold, fontSize: 18)),
+      ));
+
+      for (var endnote in doc.endnotes!) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${endnote.endnoteId}. ',
+                  style: theme.defaultTextStyle
+                      .copyWith(fontSize: 12, fontWeight: FontWeight.bold)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _generateBlockWidgets(endnote.content),
+                ),
+              ),
+            ],
+          ),
+        ));
+      }
+    }
+
+    // 5. Footer
+    if (doc.section?.footer != null) {
+      widgets.add(const Divider(height: 32, thickness: 1, color: Colors.grey));
+      widgets.addAll(_generateBlockWidgets(doc.section!.footer!.children));
+    }
+
+    return widgets;
+  }
+
+  /// Generate widgets for a list of blocks.
+  List<Widget> _generateBlockWidgets(List<DocxNode> elements) {
     final widgets = <Widget>[];
     int i = 0;
 
@@ -198,12 +287,27 @@ class DocxWidgetGenerator {
   }
 
   /// Extract all text content for search indexing.
-  List<String> extractTextForSearch(List<DocxNode> elements) {
+  List<String> extractTextForSearch(DocxBuiltDocument doc) {
     final texts = <String>[];
 
-    for (final element in elements) {
+    // Header
+    if (doc.section?.header != null) {
+      for (var element in doc.section!.header!.children) {
+        texts.add(_extractText(element));
+      }
+    }
+
+    // Body
+    for (final element in doc.elements) {
       final text = _extractText(element);
       texts.add(text);
+    }
+
+    // Footer
+    if (doc.section?.footer != null) {
+      for (var element in doc.section!.footer!.children) {
+        texts.add(_extractText(element));
+      }
     }
 
     return texts;
