@@ -294,10 +294,15 @@ class ParagraphBuilder {
     // Apply paragraph styling from DocxParagraph properties
     const double twipsToPixels = 1 / 15.0;
 
-    double leftPadding = (paragraph.indentLeft ?? 0) * twipsToPixels;
-    double rightPadding = (paragraph.indentRight ?? 0) * twipsToPixels;
-    double topPadding = (paragraph.spacingBefore ?? 80) * twipsToPixels;
-    double bottomPadding = (paragraph.spacingAfter ?? 80) * twipsToPixels;
+    // Clamp all padding values to non-negative to prevent assertion errors
+    double leftPadding =
+        ((paragraph.indentLeft ?? 0) * twipsToPixels).clamp(0, double.infinity);
+    double rightPadding = ((paragraph.indentRight ?? 0) * twipsToPixels)
+        .clamp(0, double.infinity);
+    double topPadding = ((paragraph.spacingBefore ?? 80) * twipsToPixels)
+        .clamp(0, double.infinity);
+    double bottomPadding = ((paragraph.spacingAfter ?? 80) * twipsToPixels)
+        .clamp(0, double.infinity);
 
     // Handle first line indent (only applies if we have a simple block, but here we apply to wrapper padding?)
     // Actually standard first line indent shifts the first line text.
@@ -411,7 +416,7 @@ class ParagraphBuilder {
 
     // Convert size from eighths of a point to pixels
     final width = (side.size / 8.0).clamp(0.5, 10.0);
-    final color = _parseHexColor(side.color.hex);
+    final color = _parseHexColor(side.color.hex) ?? Colors.black;
 
     return BorderSide(
       color: color,
@@ -794,11 +799,11 @@ class ParagraphBuilder {
       height: shape.height,
       decoration: BoxDecoration(
         color: shape.fillColor != null
-            ? _parseHexColor(shape.fillColor!.hex)
+            ? (_parseHexColor(shape.fillColor!.hex) ?? Colors.grey.shade200)
             : Colors.grey.shade200,
         border: shape.outlineColor != null
             ? Border.all(
-                color: _parseHexColor(shape.outlineColor!.hex),
+                color: _parseHexColor(shape.outlineColor!.hex) ?? Colors.black,
                 width: shape.outlineWidth,
               )
             : null,
@@ -836,14 +841,48 @@ class ParagraphBuilder {
     }
   }
 
-  Color _parseHexColor(String hex) {
-    String cleanHex = hex.replaceAll('#', '').replaceAll('0x', '');
-    if (cleanHex.length == 6) {
-      return Color(int.parse('FF$cleanHex', radix: 16));
-    } else if (cleanHex.length == 8) {
-      return Color(int.parse(cleanHex, radix: 16));
+  Color? _parseHexColor(String hex) {
+    // Handle 'auto' and empty strings
+    if (hex.isEmpty || hex.toLowerCase() == 'auto') {
+      return null;
     }
-    return Colors.black;
+
+    String cleanHex = hex.replaceAll('#', '').replaceAll('0x', '');
+
+    // Handle common named colors from DOCX
+    switch (cleanHex.toLowerCase()) {
+      case 'black':
+        return Colors.black;
+      case 'white':
+        return Colors.white;
+      case 'red':
+        return Colors.red;
+      case 'green':
+        return Colors.green;
+      case 'blue':
+        return Colors.blue;
+      case 'yellow':
+        return Colors.yellow;
+      case 'cyan':
+        return Colors.cyan;
+      case 'magenta':
+        return Colors.pink;
+    }
+
+    if (cleanHex.length == 6) {
+      try {
+        return Color(int.parse('FF$cleanHex', radix: 16));
+      } catch (e) {
+        return null;
+      }
+    } else if (cleanHex.length == 8) {
+      try {
+        return Color(int.parse(cleanHex, radix: 16));
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
   }
 
   Color _highlightToColor(DocxHighlight highlight) {
@@ -886,6 +925,7 @@ class ParagraphBuilder {
   Color _contrastColor(DocxColor? color) {
     if (color == null) return Colors.black;
     final c = _parseHexColor(color.hex);
+    if (c == null) return Colors.black;
     final luminance = c.computeLuminance();
     return luminance > 0.5 ? Colors.black : Colors.white;
   }
