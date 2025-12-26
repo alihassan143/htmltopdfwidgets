@@ -202,6 +202,13 @@ final doc = DocxDocumentBuilder()
       color: DocxColor.blue,
       decoration: DocxTextDecoration.underline),
   ]))
+  
+  // Paragraph with specific line spacing
+  .add(DocxParagraph(
+    children: [DocxText('Exact Spacing')],
+    lineSpacing: 240,       // 12 pt
+    lineRule: 'exact',      // 'auto', 'exact', 'atLeast'
+  ))
   .build();
 ```
 
@@ -671,7 +678,11 @@ final doc = DocxDocumentBuilder()
   .build();
 ```
 
-> **Note:** Fonts are automatically obfuscated per the OpenXML specification to ensure compatibility with Microsoft Word.
+  .build();
+```
+
+> **Note:** Fonts are automatically obfuscated per the OpenXML specification.
+> **High Fidelity:** When reading existing documents, `docx_creator` preserves embedded fonts byte-for-byte, ensuring exact visual fidelity during round-trip edits.
 
 ---
 

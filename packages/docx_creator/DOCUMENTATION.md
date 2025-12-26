@@ -115,6 +115,8 @@ DocxNode (abstract)
 | `children` | `List<DocxInline>` | Inline content |
 | `align` | `DocxAlign` | `left`, `center`, `right`, `justify` |
 | `spacing` | `DocxSpacing?` | Before/after spacing |
+| `lineSpacing` | `int?` | Line spacing amount (twips) |
+| `lineRule` | `String?` | `auto`, `exact`, `atLeast` |
 | `pageBreakBefore` | `bool` | Page break before paragraph |
 | `shadingFill` | `String?` | Background shading |
 
@@ -443,6 +445,8 @@ Future<void> loadDocument() async {
 | Headers/Footers | ✅ | Content preserved |
 | Styles XML | ✅ | For round-trip |
 | Numbering XML | ✅ | List definitions |
+| Embedded Fonts | ✅ | Preserved with original filenames |
+| Relationships | ✅ | Preserved for validity |
 | Section properties | ✅ | Page layout |
 
 ### Accessing Document Elements
