@@ -55,7 +55,8 @@ class DocxSearchController extends ChangeNotifier {
           blockIndex: blockIndex,
           startOffset: index,
           endOffset: index + query.length,
-          text: documentTexts[blockIndex].substring(index, index + query.length),
+          text:
+              documentTexts[blockIndex].substring(index, index + query.length),
         ));
 
         startIndex = index + 1;
@@ -79,7 +80,8 @@ class DocxSearchController extends ChangeNotifier {
   /// Move to the previous match.
   void previousMatch() {
     if (_matches.isEmpty) return;
-    _currentMatchIndex = (_currentMatchIndex - 1 + _matches.length) % _matches.length;
+    _currentMatchIndex =
+        (_currentMatchIndex - 1 + _matches.length) % _matches.length;
     notifyListeners();
   }
 
