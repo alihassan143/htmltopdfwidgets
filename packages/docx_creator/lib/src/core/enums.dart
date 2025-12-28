@@ -29,17 +29,29 @@ class DocxColor {
   /// The hex color value (without #).
   final String hex;
 
+  /// Theme color reference (e.g. 'accent1').
+  final String? themeColor;
+
+  /// Theme color tint.
+  final String? themeTint;
+
+  /// Theme color shade.
+  final String? themeShade;
+
   /// Private const constructor for predefined colors.
-  const DocxColor._(this.hex);
+  const DocxColor._(this.hex,
+      {this.themeColor, this.themeTint, this.themeShade});
 
   /// Creates a color from a hex string.
   ///
   /// Accepts formats: 'RRGGBB', '#RRGGBB', '0xRRGGBB'
-  factory DocxColor(String value) {
+  factory DocxColor(String value,
+      {String? themeColor, String? themeTint, String? themeShade}) {
     String hex = value.toUpperCase();
     if (hex.startsWith('#')) hex = hex.substring(1);
     if (hex.startsWith('0X')) hex = hex.substring(2);
-    return DocxColor._(hex);
+    return DocxColor._(hex,
+        themeColor: themeColor, themeTint: themeTint, themeShade: themeShade);
   }
 
   /// Creates a color from a hex string, removing # or 0x prefix.
@@ -180,6 +192,7 @@ enum DocxHighlight {
   darkGray,
   lightGray,
   black,
+  white,
 }
 
 // ============================================================

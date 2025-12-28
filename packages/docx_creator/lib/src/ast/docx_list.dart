@@ -30,6 +30,13 @@ class DocxListStyle {
   final DocxColor color;
   final double? fontSize;
 
+  /// Theme color reference.
+  final String? themeColor;
+  final String? themeTint;
+  final String? themeShade;
+  final String? themeFont;
+  final String? fontFamily;
+
   /// Custom image bullet bytes (png/jpg).
   ///
   /// If provided, this overrides [bullet] and [numberFormat].
@@ -43,6 +50,11 @@ class DocxListStyle {
     this.fontWeight = DocxFontWeight.normal,
     this.color = DocxColor.black,
     this.fontSize,
+    this.themeColor,
+    this.themeTint,
+    this.themeShade,
+    this.themeFont,
+    this.fontFamily,
     this.imageBulletBytes,
   });
 

@@ -6,8 +6,9 @@ import '../docx_view_config.dart';
 /// Builds Flutter widgets from [DocxShape] and [DocxShapeBlock] elements.
 class ShapeBuilder {
   final DocxViewConfig config;
+  final DocxTheme? docxTheme;
 
-  ShapeBuilder({required this.config});
+  ShapeBuilder({required this.config, this.docxTheme});
 
   /// Build a block-level shape widget.
   Widget buildBlockShape(DocxShapeBlock shapeBlock) {
@@ -64,13 +65,28 @@ class ShapeBuilder {
         borderRadius = null;
     }
 
+    final fillColor = _resolveColor(
+      shape.fillColor?.hex,
+      shape.fillColor?.themeColor,
+      shape.fillColor?.themeTint,
+      shape.fillColor?.themeShade,
+    );
+
+    final outlineColor = _resolveColor(
+      shape.outlineColor?.hex,
+      shape.outlineColor?.themeColor,
+      shape.outlineColor?.themeTint,
+      shape.outlineColor?.themeShade,
+    );
+
     decoration = BoxDecoration(
-      color: shape.fillColor != null
-          ? _parseHexColor(shape.fillColor!.hex)
-          : Colors.grey.shade200,
+      color: fillColor ??
+          (shape.fillColor != null
+              ? _parseHexColor(shape.fillColor!.hex)
+              : Colors.grey.shade200),
       border: shape.outlineColor != null
           ? Border.all(
-              color: _parseHexColor(shape.outlineColor!.hex),
+              color: outlineColor ?? _parseHexColor(shape.outlineColor!.hex),
               width: shape.outlineWidth,
             )
           : null,
@@ -114,7 +130,7 @@ class ShapeBuilder {
       width: shape.width,
       height: shape.height,
       child: CustomPaint(
-        painter: _ShapePainter(shape),
+        painter: _ShapePainter(shape, docxTheme),
         child: shape.text != null
             ? Center(
                 child: Text(
@@ -142,34 +158,96 @@ class ShapeBuilder {
 
   Color _contrastColor(DocxColor? color) {
     if (color == null) return Colors.black;
-    final c = _parseHexColor(color.hex);
-    final luminance = c.computeLuminance();
+    // Resolve theme color for contrast check too
+    final resolved = _resolveColor(
+            color.hex, color.themeColor, color.themeTint, color.themeShade) ??
+        _parseHexColor(color.hex);
+
+    final luminance = resolved.computeLuminance();
     return luminance > 0.5 ? Colors.black : Colors.white;
+  }
+
+  Color? _resolveColor(
+      String? hex, String? themeColor, String? themeTint, String? themeShade) {
+    Color? baseColor;
+
+    // 1. Try Theme Color
+    if (themeColor != null && docxTheme != null) {
+      final themeHex = docxTheme!.colors.getColor(themeColor);
+      if (themeHex != null) {
+        baseColor = _parseHexColor(themeHex);
+      }
+    }
+
+    // 2. Fallback to direct Hex
+    if (baseColor == null && hex != null && hex != 'auto') {
+      baseColor = _parseHexColor(hex);
+    }
+
+    if (baseColor == null) return null;
+
+    // 3. Apply Tint/Shade
+    if (themeTint != null) {
+      final tintVal = int.tryParse(themeTint, radix: 16);
+      if (tintVal != null) {
+        final factor = tintVal / 255.0;
+        baseColor =
+            Color.alphaBlend(Colors.white.withOpacity(1 - factor), baseColor);
+      }
+    }
+
+    if (themeShade != null) {
+      final shadeVal = int.tryParse(themeShade, radix: 16);
+      if (shadeVal != null) {
+        final factor = shadeVal / 255.0;
+        baseColor =
+            Color.alphaBlend(Colors.black.withOpacity(1 - factor), baseColor);
+      }
+    }
+
+    return baseColor;
   }
 }
 
 /// Custom painter for complex shapes.
 class _ShapePainter extends CustomPainter {
   final DocxShape shape;
+  final DocxTheme? docxTheme;
 
-  _ShapePainter(this.shape);
+  _ShapePainter(this.shape, this.docxTheme);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final fillColor = shape.fillColor != null
-        ? _parseHexColor(shape.fillColor!.hex)
-        : Colors.grey.shade200;
+    // Resolve colors manually since _ShapePainter is separate
+    final fillColorRaw = shape.fillColor; // default handled later
 
-    final outlineColor = shape.outlineColor != null
-        ? _parseHexColor(shape.outlineColor!.hex)
-        : Colors.black;
+    // We duplicate _resolveColor logic here or make it static utility?
+    // Duplication for now to keep it self-contained in this builder.
+    final fillColorVal = _resolveColor(
+            fillColorRaw?.hex,
+            fillColorRaw?.themeColor,
+            fillColorRaw?.themeTint,
+            fillColorRaw?.themeShade) ??
+        (fillColorRaw != null
+            ? _parseHexColor(fillColorRaw.hex)
+            : Colors.grey.shade200);
+
+    final outlineColorRaw = shape.outlineColor;
+    final outlineColorVal = _resolveColor(
+            outlineColorRaw?.hex,
+            outlineColorRaw?.themeColor,
+            outlineColorRaw?.themeTint,
+            outlineColorRaw?.themeShade) ??
+        (outlineColorRaw != null
+            ? _parseHexColor(outlineColorRaw.hex)
+            : Colors.black);
 
     final fillPaint = Paint()
-      ..color = fillColor
+      ..color = fillColorVal
       ..style = PaintingStyle.fill;
 
     final strokePaint = Paint()
-      ..color = outlineColor
+      ..color = outlineColorVal
       ..style = PaintingStyle.stroke
       ..strokeWidth = shape.outlineWidth;
 
@@ -253,10 +331,50 @@ class _ShapePainter extends CustomPainter {
       (angle * angle * angle / 6) +
       (angle * angle * angle * angle * angle / 120);
 
+  Color? _resolveColor(
+      String? hex, String? themeColor, String? themeTint, String? themeShade) {
+    Color? baseColor;
+
+    if (themeColor != null && docxTheme != null) {
+      final themeHex = docxTheme!.colors.getColor(themeColor);
+      if (themeHex != null) {
+        baseColor = _parseHexColor(themeHex);
+      }
+    }
+
+    if (baseColor == null && hex != null && hex != 'auto') {
+      baseColor = _parseHexColor(hex);
+    }
+
+    if (baseColor == null) return null;
+
+    if (themeTint != null) {
+      final tintVal = int.tryParse(themeTint, radix: 16);
+      if (tintVal != null) {
+        final factor = tintVal / 255.0;
+        baseColor =
+            Color.alphaBlend(Colors.white.withOpacity(1 - factor), baseColor);
+      }
+    }
+
+    if (themeShade != null) {
+      final shadeVal = int.tryParse(themeShade, radix: 16);
+      if (shadeVal != null) {
+        final factor = shadeVal / 255.0;
+        baseColor =
+            Color.alphaBlend(Colors.black.withOpacity(1 - factor), baseColor);
+      }
+    }
+
+    return baseColor;
+  }
+
   Color _parseHexColor(String hex) {
     String cleanHex = hex.replaceAll('#', '').replaceAll('0x', '');
     if (cleanHex.length == 6) {
       return Color(int.parse('FF$cleanHex', radix: 16));
+    } else if (cleanHex.length == 8) {
+      return Color(int.parse(cleanHex, radix: 16));
     }
     return Colors.grey;
   }

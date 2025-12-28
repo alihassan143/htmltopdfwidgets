@@ -106,6 +106,7 @@ class DropCapText extends StatelessWidget {
     this.overflow = TextOverflow.clip,
     this.maxLines,
     this.dropCapPosition,
+    this.dropCapLines,
   });
 
   /// The text to display with a drop cap effect.
@@ -156,6 +157,11 @@ class DropCapText extends StatelessWidget {
   /// How visual overflow should be handled.
   final TextOverflow overflow;
 
+  /// The number of lines the drop cap should span.
+  ///
+  /// If provided, this overrides the height-based calculation.
+  final int? dropCapLines;
+
   @override
   Widget build(BuildContext context) {
     final textStyle = TextStyle(
@@ -202,11 +208,15 @@ class DropCapText extends StatelessWidget {
     // We need 'data' equivalent for length checks.
     String plainTextContent = data;
     if (textSpan != null) {
-      plainTextContent = textSpan!.toPlainText();
+      final spanText = textSpan!.toPlainText();
+      if (spanText.isNotEmpty) {
+        plainTextContent = spanText;
+      }
     }
 
-    if (mode == DropCapMode.baseline && dropCap == null)
+    if (mode == DropCapMode.baseline && dropCap == null) {
       return _buildBaseline(context, textStyle, capStyle);
+    }
 
     // custom DropCap
     if (dropCap != null) {
@@ -221,8 +231,7 @@ class DropCapText extends StatelessWidget {
       capHeight = capPainter.height;
       if (forceNoDescent) {
         final ls = capPainter.computeLineMetrics();
-        capHeight -=
-            ls.isNotEmpty ? ls[0].descent * 0.95 : capPainter.height * 0.2;
+        capHeight -= ls.isNotEmpty ? ls[0].descent : capPainter.height * 0.2;
       }
     }
 
@@ -234,7 +243,8 @@ class DropCapText extends StatelessWidget {
         textDirection: textDirection, text: mainSpan, textAlign: textAlign);
     final lineHeight = textPainter.preferredLineHeight;
 
-    var rows = ((capHeight - indentation.dy) / lineHeight).ceil();
+    var rows =
+        dropCapLines ?? ((capHeight - indentation.dy) / lineHeight).ceil();
 
     // DROP CAP MODE - UPWARDS
     if (mode == DropCapMode.upwards) {
@@ -256,6 +266,7 @@ class DropCapText extends StatelessWidget {
           final yPos = rows * lineHeight;
           final charIndex =
               textPainter.getPositionForOffset(Offset(0, yPos)).offset;
+
           textPainter
             ..maxLines = rows
             ..layout(maxWidth: boundsWidth);
@@ -440,12 +451,15 @@ class MarkdownParser {
     void addSpan(String markup, {required bool isOpening}) {
       final markups = <Markup>[Markup(markup, isActive: isOpening)];
 
-      if (bold && markup != markupBold)
+      if (bold && markup != markupBold) {
         markups.add(Markup(markupBold, isActive: true));
-      if (italic && markup != markupItalic)
+      }
+      if (italic && markup != markupItalic) {
         markups.add(Markup(markupItalic, isActive: true));
-      if (underline && markup != markupUnderline)
+      }
+      if (underline && markup != markupUnderline) {
         markups.add(Markup(markupUnderline, isActive: true));
+      }
 
       spans.add(
         MarkdownSpan(

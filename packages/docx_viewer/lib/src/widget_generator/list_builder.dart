@@ -14,6 +14,7 @@ class ListBuilder {
   final DocxViewTheme theme;
   final DocxViewConfig config;
   final ParagraphBuilder paragraphBuilder;
+  final DocxTheme? docxTheme;
 
   /// Default bullet characters for different indent levels when no style specified.
   static const _defaultBullets = ['•', '◦', '▪', '▸', '◦', '▪', '▸', '◦', '▪'];
@@ -22,6 +23,7 @@ class ListBuilder {
     required this.theme,
     required this.config,
     required this.paragraphBuilder,
+    this.docxTheme,
   });
 
   /// Build a widget from a [DocxList].
@@ -86,8 +88,24 @@ class ListBuilder {
     final spans = _buildInlineSpans(item.children);
 
     // Apply style properties from DocxListStyle to the marker
+
+    // Resolve theme color for marker
+    final markerColor = _resolveColor(
+          style.color.hex,
+          style.themeColor,
+          style.themeTint,
+          style.themeShade,
+        ) ??
+        _parseHexColor(style.color
+            .hex); // Fallback to raw hex if resolving fails but it shouldn't if hex is valid
+
+    // Resolve theme font for marker
+    final markerFont = docxTheme != null && style.themeFont != null
+        ? docxTheme!.fonts.getFont(style.themeFont!)
+        : null;
+
     final markerStyle = TextStyle(
-      color: _parseHexColor(style.color.hex),
+      color: markerColor,
       fontSize: style.fontSize != null
           ? style.fontSize! * 1.333
           : theme.defaultTextStyle.fontSize,
@@ -95,12 +113,12 @@ class ListBuilder {
           ? FontWeight.bold
           : FontWeight.normal,
       fontFamily:
-          theme.defaultTextStyle.fontFamily, // Ensure matching font family
+          markerFont ?? style.fontFamily ?? theme.defaultTextStyle.fontFamily,
     );
 
     // Build marker widget
     Widget markerWidget;
-    if (!list.isOrdered && style.imageBulletBytes != null) {
+    if (style.imageBulletBytes != null) {
       markerWidget = Image.memory(
         style.imageBulletBytes!,
         width: 12,
@@ -268,7 +286,13 @@ class ListBuilder {
         : TextDecoration.combine(decorations);
 
     Color? textColor;
-    if (text.color != null) {
+    textColor = _resolveColor(
+      text.color?.hex,
+      text.themeColor ?? text.color?.themeColor,
+      text.themeTint ?? text.color?.themeTint,
+      text.themeShade ?? text.color?.themeShade,
+    );
+    if (textColor == null && text.color != null) {
       textColor = _parseHexColor(text.color!.hex);
     }
 
@@ -399,6 +423,48 @@ class ListBuilder {
       default:
         return Colors.transparent;
     }
+  }
+
+  Color? _resolveColor(
+      String? hex, String? themeColor, String? themeTint, String? themeShade) {
+    Color? baseColor;
+
+    // 1. Try Theme Color
+    if (themeColor != null && docxTheme != null) {
+      final themeHex = docxTheme!.colors.getColor(themeColor);
+      if (themeHex != null) {
+        baseColor = _parseHexColor(themeHex);
+      }
+    }
+
+    // 2. Fallback to direct Hex
+    if (baseColor == null && hex != null && hex != 'auto') {
+      baseColor = _parseHexColor(hex);
+    }
+
+    if (baseColor == null) return null;
+
+    // 3. Apply Tint/Shade
+    if (themeTint != null) {
+      final tintVal = int.tryParse(themeTint, radix: 16);
+      if (tintVal != null) {
+        final factor = tintVal / 255.0;
+        baseColor = Color.alphaBlend(
+            Colors.white.withValues(alpha: 1 - factor), baseColor);
+      }
+    }
+
+    if (themeShade != null) {
+      final shadeVal = int.tryParse(themeShade, radix: 16);
+      if (shadeVal != null) {
+        // Shade means darker, mix with black
+        final factor = shadeVal / 255.0;
+        baseColor = Color.alphaBlend(
+            Colors.black.withValues(alpha: 1 - factor), baseColor);
+      }
+    }
+
+    return baseColor;
   }
 
   Color _parseHexColor(String hex) {

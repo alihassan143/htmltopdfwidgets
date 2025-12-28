@@ -98,14 +98,10 @@ class InlineParser {
     final textElem = run.getElement('w:t');
     if (textElem != null) {
       // For font properties, only use direct + character style, not paragraph style
-      DocxStyle? charStyle;
-      if (rStyle != null) {
-        charStyle = context.resolveStyle(rStyle);
-      }
-      final runFontSize = parsedProps.fontSize ?? charStyle?.fontSize;
-      final runFonts =
-          charStyle?.fonts?.merge(parsedProps.fonts) ?? parsedProps.fonts;
-      final runFontFamily = parsedProps.fontFamily ?? charStyle?.fontFamily;
+
+      final runFontSize = finalProps.fontSize;
+      final runFonts = finalProps.fonts;
+      final runFontFamily = finalProps.fontFamily;
 
       return DocxText(
         textElem.innerText,

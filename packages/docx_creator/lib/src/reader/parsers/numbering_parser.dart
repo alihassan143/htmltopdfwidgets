@@ -120,14 +120,36 @@ class NumberingParser {
     // Parse bullet character
     String? bulletChar;
     String? bulletFont;
+    // Parse numbering properties (color, font, etc.)
+    String? themeColor;
+    String? themeTint;
+    String? themeShade;
+    String? themeFont;
+
     final rPr = lvl.getElement('w:rPr');
+    if (rPr != null) {
+      // Parse Fonts
+      final rFonts = rPr.getElement('w:rFonts');
+      if (rFonts != null) {
+        if (numFmt == 'bullet') {
+          bulletFont =
+              rFonts.getAttribute('w:ascii') ?? rFonts.getAttribute('w:hAnsi');
+        }
+        themeFont = rFonts.getAttribute('w:asciiTheme') ??
+            rFonts.getAttribute('w:hAnsiTheme');
+      }
+
+      // Parse Color
+      final colorElem = rPr.getElement('w:color');
+      if (colorElem != null) {
+        themeColor = colorElem.getAttribute('w:themeColor');
+        themeTint = colorElem.getAttribute('w:themeTint');
+        themeShade = colorElem.getAttribute('w:themeShade');
+      }
+    }
+
     if (numFmt == 'bullet') {
       bulletChar = lvlText;
-      if (rPr != null) {
-        final rFonts = rPr.getElement('w:rFonts');
-        bulletFont =
-            rFonts?.getAttribute('w:ascii') ?? rFonts?.getAttribute('w:hAnsi');
-      }
     }
 
     // Parse picture bullet reference
@@ -166,6 +188,10 @@ class NumberingParser {
       hanging: hanging,
       bulletChar: bulletChar,
       bulletFont: bulletFont,
+      themeFont: themeFont,
+      themeColor: themeColor,
+      themeTint: themeTint,
+      themeShade: themeShade,
       picBulletId: picBulletId,
       picBulletImage: picBulletImage,
     );

@@ -167,7 +167,6 @@ class _DocxViewState extends State<DocxView> {
       // Load document using docx_creator
       final doc = await DocxReader.loadFromBytes(bytes);
 
-      // Load embedded fonts
       for (final font in doc.fonts) {
         await EmbeddedFontLoader.loadFont(
           font.familyName,
@@ -184,6 +183,7 @@ class _DocxViewState extends State<DocxView> {
       _generator = DocxWidgetGenerator(
         config: widget.config,
         theme: widget.config.theme,
+        docxTheme: doc.theme,
         searchController: widget.config.enableSearch ? _searchController : null,
         onFootnoteTap: (id) =>
             _showNoteContent('Footnote', footnoteMap[id]?.content),
@@ -295,16 +295,44 @@ class _DocxViewState extends State<DocxView> {
     final backgroundColor =
         widget.config.backgroundColor ?? theme.backgroundColor ?? Colors.white;
 
-    Widget content = Container(
-      color: backgroundColor,
-      child: ListView.builder(
-        padding: widget.config.padding,
-        itemCount: _widgets!.length,
-        itemBuilder: (context, index) {
-          return _widgets![index];
-        },
-      ),
+    Widget content;
+    final list = ListView.builder(
+      // If page mode, padding is handled by the page container mostly, but we keep config padding inside
+      padding: widget.config.padding,
+      itemCount: _widgets!.length,
+      itemBuilder: (context, index) {
+        return _widgets![index];
+      },
     );
+
+    if (widget.config.pageWidth != null) {
+      // Page Layout Mode
+      content = Container(
+        color: widget.config.backgroundColor ?? const Color(0xFFF0F0F0),
+        alignment: Alignment.topCenter,
+        child: Container(
+          width: widget.config.pageWidth,
+          margin: const EdgeInsets.symmetric(vertical: 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: list,
+        ),
+      );
+    } else {
+      // Standard Responsive Mode
+      content = Container(
+        color: backgroundColor,
+        child: list,
+      );
+    }
 
     // Wrap with InteractiveViewer for zoom functionality
     if (widget.config.enableZoom) {

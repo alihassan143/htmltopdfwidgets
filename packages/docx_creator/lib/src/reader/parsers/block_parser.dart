@@ -149,6 +149,9 @@ class BlockParser {
       styleId: pStyle,
       align: finalProps.align ?? DocxAlign.left,
       shadingFill: finalProps.shadingFill,
+      themeFill: finalProps.themeFill,
+      themeFillTint: finalProps.themeFillTint,
+      themeFillShade: finalProps.themeFillShade,
       numId: finalProps.numId,
       ilvl: finalProps.ilvl,
       spacingAfter: finalProps.spacingAfter,
@@ -197,8 +200,42 @@ class BlockParser {
       final levelDef =
           numberingDef.levels.where((l) => l.level == firstLevel).firstOrNull;
 
-      if (levelDef?.picBulletImage != null) {
-        listStyle = DocxListStyle(imageBulletBytes: levelDef!.picBulletImage);
+      if (levelDef != null) {
+        DocxNumberFormat format = DocxNumberFormat.decimal;
+        switch (levelDef.numFmt) {
+          case 'bullet':
+            format = DocxNumberFormat.bullet;
+            break;
+          case 'lowerLetter':
+          case 'lowerAlpha':
+            format = DocxNumberFormat.lowerAlpha;
+            break;
+          case 'upperLetter':
+          case 'upperAlpha':
+            format = DocxNumberFormat.upperAlpha;
+            break;
+          case 'lowerRoman':
+            format = DocxNumberFormat.lowerRoman;
+            break;
+          case 'upperRoman':
+            format = DocxNumberFormat.upperRoman;
+            break;
+          default:
+            format = DocxNumberFormat.decimal;
+        }
+
+        listStyle = DocxListStyle(
+          imageBulletBytes: levelDef.picBulletImage,
+          bullet: levelDef.bulletChar ?? '•',
+          numberFormat: format,
+          indentPerLevel: levelDef.indentLeft ?? 720,
+          hangingIndent: levelDef.hanging ?? 360,
+          themeColor: levelDef.themeColor,
+          themeTint: levelDef.themeTint,
+          themeShade: levelDef.themeShade,
+          themeFont: levelDef.themeFont,
+          fontFamily: levelDef.bulletFont,
+        );
       }
     }
 
@@ -369,6 +406,62 @@ class BlockParser {
       }
     }
 
+    // Parse the rest of the paragraph (everything after the first run's first letter)
+    // Complexity: The first run might have more text than just the letter.
+    // If so, we need to split it.
+    // But usually Word puts the Drop Cap in its own Frame/Run.
+    // We will assume the remaining runs are the rest of the paragraph.
+
+    final restOfChildren = <DocxInline>[];
+
+    // If first run has more text, add it
+    if (runs.isNotEmpty) {
+      final firstRun = runs.first;
+      final textElem = firstRun.getElement('w:t');
+      if (textElem != null && textElem.innerText.length > 1) {
+        // This case is rare for Drop Caps produced by Word (usually strict separation),
+        // but if it happens, we should technically keep the rest.
+        // However, for now, we rely on standard Word behavior where Drop Cap is isolated.
+      }
+
+      // Add all subsequent runs
+      for (var i = 1; i < runs.length; i++) {
+        restOfChildren.add(inlineParser.parseRun(runs.elementAt(i)));
+      }
+    }
+
+    // Also need to parse any other non-run children that might follow?
+    // Usually Drop Cap frame is tight.
+    // BUT the real 'rest of paragraph' is often in the *next* logical paragraph in the XML
+    // if the Frame is separate, or within the same paragraph if it's a framePr on the paragraph.
+    // When w:dropCap is used, it's a paragraph property.
+    // So the paragraph contains the drop cap AND the text wrapping around it.
+
+    // We need to parse all other children of 'xml' that are not the first run, using inlineParser.
+    // Filter out the first run we consumed.
+
+    // Get all child nodes of the paragraph
+    final allChildren = xml.children;
+    bool skippedFirstRun = false;
+    final nodesToParse = <XmlNode>[];
+
+    for (var child in allChildren) {
+      if (child is XmlElement && child.name.local == 'r') {
+        if (!skippedFirstRun) {
+          skippedFirstRun = true;
+          continue;
+        }
+      }
+      if (child is XmlElement && ['pPr', 'sectPr'].contains(child.name.local)) {
+        continue; // Skip properties
+      }
+      nodesToParse.add(child);
+    }
+
+    final effectiveStyle = context.resolveStyle('Normal'); // Approximation
+    restOfChildren.addAll(
+        inlineParser.parseChildren(nodesToParse, parentStyle: effectiveStyle));
+
     return DocxDropCap(
       letter: letter,
       lines: lines,
@@ -376,7 +469,7 @@ class BlockParser {
       hSpace: hSpace,
       fontFamily: fontFamily,
       fontSize: fontSize,
-      restOfParagraph: const [], // Rest of paragraph is typically in following paragraph
+      restOfParagraph: restOfChildren,
     );
   }
 }

@@ -76,12 +76,31 @@ class EmbeddedFontLoader {
 
     if (cleanGuid.length != 32) return Uint8List(0);
 
+    // Parse hex string to bytes (Big Endian initial parse)
     final bytes = Uint8List(16);
     for (int i = 0; i < 16; i++) {
       final hex = cleanGuid.substring(i * 2, i * 2 + 2);
       bytes[i] = int.parse(hex, radix: 16);
     }
 
+    // Apply Little Endian swapping for the first 3 components (Data1, Data2, Data3)
+    // as per Microsoft GUID spec used in OOXML obfuscation.
+    // GUID Structure: {D1-D2-D3-D4-D5}
+    // D1 (4 bytes): Swap
+    _swap(bytes, 0, 3);
+    _swap(bytes, 1, 2);
+    // D2 (2 bytes): Swap
+    _swap(bytes, 4, 5);
+    // D3 (2 bytes): Swap
+    _swap(bytes, 6, 7);
+    // D4, D5 (8 bytes): Keep Big Endian
+
     return bytes;
+  }
+
+  static void _swap(Uint8List list, int i, int j) {
+    final temp = list[i];
+    list[i] = list[j];
+    list[j] = temp;
   }
 }

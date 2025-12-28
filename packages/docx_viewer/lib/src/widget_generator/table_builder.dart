@@ -1,559 +1,482 @@
-import 'dart:convert';
-
 import 'package:docx_creator/docx_creator.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
 import '../docx_view_config.dart';
 import '../theme/docx_view_theme.dart';
 import 'paragraph_builder.dart';
 
-/// Builds Flutter widgets from [DocxTable] elements.
-///
-/// Uses HTML rendering approach (like microsoft_viewer) for complex tables
-/// with proper support for colspan, rowspan, borders, and cell styling.
+/// Builds Flutter widgets from [DocxTable] elements using native layout.
 class TableBuilder {
   final DocxViewTheme theme;
   final DocxViewConfig config;
   final ParagraphBuilder paragraphBuilder;
+  final DocxTheme? docxTheme;
+
+  // Constants
+  static const double _twipsToPx = 1 / 15.0;
 
   TableBuilder({
     required this.theme,
     required this.config,
     required this.paragraphBuilder,
+    this.docxTheme,
   });
 
-  /// Build a widget from a [DocxTable] using HTML rendering.
+  /// Build a widget from a [DocxTable].
   Widget build(DocxTable table) {
     if (table.rows.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    // Convert table to HTML for rendering
-    final htmlString = _tableToHtml(table);
+    // 1. Resolve Grid Columns (Widths)
+    final gridCols = table.resolvedGridColumns;
+    List<double> colWidths = [];
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: HtmlWidget(
-        htmlString,
-        textStyle: TextStyle(
-          fontSize: theme.defaultTextStyle.fontSize ?? 14,
-          color: theme.defaultTextStyle.color ?? Colors.black87,
-        ),
+    if (gridCols.isNotEmpty) {
+      colWidths = gridCols.map((w) => w * _twipsToPx).toList();
+    } else {
+      // Fallback: If no grid, distribute evenly based on first row
+      final firstRowCells = table.rows.first.cells.length;
+      if (firstRowCells > 0) {
+        // Assume page width 800 roughly, just for fallback
+        final w = 800.0 / firstRowCells;
+        colWidths = List.filled(firstRowCells, w);
+      }
+    }
+
+    // Initialize skip counts for vertical merges
+    final skipCounts = List<int>.filled(colWidths.length, 0);
+
+    // 2. Build Rows with table-level context
+    final rowWidgets = <Widget>[];
+    for (int r = 0; r < table.rows.length; r++) {
+      rowWidgets.add(_buildRow(
+        table.rows[r],
+        colWidths,
+        skipCounts,
+        table: table,
+        rowIndex: r,
+        totalRows: table.rows.length,
+      ));
+    }
+
+    // 3. Build table content
+    Widget tableContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: rowWidgets,
+    );
+
+    // Apply Table-level background if exists
+    final tableFill = _resolveColor(table.style.fill, null, null, null);
+    if (tableFill != null) {
+      tableContent = DecoratedBox(
+          decoration: BoxDecoration(
+            color: tableFill,
+          ),
+          child: tableContent);
+    }
+
+    // Wrap in horizontal scroll for overflow protection
+    Widget scrollableTable = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: tableContent,
+      ),
+    );
+
+    // Handle Table Alignment
+    if (table.alignment == DocxAlign.center) {
+      return Center(child: scrollableTable);
+    } else if (table.alignment == DocxAlign.right) {
+      return Align(alignment: Alignment.centerRight, child: scrollableTable);
+    }
+
+    return scrollableTable;
+  }
+
+  Widget _buildRow(
+    DocxTableRow row,
+    List<double> colWidths,
+    List<int> skipCounts, {
+    required DocxTable table,
+    required int rowIndex,
+    required int totalRows,
+  }) {
+    final cells = <Widget>[];
+    final style = table.style;
+    final look = table.look;
+    final totalColumns = colWidths.length;
+
+    // Determine row-level conditions
+    final isHeaderRow = rowIndex == 0 && table.hasHeader && look.firstRow;
+    final isLastRow = rowIndex == totalRows - 1 && look.lastRow;
+
+    // Determine row-level background based on styling
+    Color? rowBackground;
+
+    if (isHeaderRow && style.headerFill != null) {
+      rowBackground = _resolveColor(style.headerFill, null, null, null);
+    }
+
+    // Row banding (alternating colors) if not header and banding is enabled
+    if (rowBackground == null && !isHeaderRow && !look.noHBand) {
+      final isEvenRow = rowIndex.isEven;
+      if (isEvenRow && style.evenRowFill != null) {
+        rowBackground = _resolveColor(style.evenRowFill, null, null, null);
+      } else if (!isEvenRow && style.oddRowFill != null) {
+        rowBackground = _resolveColor(style.oddRowFill, null, null, null);
+      }
+    }
+
+    int gridIndex = 0;
+    int cellIndex = 0; // Index in row.cells
+
+    while (gridIndex < colWidths.length) {
+      // Determine column conditions
+      final isFirstColumn = gridIndex == 0 && look.firstColumn;
+      final isLastColumn = gridIndex >= totalColumns - 1 && look.lastColumn;
+
+      if (skipCounts[gridIndex] > 0) {
+        // --- CONTINUED CELL (Merged Placeholder) ---
+        skipCounts[gridIndex]--;
+        final remainingSkips = skipCounts[gridIndex];
+
+        double width = colWidths[gridIndex];
+        bool isLastRowOfMerge = remainingSkips == 0;
+
+        cells.add(_buildCell(
+          null, // No content
+          width,
+          drawTop: false,
+          drawBottom: isLastRowOfMerge,
+          isEmpty: true,
+          tableStyle: style,
+          tableLook: look,
+          rowBackground: rowBackground,
+          isHeaderRow: isHeaderRow,
+          isLastRow: isLastRow,
+          isFirstColumn: isFirstColumn,
+          isLastColumn: isLastColumn,
+          isFirstRowActual: rowIndex == 0,
+          isLastRowActual: rowIndex == totalRows - 1,
+          isFirstColumnActual: gridIndex == 0,
+          isLastColumnActual: gridIndex >= totalColumns - 1,
+        ));
+
+        gridIndex++;
+      } else {
+        // --- NEW CELL ---
+        if (cellIndex < row.cells.length) {
+          final cell = row.cells[cellIndex];
+
+          final span = cell.colSpan > 0 ? cell.colSpan : 1;
+          double width = 0;
+          for (int k = 0; k < span; k++) {
+            if (gridIndex + k < colWidths.length) {
+              width += colWidths[gridIndex + k];
+            } else {
+              width += 100;
+            }
+          }
+
+          final rowSpan = cell.rowSpan > 1 ? cell.rowSpan : 1;
+
+          for (int k = 0; k < span; k++) {
+            if (gridIndex + k < skipCounts.length) {
+              skipCounts[gridIndex + k] = rowSpan - 1;
+            }
+          }
+
+          bool hasVMerge = rowSpan > 1;
+
+          // Check if this cell spans to last column
+          final cellIsLastColumn =
+              (gridIndex + span - 1) >= totalColumns - 1 && look.lastColumn;
+
+          cells.add(_buildCell(
+            cell,
+            width,
+            drawTop: true,
+            drawBottom: !hasVMerge,
+            isEmpty: false,
+            tableStyle: style,
+            tableLook: look,
+            rowBackground: rowBackground,
+            isHeaderRow: isHeaderRow,
+            isLastRow: isLastRow,
+            isFirstColumn: isFirstColumn,
+            isLastColumn: cellIsLastColumn,
+            isFirstRowActual: rowIndex == 0,
+            isLastRowActual: rowIndex == totalRows - 1,
+            isFirstColumnActual: gridIndex == 0,
+            isLastColumnActual: (gridIndex + span - 1) >= totalColumns - 1,
+          ));
+
+          gridIndex += span;
+          cellIndex++;
+        } else {
+          if (gridIndex < colWidths.length) {
+            cells.add(SizedBox(width: colWidths[gridIndex]));
+          }
+          gridIndex++;
+        }
+      }
+    }
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: cells,
       ),
     );
   }
 
-  /// Convert DocxTable to HTML string for HtmlWidget rendering.
-  String _tableToHtml(DocxTable table) {
-    final buffer = StringBuffer();
-
-    // Get table style
-    final tableStyle = table.style;
-    final borderColor = _getColorString(tableStyle.borderColor);
-    final borderWidth = (tableStyle.borderWidth / 8.0).clamp(0.5, 4.0);
-
-    // Calculate table width
-    // Calculate table width
-    String tableWidth = 'auto'; // Default to auto, not 100%
-    if (table.width != null && table.width! > 0) {
-      if (table.widthType == DocxWidthType.pct) {
-        tableWidth = '${table.width! / 50}%'; // DOCX percentage is in fiftieths
-      } else if (table.widthType == DocxWidthType.dxa) {
-        // Twips to pixels: 1440 twips = 1 inch. 96 px = 1 inch. 1 px = 15 twips.
-        tableWidth = '${table.width! / 15}px';
-      }
-    }
-
-    // Handle floating table position (margins/offsets)
-    // HTML renderer doesn't support absolute positioning well in this context,
-    // so we translate what we can to buffer-level styles or separate wrapper.
-
-    // Global table fill
-    String tableBackground = '';
-    if (tableStyle.fill != null) {
-      tableBackground = 'background-color: #${_cleanHex(tableStyle.fill!)};';
-    }
-
-    // Handle alignment and floating
-    String containerStyle = '';
-    String tableFloat = '';
-
-    if (table.position != null) {
-      // Floating table logic
-      if (table.alignment == DocxAlign.left) {
-        tableFloat = 'float: left; margin-right: 1em;';
-      } else if (table.alignment == DocxAlign.right) {
-        tableFloat = 'float: right; margin-left: 1em;';
-      }
-    } else {
-      // Standard table alignment
-      if (table.alignment == DocxAlign.center) {
-        containerStyle = 'text-align: center;';
-        // Also set margin auto for block centering
-        tableFloat = 'margin-left: auto; margin-right: auto;';
-      } else if (table.alignment == DocxAlign.right) {
-        containerStyle = 'text-align: right;';
-        tableFloat = 'margin-left: auto;';
-      }
-    }
-
-    buffer.writeln('<html><body>');
-
-    // Wrap table in a div for alignment/floating
-    // If floating, the div floats. If centering, the div aligns text.
-    if (tableFloat.isNotEmpty || containerStyle.isNotEmpty) {
-      buffer.writeln('<div style="$containerStyle $tableFloat">');
-    }
-
-    buffer.writeln(
-        '<table style="border-collapse: collapse; width: $tableWidth; $tableBackground margin-left: auto; margin-right: auto;">');
-
-    // Use table look flags
-    final look = table.look;
-
-    for (int rowIndex = 0; rowIndex < table.rows.length; rowIndex++) {
-      final row = table.rows[rowIndex];
-      final isFirstRow = rowIndex == 0;
-      final isLastRow = rowIndex == table.rows.length - 1;
-      final isEven = rowIndex % 2 == 0;
-
-      buffer.writeln('<tr>');
-
-      for (int colIndex = 0; colIndex < row.cells.length; colIndex++) {
-        final cell = row.cells[colIndex];
-
-        // Get cell dimensions
-        final colSpan = cell.colSpan > 0 ? cell.colSpan : 1;
-        final rowSpan = cell.rowSpan > 0 ? cell.rowSpan : 1;
-
-        final isFirstCol = colIndex == 0;
-        final isLastCol = colIndex == row.cells.length - 1;
-
-        // Build cell style
-        final cellStyle = _buildCellStyle(
-          cell,
-          tableStyle,
-          isHeader: (isFirstRow && look.firstRow) ||
-              (isLastRow && look.lastRow), // Simplified logic
-          isFirstRow: isFirstRow && look.firstRow,
-          isLastRow: isLastRow && look.lastRow,
-          isFirstCol: isFirstCol && look.firstColumn,
-          isLastCol: isLastCol && look.lastColumn,
-          isEven: isEven,
-          look: look,
-          defaultBorderColor: borderColor,
-          defaultBorderWidth: borderWidth,
-        );
-
-        // Get cell content
-        final cellContent = _getCellContent(cell);
-
-        buffer.write('<td style="$cellStyle"');
-        if (colSpan > 1) buffer.write(' colspan="$colSpan"');
-        if (rowSpan > 1) buffer.write(' rowspan="$rowSpan"');
-        buffer.write('>');
-        buffer.write(cellContent);
-        buffer.writeln('</td>');
-      }
-
-      buffer.writeln('</tr>');
-    }
-
-    buffer.writeln('</table>');
-
-    if (tableFloat.isNotEmpty) {
-      buffer.writeln('</div>');
-    }
-
-    buffer.writeln('</body></html>');
-
-    return buffer.toString();
-  }
-
-  /// Build CSS style string for a table cell.
-  String _buildCellStyle(
-    DocxTableCell cell,
-    DocxTableStyle tableStyle, {
-    required bool isHeader,
-    required bool isFirstRow,
-    required bool isLastRow,
-    required bool isFirstCol,
-    required bool isLastCol,
-    required bool isEven,
-    required DocxTableLook look,
-    required String defaultBorderColor,
-    required double defaultBorderWidth,
+  Widget _buildCell(
+    DocxTableCell? cell,
+    double width, {
+    required bool drawTop,
+    required bool drawBottom,
+    required bool isEmpty,
+    required DocxTableStyle tableStyle,
+    DocxTableLook? tableLook,
+    Color? rowBackground,
+    bool isHeaderRow = false,
+    bool isLastRow = false,
+    bool isFirstColumn = false,
+    bool isLastColumn = false,
+    bool isFirstRowActual = false,
+    bool isLastRowActual = false,
+    bool isFirstColumnActual = false,
+    bool isLastColumnActual = false,
   }) {
-    final styles = <String>[];
+    // Helper to get side with proper merging of cell and table-level borders
+    BorderSide getSide(DocxBorderSide? cellSide, DocxBorderSide? tableSide,
+        {bool forceSkip = false}) {
+      if (forceSkip) return BorderSide.none;
+      // Use cell border if available, otherwise fall back to table border
+      final effectiveSide = cellSide ?? tableSide;
 
-    // Cell padding - apply default if not specified
-    if (tableStyle.cellPadding != null) {
-      final padding = tableStyle.cellPadding! / 15.0; // Convert twips to pixels
-      styles.add('padding: ${padding.clamp(2, 20)}px');
-    } else {
-      styles.add('padding: 4px'); // Default padding for readability
+      // If no border defined at either level, return none
+      if (effectiveSide == null) {
+        return BorderSide.none;
+      }
+
+      // If border style is explicitly none, return none
+      if (effectiveSide.style == DocxBorder.none) {
+        return BorderSide.none;
+      }
+
+      // Determine effective color
+      Color? borderColor;
+
+      // Try theme color first (takes priority)
+      if (effectiveSide.themeColor != null) {
+        borderColor = _resolveColor(
+            effectiveSide.color.hex,
+            effectiveSide.themeColor,
+            effectiveSide.themeTint,
+            effectiveSide.themeShade);
+      }
+
+      // Fall back to direct hex color if no theme color
+      if (borderColor == null && effectiveSide.color.hex != 'auto') {
+        borderColor = _resolveColor(effectiveSide.color.hex, null, null, null);
+      }
+
+      // Fall back to table's default border color
+      borderColor ??= _resolveColor(tableStyle.borderColor, null, null, null);
+
+      // Determine effective width
+      double borderWidth;
+      if (effectiveSide.size > 0) {
+        borderWidth = (effectiveSide.size / 8.0).clamp(0.5, 5.0);
+      } else {
+        borderWidth = (tableStyle.borderWidth / 8.0).clamp(0.5, 5.0);
+      }
+
+      return BorderSide(
+        color: borderColor ?? Colors.transparent,
+        width: borderWidth,
+        style: effectiveSide.style == DocxBorder.dotted ||
+                effectiveSide.style == DocxBorder.dashed
+            ? BorderStyle.none
+            : BorderStyle.solid,
+      );
     }
 
-    // Vertical alignment
-    switch (cell.verticalAlign) {
-      case DocxVerticalAlign.top:
-        styles.add('vertical-align: top');
-        break;
-      case DocxVerticalAlign.center:
-        styles.add('vertical-align: middle');
-        break;
-      case DocxVerticalAlign.bottom:
-        styles.add('vertical-align: bottom');
-        break;
+    // Determine which table-level border to use based on position
+    // - Outer edges: use borderTop/borderBottom/borderLeft/borderRight
+    // - Inner edges: use borderInsideH (horizontal inner) / borderInsideV (vertical inner)
+
+    // QUICK FIX: Create a default subtle border for tables without explicit border definitions
+    // This handles the case where borders come from table styles (in styles.xml) which aren't
+    // currently parsed. A proper fix would parse w:tblStylePr/w:tcBorders from style definitions.
+    DocxBorderSide? defaultSubtleBorder;
+    final hasAnyExplicitBorder = cell?.borderTop != null ||
+        cell?.borderBottom != null ||
+        cell?.borderLeft != null ||
+        cell?.borderRight != null ||
+        tableStyle.borderTop != null ||
+        tableStyle.borderBottom != null ||
+        tableStyle.borderLeft != null ||
+        tableStyle.borderRight != null ||
+        tableStyle.borderInsideH != null ||
+        tableStyle.borderInsideV != null;
+
+    if (!hasAnyExplicitBorder) {
+      // Apply subtle gray default border when no borders are defined
+      defaultSubtleBorder = DocxBorderSide(
+        color: DocxColor('D0D0D0'),
+        style: DocxBorder.single,
+        size: 2, // 1pt border (8 eighths)
+      );
     }
 
-    // Background color priority:
-    // 1. Cell specific fill
-    // 2. Conditional formatting (Header, Total Row, Banding)
+    // Get table-level borders with default fallback
+    final topTableBorder =
+        isFirstRowActual ? tableStyle.borderTop : tableStyle.borderInsideH;
+    final bottomTableBorder =
+        isLastRowActual ? tableStyle.borderBottom : tableStyle.borderInsideH;
+    final leftTableBorder =
+        isFirstColumnActual ? tableStyle.borderLeft : tableStyle.borderInsideV;
+    final rightTableBorder =
+        isLastColumnActual ? tableStyle.borderRight : tableStyle.borderInsideV;
 
-    if (cell.shadingFill != null && cell.shadingFill != 'auto') {
-      styles.add('background-color: #${_cleanHex(cell.shadingFill!)}');
-    } else {
-      // Conditional styling
-      String? conditionalFill;
+    Border sideBorder = Border(
+      top: getSide(cell?.borderTop, topTableBorder),
+      bottom: getSide(cell?.borderBottom, bottomTableBorder),
+      left: getSide(cell?.borderLeft, leftTableBorder),
+      right: getSide(cell?.borderRight, rightTableBorder),
+    );
 
-      if (isFirstRow && tableStyle.headerFill != null) {
-        conditionalFill = tableStyle.headerFill;
-      } else if (isLastRow && tableStyle.headerFill != null) {
-        // Often total rows share header style, but AST doesn't have specific totalRowFill.
-        // Implementation dependent.
-      } else if (!look.noHBand) {
-        // Banding enabled
-        if (isEven && tableStyle.evenRowFill != null) {
-          conditionalFill = tableStyle.evenRowFill;
-        } else if (!isEven && tableStyle.oddRowFill != null) {
-          conditionalFill = tableStyle.oddRowFill;
+    // Background: Cell shading takes priority, then row background
+    Color? color;
+    if (cell != null) {
+      color = _resolveColor(cell.shadingFill, cell.themeFill,
+          cell.themeFillTint, cell.themeFillShade);
+    }
+    // Fall back to row background if cell has no explicit shading
+    color ??= rowBackground;
+
+    // Content
+    Widget? contentWidget;
+    if (!isEmpty && cell != null) {
+      final children = <Widget>[];
+      for (final child in cell.children) {
+        if (child is DocxParagraph) {
+          children.add(paragraphBuilder.build(child));
+        } else if (child is DocxTable) {
+          children.add(build(child)); // Recursive
         }
       }
 
-      if (conditionalFill != null) {
-        styles.add('background-color: #${_cleanHex(conditionalFill)}');
-      } else if (isHeader) {
-        styles.add(
-            'background-color: #${_colorToHex(theme.tableHeaderBackground)}');
+      MainAxisAlignment mainAxis = MainAxisAlignment.start;
+      if (cell.verticalAlign == DocxVerticalAlign.center) {
+        mainAxis = MainAxisAlignment.center;
+      }
+      if (cell.verticalAlign == DocxVerticalAlign.bottom) {
+        mainAxis = MainAxisAlignment.end;
+      }
+
+      contentWidget = Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: mainAxis,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      );
+
+      // Vertical align wrapper
+      if (cell.verticalAlign != DocxVerticalAlign.top) {
+        if (cell.verticalAlign == DocxVerticalAlign.center) {
+          contentWidget = Center(child: contentWidget);
+        } else if (cell.verticalAlign == DocxVerticalAlign.bottom) {
+          contentWidget =
+              Align(alignment: Alignment.bottomLeft, child: contentWidget);
+        }
+      }
+
+      // Apply conditional text styling (bold for header row or first column)
+      if (isHeaderRow || isFirstColumn) {
+        // Determine text color for contrast (white text on dark backgrounds)
+        Color? textColor;
+        if (color != null) {
+          final luminance = color.computeLuminance();
+          if (luminance < 0.5) {
+            textColor = Colors.white;
+          }
+        }
+
+        contentWidget = DefaultTextStyle.merge(
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+          child: contentWidget,
+        );
       }
     }
 
-    // Cell borders - use cell-specific or fall back to table defaults
-    final defaultBorder = '${defaultBorderWidth}px solid #$defaultBorderColor';
+    // Use cellPadding from style if available, otherwise default to 4.0
+    final cellPaddingPx = tableStyle.cellPadding != null
+        ? (tableStyle.cellPadding! * _twipsToPx).clamp(2.0, 20.0)
+        : 4.0;
 
-    if (cell.borderTop != null) {
-      styles.add('border-top: ${_borderSideToCSS(cell.borderTop!)}');
-    } else if (tableStyle.border != DocxBorder.none) {
-      styles.add('border-top: $defaultBorder');
-    }
-
-    if (cell.borderBottom != null) {
-      styles.add('border-bottom: ${_borderSideToCSS(cell.borderBottom!)}');
-    } else if (tableStyle.border != DocxBorder.none) {
-      styles.add('border-bottom: $defaultBorder');
-    }
-
-    if (cell.borderLeft != null) {
-      styles.add('border-left: ${_borderSideToCSS(cell.borderLeft!)}');
-    } else if (tableStyle.border != DocxBorder.none) {
-      styles.add('border-left: $defaultBorder');
-    }
-
-    if (cell.borderRight != null) {
-      styles.add('border-right: ${_borderSideToCSS(cell.borderRight!)}');
-    } else if (tableStyle.border != DocxBorder.none) {
-      styles.add('border-right: $defaultBorder');
-    }
-
-    // Cell width if specified
-    if (cell.width != null && cell.width! > 0) {
-      styles.add('width: ${cell.width! / 20}px'); // Twips to pixels
-    }
-
-    return styles.join('; ');
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: color,
+        border: sideBorder,
+      ),
+      padding: EdgeInsets.all(cellPaddingPx),
+      child: contentWidget,
+    );
   }
 
-  /// Convert DocxBorderSide to CSS border string.
-  String _borderSideToCSS(DocxBorderSide side) {
-    if (side.style == DocxBorder.none) {
-      return 'none';
-    }
+  /// Resolve color from hex or theme properties (tint/shade).
+  Color? _resolveColor(
+      String? hex, String? themeColor, String? themeTint, String? themeShade) {
+    Color? baseColor;
 
-    final width = (side.size / 8.0).clamp(0.5, 4.0);
-    final color = _cleanHex(side.color.hex);
-
-    String styleStr = 'solid';
-    switch (side.style) {
-      case DocxBorder.dotted:
-        styleStr = 'dotted';
-        break;
-      case DocxBorder.dashed:
-        styleStr = 'dashed';
-        break;
-      case DocxBorder.double:
-        styleStr = 'double';
-        break;
-      default:
-        styleStr = 'solid';
-    }
-
-    return '${width}px $styleStr #$color';
-  }
-
-  /// Get cell content as HTML string.
-  String _getCellContent(DocxTableCell cell) {
-    final buffer = StringBuffer();
-
-    for (final child in cell.children) {
-      if (child is DocxParagraph) {
-        buffer.write(_paragraphToHtml(child));
-      } else if (child is DocxTable) {
-        // Recursive table rendering
-        buffer.write(_tableToHtml(child));
-      } else if (child is DocxList) {
-        buffer.write(_listToHtml(child));
+    // 1. Try Theme Color
+    if (themeColor != null && docxTheme != null) {
+      final themeHex = docxTheme!.colors.getColor(themeColor);
+      if (themeHex != null) {
+        baseColor = _parseHex(themeHex);
       }
     }
 
-    return buffer.isEmpty ? '&nbsp;' : buffer.toString();
+    // 2. Fallback to direct Hex
+    if (baseColor == null && hex != null && hex != 'auto') {
+      baseColor = _parseHex(hex);
+    }
+
+    if (baseColor == null) return null;
+
+    // 3. Apply Tint/Shade
+    // Note: The OOXML tint/shade specification is complex and the simple
+    // alphaBlend approach was incorrect (e.g., black became gray).
+    // For now, skip tint/shade processing and use the base color directly.
+    // A proper implementation would use HSL color space calculations.
+    //
+    // TODO: Implement proper OOXML tint/shade logic if needed:
+    // - Tint: Lighten color towards white
+    // - Shade: Darken color towards black
+    // The current values in DOCX indicate the "amount" of the base color to preserve.
+
+    return baseColor;
   }
 
-  /// Convert DocxList to HTML string.
-  String _listToHtml(DocxList list) {
-    final buffer = StringBuffer();
-    final tag = list.isOrdered ? 'ol' : 'ul';
-
-    String listStyle = 'margin: 0; padding-left: 20px;';
-    if (!list.isOrdered && list.style.imageBulletBytes != null) {
-      final b64 = base64Encode(list.style.imageBulletBytes!);
-      listStyle += " list-style-image: url('data:image/png;base64,$b64');";
-    }
-
-    buffer.write('<$tag style="$listStyle">');
-
-    for (final item in list.items) {
-      buffer.write('<li>');
-      // List items are paragraphs in AST mostly
-      final itemContent =
-          item.children.whereType<DocxText>().map((t) => _textToHtml(t)).join();
-      buffer.write(itemContent.isEmpty ? '&nbsp;' : itemContent);
-      buffer.write('</li>');
-    }
-
-    buffer.write('</$tag>');
-    return buffer.toString();
-  }
-
-  /// Convert paragraph to HTML string.
-  String _paragraphToHtml(DocxParagraph paragraph) {
-    final buffer = StringBuffer();
-
-    // Get paragraph alignment
-    String align = 'left';
-    switch (paragraph.align) {
-      case DocxAlign.center:
-        align = 'center';
-        break;
-      case DocxAlign.right:
-        align = 'right';
-        break;
-      case DocxAlign.justify:
-        align = 'justify';
-        break;
-      default:
-        align = 'left';
-    }
-
-    buffer.write('<p style="margin: 2px 0; text-align: $align;">');
-
-    for (final inline in paragraph.children) {
-      if (inline is DocxText) {
-        buffer.write(_textToHtml(inline));
-      } else if (inline is DocxLineBreak) {
-        buffer.write('<br/>');
-      } else if (inline is DocxTab) {
-        buffer.write('&nbsp;&nbsp;&nbsp;&nbsp;');
-      } else if (inline is DocxCheckbox) {
-        buffer.write(inline.isChecked ? '☒' : '☐');
-      } else if (inline is DocxInlineImage) {
-        // Handle inline images with base64 encoding
-        final base64 = _bytesToBase64(inline.bytes);
-        final width = inline.width;
-        final height = inline.height;
-        buffer.write(
-            '<img src="data:image/png;base64,$base64" width="$width" height="$height" style="display: inline-block; vertical-align: middle;"/>');
-      }
-    }
-
-    buffer.write('</p>');
-    return buffer.toString();
-  }
-
-  /// Convert DocxText to HTML span with styles.
-  String _textToHtml(DocxText text) {
-    final styles = <String>[];
-    String content = _escapeHtml(text.content);
-
-    // Text color
-    if (text.color != null && text.color!.hex != 'auto') {
-      styles.add('color: #${_cleanHex(text.color!.hex)}');
-    }
-
-    // Font size
-    if (text.fontSize != null) {
-      styles.add('font-size: ${text.fontSize}px');
-    }
-
-    // Font family
-    if (text.fontFamily != null) {
-      styles.add('font-family: "${text.fontFamily}"');
-    }
-
-    // Font weight
-    if (text.fontWeight == DocxFontWeight.bold) {
-      styles.add('font-weight: bold');
-    }
-
-    // Font style
-    if (text.fontStyle == DocxFontStyle.italic) {
-      styles.add('font-style: italic');
-    }
-
-    // Text decoration
-    if (text.decoration == DocxTextDecoration.underline) {
-      styles.add('text-decoration: underline');
-    } else if (text.decoration == DocxTextDecoration.strikethrough) {
-      styles.add('text-decoration: line-through');
-    }
-
-    // Double strike
-    if (text.isDoubleStrike) {
-      styles.add('text-decoration: line-through double');
-    }
-
-    // Background color (highlight)
-    if (text.highlight != DocxHighlight.none) {
-      final highlightColor = _highlightToHex(text.highlight);
-      if (highlightColor != null) {
-        styles.add('background-color: $highlightColor');
-      }
-    }
-
-    // Shading fill
-    if (text.shadingFill != null && text.shadingFill != 'auto') {
-      styles.add('background-color: #${_cleanHex(text.shadingFill!)}');
-    }
-
-    // All caps
-    if (text.isAllCaps) {
-      content = content.toUpperCase();
-    }
-
-    // Small caps (simulate with uppercase and smaller font)
-    if (text.isSmallCaps) {
-      content = content.toUpperCase();
-      styles.add('font-variant: small-caps');
-    }
-
-    // Superscript/Subscript
-    if (text.isSuperscript) {
-      return '<sup style="${styles.join('; ')}">$content</sup>';
-    }
-    if (text.isSubscript) {
-      return '<sub style="${styles.join('; ')}">$content</sub>';
-    }
-
-    if (styles.isEmpty) {
-      return content;
-    }
-
-    return '<span style="${styles.join('; ')}">$content</span>';
-  }
-
-  /// Convert highlight color enum to hex color.
-  String? _highlightToHex(DocxHighlight highlight) {
-    switch (highlight) {
-      case DocxHighlight.yellow:
-        return '#FFFF00';
-      case DocxHighlight.green:
-        return '#00FF00';
-      case DocxHighlight.cyan:
-        return '#00FFFF';
-      case DocxHighlight.magenta:
-        return '#FF00FF';
-      case DocxHighlight.blue:
-        return '#0000FF';
-      case DocxHighlight.red:
-        return '#FF0000';
-      case DocxHighlight.darkBlue:
-        return '#00008B';
-      case DocxHighlight.darkCyan:
-        return '#008B8B';
-      case DocxHighlight.darkGreen:
-        return '#006400';
-      case DocxHighlight.darkMagenta:
-        return '#8B008B';
-      case DocxHighlight.darkRed:
-        return '#8B0000';
-      case DocxHighlight.darkYellow:
-        return '#808000';
-      case DocxHighlight.darkGray:
-        return '#A9A9A9';
-      case DocxHighlight.lightGray:
-        return '#D3D3D3';
-      case DocxHighlight.black:
-        return '#000000';
-      case DocxHighlight.none:
-        return null;
-    }
-  }
-
-  /// Escape HTML special characters.
-  String _escapeHtml(String text) {
-    return text
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-  }
-
-  /// Clean hex color string.
-  String _cleanHex(String hex) {
-    String clean = hex.replaceAll('#', '').replaceAll('0x', '');
-    if (clean == 'auto' || clean.isEmpty) {
-      return '000000';
-    }
+  Color? _parseHex(String hex) {
+    if (hex == 'auto' || hex.isEmpty) return null;
+    var clean = hex.replaceAll('#', '').replaceAll('0x', '');
     if (clean.length == 8) {
-      // Remove alpha channel for CSS
-      clean = clean.substring(2);
+      // ARGB?
+      return Color(int.parse('0x$clean'));
     }
-    return clean;
-  }
-
-  /// Get color string from table style border color.
-  String _getColorString(String color) {
-    if (color == 'auto' || color.isEmpty) {
-      return _colorToHex(theme.tableBorderColor);
+    if (clean.length == 6) {
+      return Color(int.parse('0xFF$clean'));
     }
-    return _cleanHex(color);
-  }
-
-  /// Convert Flutter Color to hex string.
-  String _colorToHex(Color color) {
-    final r =
-        ((color.r * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
-    final g =
-        ((color.g * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
-    final b =
-        ((color.b * 255.0).round() & 0xff).toRadixString(16).padLeft(2, '0');
-    return '$r$g$b';
-  }
-
-  /// Convert bytes to base64 string for inline images.
-  String _bytesToBase64(List<int> bytes) {
-    return base64Encode(bytes);
+    return null;
   }
 }

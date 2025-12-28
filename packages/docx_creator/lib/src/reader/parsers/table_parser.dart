@@ -15,7 +15,7 @@ class TableParser {
   /// Parse a table element into DocxTable.
   DocxTable parse(XmlElement node) {
     // 1. Parse Table Properties
-    DocxTableStyle style = const DocxTableStyle(border: DocxBorder.none);
+    DocxTableStyle style = const DocxTableStyle(border: DocxBorder.single);
     int? tableWidth;
     DocxWidthType widthType = DocxWidthType.auto;
 
@@ -202,6 +202,7 @@ class TableParser {
 
     // Resolve Table Style from context
     final resolvedTableStyle = context.resolveStyle(styleId);
+
     final rowCount = grid.length;
     final int colCount =
         grid.isNotEmpty ? grid.first.fold(0, (sum, c) => sum + c.gridSpan) : 0;
@@ -230,7 +231,10 @@ class TableParser {
           children: c.children,
           colSpan: c.gridSpan,
           rowSpan: c.finalRowSpan,
-          shadingFill: c.shadingFill,
+          shadingFill: c.shadingFill ?? effectiveStyle.shadingFill,
+          themeFill: c.themeFill ?? effectiveStyle.themeFill,
+          themeFillTint: c.themeFillTint ?? effectiveStyle.themeFillTint,
+          themeFillShade: c.themeFillShade ?? effectiveStyle.themeFillShade,
           width: cellWidth,
           borderTop: c.borderTop ?? effectiveStyle.borderTop,
           borderBottom: c.borderBottom ?? effectiveStyle.borderBottomSide,
@@ -272,6 +276,9 @@ class TableParser {
     int gridSpan = 1;
     String? vMergeVal;
     String? shadingFill;
+    String? themeFill;
+    String? themeFillTint;
+    String? themeFillShade;
     int? cellWidth;
     DocxBorderSide? borderTop;
     DocxBorderSide? borderBottom;
@@ -303,7 +310,10 @@ class TableParser {
             shadingFill = '#$shadingFill';
           }
         }
-        // TODO: Add themeFill, themeFillTint, themeFillShade to _TempCell when needed
+
+        themeFill = shd.getAttribute('w:themeFill');
+        themeFillTint = shd.getAttribute('w:themeFillTint');
+        themeFillShade = shd.getAttribute('w:themeFillShade');
       }
 
       // Parse vertical alignment
@@ -364,6 +374,9 @@ class TableParser {
       gridSpan: gridSpan,
       vMerge: vMergeVal,
       shadingFill: shadingFill,
+      themeFill: themeFill,
+      themeFillTint: themeFillTint,
+      themeFillShade: themeFillShade,
       width: cellWidth,
       borderTop: borderTop,
       borderBottom: borderBottom,
@@ -424,7 +437,10 @@ class TableParser {
       children: children,
       styleId: pStyle,
       align: align ?? effectiveStyle.align ?? DocxAlign.left,
-      shadingFill: shadingFill,
+      shadingFill: shadingFill ?? effectiveStyle.shadingFill,
+      themeFill: effectiveStyle.themeFill,
+      themeFillTint: effectiveStyle.themeFillTint,
+      themeFillShade: effectiveStyle.themeFillShade,
       cnfStyle: cnfStyle,
     );
   }
@@ -623,6 +639,9 @@ class _TempCell {
   final int gridSpan;
   final String? vMerge;
   final String? shadingFill;
+  final String? themeFill;
+  final String? themeFillTint;
+  final String? themeFillShade;
   final int? width;
   final DocxBorderSide? borderTop;
   final DocxBorderSide? borderBottom;
@@ -637,6 +656,9 @@ class _TempCell {
     this.gridSpan = 1,
     this.vMerge,
     this.shadingFill,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     this.width,
     this.borderTop,
     this.borderBottom,
@@ -653,6 +675,9 @@ class _TempCell {
       gridSpan: gridSpan,
       vMerge: vMerge,
       shadingFill: shadingFill,
+      themeFill: themeFill,
+      themeFillTint: themeFillTint,
+      themeFillShade: themeFillShade,
       width: width,
       borderTop: borderTop,
       borderBottom: borderBottom,

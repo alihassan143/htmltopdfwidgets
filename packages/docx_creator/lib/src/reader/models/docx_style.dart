@@ -16,6 +16,9 @@ class DocxStyle {
   final String? pStyleId;
   final DocxAlign? align;
   final String? shadingFill;
+  final String? themeFill;
+  final String? themeFillTint;
+  final String? themeFillShade;
   final int? numId;
   final int? ilvl;
   final int? spacingAfter;
@@ -63,6 +66,9 @@ class DocxStyle {
     this.pStyleId,
     this.align,
     this.shadingFill,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     this.numId,
     this.ilvl,
     this.spacingAfter,
@@ -123,6 +129,9 @@ class DocxStyle {
       pStyleId: pProps.pStyleId,
       align: pProps.align,
       shadingFill: pProps.shadingFill ?? rProps.shadingFill,
+      themeFill: pProps.themeFill ?? rProps.themeFill,
+      themeFillTint: pProps.themeFillTint ?? rProps.themeFillTint,
+      themeFillShade: pProps.themeFillShade ?? rProps.themeFillShade,
       numId: pProps.numId,
       ilvl: pProps.ilvl,
       spacingAfter: pProps.spacingAfter,
@@ -132,10 +141,10 @@ class DocxStyle {
       indentLeft: pProps.indentLeft,
       indentRight: pProps.indentRight,
       indentFirstLine: pProps.indentFirstLine,
-      borderTop: pProps.borderTop,
-      borderBottomSide: pProps.borderBottomSide,
-      borderLeft: pProps.borderLeft,
-      borderRight: pProps.borderRight,
+      borderTop: pProps.borderTop ?? rProps.borderTop,
+      borderBottomSide: pProps.borderBottomSide ?? rProps.borderBottomSide,
+      borderLeft: pProps.borderLeft ?? rProps.borderLeft,
+      borderRight: pProps.borderRight ?? rProps.borderRight,
       borderBetween: pProps.borderBetween,
       borderBottom: pProps.borderBottom,
       // R Props (merged)
@@ -171,6 +180,9 @@ class DocxStyle {
       // P props
       align: other.align ?? align,
       shadingFill: other.shadingFill ?? shadingFill,
+      themeFill: other.themeFill ?? themeFill,
+      themeFillTint: other.themeFillTint ?? themeFillTint,
+      themeFillShade: other.themeFillShade ?? themeFillShade,
       numId: other.numId ?? numId,
       ilvl: other.ilvl ?? ilvl,
       spacingAfter: other.spacingAfter ?? spacingAfter,
@@ -220,6 +232,9 @@ class DocxStyle {
 
     DocxAlign? align;
     String? shadingFill;
+    String? themeFill;
+    String? themeFillTint;
+    String? themeFillShade;
     int? numId;
     int? ilvl;
     int? spacingAfter;
@@ -296,6 +311,10 @@ class DocxStyle {
     if (shdElem != null) {
       shadingFill = shdElem.getAttribute('w:fill');
       if (shadingFill == 'auto') shadingFill = null;
+
+      themeFill = shdElem.getAttribute('w:themeFill');
+      themeFillTint = shdElem.getAttribute('w:themeFillTint');
+      themeFillShade = shdElem.getAttribute('w:themeFillShade');
     }
 
     // Numbering/Lists
@@ -327,6 +346,9 @@ class DocxStyle {
       pStyleId: styleId,
       align: align,
       shadingFill: shadingFill,
+      themeFill: themeFill,
+      themeFillTint: themeFillTint,
+      themeFillShade: themeFillShade,
       numId: numId,
       ilvl: ilvl,
       spacingAfter: spacingAfter,
@@ -371,6 +393,10 @@ class DocxStyle {
     bool? isEmboss;
     bool? isImprint;
     DocxVerticalAlign? verticalAlign; // Added for tcPr parsing
+    DocxBorderSide? borderTop;
+    DocxBorderSide? borderBottomSide;
+    DocxBorderSide? borderLeft;
+    DocxBorderSide? borderRight;
 
     if (rPr != null) {
       if (rPr.getElement('w:b') != null) fontWeight = DocxFontWeight.bold;
@@ -385,7 +411,14 @@ class DocxStyle {
       final colorElem = rPr.getElement('w:color');
       if (colorElem != null) {
         final val = colorElem.getAttribute('w:val');
-        if (val != null && val != 'auto') color = DocxColor('#$val');
+        if (val != null) {
+          color = DocxColor(
+            val,
+            themeColor: colorElem.getAttribute('w:themeColor'),
+            themeTint: colorElem.getAttribute('w:themeTint'),
+            themeShade: colorElem.getAttribute('w:themeShade'),
+          );
+        }
       }
 
       final shdElem = rPr.getElement('w:shd');
@@ -477,6 +510,14 @@ class DocxStyle {
         if (val == 'center') verticalAlign = DocxVerticalAlign.center;
         if (val == 'bottom') verticalAlign = DocxVerticalAlign.bottom;
       }
+
+      final tcBorders = tcPr.getElement('w:tcBorders');
+      if (tcBorders != null) {
+        borderTop = _parseBorderSide(tcBorders.getElement('w:top'));
+        borderBottomSide = _parseBorderSide(tcBorders.getElement('w:bottom'));
+        borderLeft = _parseBorderSide(tcBorders.getElement('w:left'));
+        borderRight = _parseBorderSide(tcBorders.getElement('w:right'));
+      }
     }
 
     return DocxStyle(
@@ -500,6 +541,10 @@ class DocxStyle {
       isImprint: isImprint,
       textBorder: textBorder,
       verticalAlign: verticalAlign,
+      borderTop: borderTop,
+      borderBottomSide: borderBottomSide,
+      borderLeft: borderLeft,
+      borderRight: borderRight,
     );
   }
 

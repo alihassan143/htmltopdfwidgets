@@ -123,15 +123,22 @@ class DocxThemeColors {
   });
 
   /// Gets a color by scheme name.
+  ///
+  /// Supports standard names (dk1, lt1, accent1-6, hlink, folHlink)
+  /// and OOXML aliases (text1/2, background1/2).
   String? getColor(String schemeName) {
     switch (schemeName) {
       case 'dk1':
+      case 'text1': // OOXML alias for dk1
         return dk1;
       case 'lt1':
+      case 'background1': // OOXML alias for lt1
         return lt1;
       case 'dk2':
+      case 'text2': // OOXML alias for dk2
         return dk2;
       case 'lt2':
+      case 'background2': // OOXML alias for lt2
         return lt2;
       case 'accent1':
         return accent1;
@@ -185,6 +192,28 @@ class DocxThemeFonts {
 
   /// Gets the font for body text.
   String get bodyFont => minorLatin;
+
+  /// Gets a font by theme reference name (e.g. 'majorHAnsi').
+  String? getFont(String themeFontName) {
+    switch (themeFontName) {
+      case 'majorHAnsi':
+      case 'majorAscii':
+        return majorLatin;
+      case 'majorEastAsia':
+        return majorEastAsia;
+      case 'majorBidi':
+        return majorComplexScript;
+      case 'minorHAnsi':
+      case 'minorAscii':
+        return minorLatin;
+      case 'minorEastAsia':
+        return minorEastAsia;
+      case 'minorBidi':
+        return minorComplexScript;
+      default:
+        return null;
+    }
+  }
 }
 
 /// Latent style definition for styles not explicitly defined.
@@ -248,6 +277,14 @@ class DocxNumberingLevel {
   /// Font for bullet character.
   final String? bulletFont;
 
+  /// Theme font reference.
+  final String? themeFont;
+
+  /// Theme color reference.
+  final String? themeColor;
+  final String? themeTint;
+  final String? themeShade;
+
   /// Picture bullet ID (references a numPicBullet definition).
   final int? picBulletId;
 
@@ -263,6 +300,10 @@ class DocxNumberingLevel {
     this.hanging,
     this.bulletChar,
     this.bulletFont,
+    this.themeFont,
+    this.themeColor,
+    this.themeTint,
+    this.themeShade,
     this.picBulletId,
     this.picBulletImage,
   });

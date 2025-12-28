@@ -82,6 +82,15 @@ class DocxParagraph extends DocxBlock {
   /// Background shading color hex.
   final String? shadingFill;
 
+  /// Theme fill color reference.
+  final String? themeFill;
+
+  /// Theme fill tint.
+  final String? themeFillTint;
+
+  /// Theme fill shade.
+  final String? themeFillShade;
+
   /// Outline level for TOC (0-8, null for body text).
   final int? outlineLevel;
 
@@ -116,6 +125,9 @@ class DocxParagraph extends DocxBlock {
     this.borderRight,
     this.borderBetween,
     this.shadingFill,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     this.outlineLevel,
     this.pageBreakBefore = false,
     this.numId,
@@ -287,6 +299,9 @@ class DocxParagraph extends DocxBlock {
       borderRight: borderRight ?? borderRight,
       borderBetween: borderBetween ?? borderBetween,
       shadingFill: shadingFill ?? this.shadingFill,
+      themeFill: themeFill ?? themeFill,
+      themeFillTint: themeFillTint ?? themeFillTint,
+      themeFillShade: themeFillShade ?? themeFillShade,
       outlineLevel: outlineLevel ?? this.outlineLevel,
       pageBreakBefore: pageBreakBefore ?? this.pageBreakBefore,
       numId: numId ?? this.numId,

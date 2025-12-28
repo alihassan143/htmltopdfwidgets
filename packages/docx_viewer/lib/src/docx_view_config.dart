@@ -43,6 +43,10 @@ class DocxViewConfig {
   /// Current search match highlight color.
   final Color currentSearchHighlightColor;
 
+  /// Optional fixed page width to simulate print layout (e.g. 793 for A4).
+  /// If null, content fills the available width (web/mobile responsive style).
+  final double? pageWidth;
+
   const DocxViewConfig({
     this.enableSearch = true,
     this.enableZoom = true,
@@ -57,6 +61,7 @@ class DocxViewConfig {
     this.showDebugInfo = false,
     this.searchHighlightColor = const Color(0xFFFFEB3B),
     this.currentSearchHighlightColor = const Color(0xFFFF9800),
+    this.pageWidth,
   });
 
   DocxViewConfig copyWith({
@@ -73,6 +78,7 @@ class DocxViewConfig {
     bool? showDebugInfo,
     Color? searchHighlightColor,
     Color? currentSearchHighlightColor,
+    double? pageWidth,
   }) {
     return DocxViewConfig(
       enableSearch: enableSearch ?? this.enableSearch,
@@ -89,6 +95,7 @@ class DocxViewConfig {
       searchHighlightColor: searchHighlightColor ?? this.searchHighlightColor,
       currentSearchHighlightColor:
           currentSearchHighlightColor ?? this.currentSearchHighlightColor,
+      pageWidth: pageWidth ?? this.pageWidth,
     );
   }
 }
