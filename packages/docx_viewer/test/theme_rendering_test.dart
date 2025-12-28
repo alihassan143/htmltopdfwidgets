@@ -82,10 +82,11 @@ void main() {
       final decoration = container.decoration as BoxDecoration;
 
       // Should be lighter than red (FF0000)
+      // Should be lighter than red (FF0000)
       final color = decoration.color!;
-      expect(color.red, greaterThan(200));
-      expect(color.green, greaterThan(0)); // Whiteness added
-      expect(color.blue, greaterThan(0)); // Whiteness added
+      expect((color.r * 255).round(), greaterThan(200));
+      expect((color.g * 255).round(), greaterThan(0)); // Whiteness added
+      expect((color.b * 255).round(), greaterThan(0)); // Whiteness added
     });
 
     testWidgets('resolves themeFill with Shade (darker)', (tester) async {
@@ -111,10 +112,10 @@ void main() {
 
       // Should be darker than red
       final color = decoration.color!;
-      expect(color.r, lessThan(255)); // Darker
-      expect(color.r, greaterThan(0));
-      expect(color.g, 0);
-      expect(color.b, 0);
+      expect((color.r * 255).round(), lessThan(255)); // Darker
+      expect((color.r * 255).round(), greaterThan(0));
+      expect((color.g * 255).round(), 0);
+      expect((color.b * 255).round(), 0);
     });
   });
 }

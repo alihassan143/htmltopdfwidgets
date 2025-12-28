@@ -1,3 +1,10 @@
+## 1.0.6
+
+### Fixed
+- **Table Style Fidelity**: Fixed critical issue where table cell borders defined in Named Table Styles (via `w:tblStylePr`) were ignored.
+  - Updated `DocxStyle` parser to correctly extract `w:tcBorders` from table style conditionals.
+  - Fixed logic to properly prioritize table style borders when paragraph borders are absent.
+
 ## 1.0.5
 
 ### Fixed
