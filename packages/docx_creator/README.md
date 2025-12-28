@@ -31,7 +31,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  docx_creator: ^1.0.4
+  docx_creator: ^1.0.6
 ```
 
 Then run:
