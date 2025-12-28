@@ -281,8 +281,9 @@ class DocxWidgetGenerator {
           if (followingContent.isNotEmpty) {
             final contentWidgets = followingContent.map((node) {
               if (node is DocxParagraph) return _paragraphBuilder.build(node);
-              if (node is DocxDropCap)
+              if (node is DocxDropCap) {
                 return _paragraphBuilder.buildDropCap(node);
+              }
               return const SizedBox.shrink();
             }).toList();
 

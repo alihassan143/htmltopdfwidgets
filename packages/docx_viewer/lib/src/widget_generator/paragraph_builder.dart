@@ -18,7 +18,6 @@ class ParagraphBuilder {
   final void Function(int id)? onEndnoteTap;
 
   // Used for search highlighting
-  int _blockIndex = 0;
 
   ParagraphBuilder({
     required this.theme,
@@ -29,14 +28,8 @@ class ParagraphBuilder {
     this.docxTheme,
   });
 
-  /// Set the current block index for search highlighting.
-  void setBlockIndex(int index) {
-    _blockIndex = index;
-  }
-
   /// Build a widget from a [DocxParagraph].
   Widget build(DocxParagraph paragraph, {int? blockIndex}) {
-    if (blockIndex != null) _blockIndex = blockIndex;
     return _buildNativeParagraph(paragraph);
   }
 
