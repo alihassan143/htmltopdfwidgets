@@ -309,30 +309,6 @@ class TableBuilder {
     // - Outer edges: use borderTop/borderBottom/borderLeft/borderRight
     // - Inner edges: use borderInsideH (horizontal inner) / borderInsideV (vertical inner)
 
-    // QUICK FIX: Create a default subtle border for tables without explicit border definitions
-    // This handles the case where borders come from table styles (in styles.xml) which aren't
-    // currently parsed. A proper fix would parse w:tblStylePr/w:tcBorders from style definitions.
-    DocxBorderSide? defaultSubtleBorder;
-    final hasAnyExplicitBorder = cell?.borderTop != null ||
-        cell?.borderBottom != null ||
-        cell?.borderLeft != null ||
-        cell?.borderRight != null ||
-        tableStyle.borderTop != null ||
-        tableStyle.borderBottom != null ||
-        tableStyle.borderLeft != null ||
-        tableStyle.borderRight != null ||
-        tableStyle.borderInsideH != null ||
-        tableStyle.borderInsideV != null;
-
-    if (!hasAnyExplicitBorder) {
-      // Apply subtle gray default border when no borders are defined
-      defaultSubtleBorder = DocxBorderSide(
-        color: DocxColor('D0D0D0'),
-        style: DocxBorder.single,
-        size: 2, // 1pt border (8 eighths)
-      );
-    }
-
     // Get table-level borders with default fallback
     final topTableBorder =
         isFirstRowActual ? tableStyle.borderTop : tableStyle.borderInsideH;

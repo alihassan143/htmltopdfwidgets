@@ -352,8 +352,8 @@ class _ShapePainter extends CustomPainter {
       final tintVal = int.tryParse(themeTint, radix: 16);
       if (tintVal != null) {
         final factor = tintVal / 255.0;
-        baseColor =
-            Color.alphaBlend(Colors.white.withOpacity(1 - factor), baseColor);
+        baseColor = Color.alphaBlend(
+            Colors.white.withValues(alpha: 1 - factor), baseColor);
       }
     }
 
@@ -361,8 +361,8 @@ class _ShapePainter extends CustomPainter {
       final shadeVal = int.tryParse(themeShade, radix: 16);
       if (shadeVal != null) {
         final factor = shadeVal / 255.0;
-        baseColor =
-            Color.alphaBlend(Colors.black.withOpacity(1 - factor), baseColor);
+        baseColor = Color.alphaBlend(
+            Colors.black.withValues(alpha: 1 - factor), baseColor);
       }
     }
 
