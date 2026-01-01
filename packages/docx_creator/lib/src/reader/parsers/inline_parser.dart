@@ -90,29 +90,33 @@ class InlineParser {
       baseStyle = baseStyle.merge(cStyle);
     }
 
-    // 3. Direct Properties - Overrides everything
+    // 3. Direct Properties - Parse directly from XML (these are explicit)
     final parsedProps = DocxStyle.fromXml('temp', rPr: rPr);
+
+    // 4. Merged properties for formatting checks (bold, italic, etc.)
     final finalProps = baseStyle.merge(parsedProps);
 
     // Extract text
     final textElem = run.getElement('w:t');
     if (textElem != null) {
-      // For font properties, only use direct + character style, not paragraph style
-
-      final runFontSize = finalProps.fontSize;
-      final runFonts = finalProps.fonts;
-      final runFontFamily = finalProps.fontFamily;
+      // IMPORTANT: Only use DIRECT properties for font-related output
+      // This ensures we don't override table style inheritance
+      // Font properties should only be emitted if they were explicitly set in source
+      final directFontSize = parsedProps.fontSize;
+      final directFonts = parsedProps.fonts;
+      final directFontFamily = parsedProps.fontFamily;
+      final directColor = parsedProps.color;
 
       return DocxText(
         textElem.innerText,
         fontWeight: finalProps.fontWeight ?? DocxFontWeight.normal,
         fontStyle: finalProps.fontStyle ?? DocxFontStyle.normal,
         decoration: finalProps.decoration ?? DocxTextDecoration.none,
-        color: finalProps.color,
+        color: directColor, // Only direct color
         shadingFill: parsedProps.shadingFill, // Only direct shading
-        fontSize: runFontSize,
-        fontFamily: runFontFamily,
-        fonts: runFonts,
+        fontSize: directFontSize, // Only direct font size
+        fontFamily: directFontFamily, // Only direct font family
+        fonts: directFonts, // Only direct fonts
         highlight: finalProps.highlight ?? DocxHighlight.none,
         isSuperscript: finalProps.isSuperscript ?? false,
         isSubscript: finalProps.isSubscript ?? false,

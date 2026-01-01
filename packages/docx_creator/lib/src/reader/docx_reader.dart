@@ -288,45 +288,55 @@ class _DocxReaderOrchestrator {
         if (id != null && target != null) rels[id] = target;
       }
 
-      // Parse fonts
+      // Parse fonts - look for all embed types (Regular, Bold, Italic, BoldItalic)
+      final embedTypes = [
+        'w:embedRegular',
+        'w:embedBold',
+        'w:embedItalic',
+        'w:embedBoldItalic'
+      ];
+
       for (var fontElem in ftXml.findAllElements('w:font')) {
         final name = fontElem.getAttribute('w:name');
         if (name == null) continue;
 
-        final embed = fontElem.findAllElements('w:embedRegular').firstOrNull;
-        if (embed != null) {
-          final id = embed.getAttribute('r:id');
-          final key = embed.getAttribute('w:fontKey');
+        // Check for each embed type
+        for (var embedType in embedTypes) {
+          final embed = fontElem.findAllElements(embedType).firstOrNull;
+          if (embed != null) {
+            final id = embed.getAttribute('r:id');
+            final key = embed.getAttribute('w:fontKey');
 
-          if (id != null && key != null && rels.containsKey(id)) {
-            String target = rels[id]!;
-            ArchiveFile? file;
-            if (target.startsWith('/')) {
-              target = target.substring(1);
-              file = context.archive.findFile(target);
-            } else {
-              file = context.archive.findFile('word/$target');
-            }
+            if (id != null && key != null && rels.containsKey(id)) {
+              String target = rels[id]!;
+              ArchiveFile? file;
+              if (target.startsWith('/')) {
+                target = target.substring(1);
+                file = context.archive.findFile(target);
+              } else {
+                file = context.archive.findFile('word/$target');
+              }
 
-            if (file != null) {
-              String cleanKey = key.replaceAll(RegExp(r'[{}]'), '');
-              fonts.add(EmbeddedFont.fromObfuscated(
-                familyName: name,
-                obfuscatedBytes: Uint8List.fromList(file.content as List<int>),
-                obfuscationKey: cleanKey,
-                // The filename matters for matching the PRESERVED fontTable.xml.rels
-                // target usually includes 'fonts/' or similar.
-                // We should store the EXACT filename used in the archive so we can recreate it.
-                // But wait, the RELS file contains 'fonts/foo.odttf'.
-                // If we preserved RELS, we must output file at 'word/fonts/foo.odttf'.
-                // So preservedFilename should be the target path inside 'word/'.
-                // Let's store just the filename part or relative path?
-                // The exporter will prepend 'word/'.
-                // If 'target' is 'fonts/foo.odttf', we want to store 'fonts/foo.odttf'.
-                preservedFilename: target.startsWith('word/')
-                    ? target.substring(5)
-                    : (target.startsWith('/') ? target.substring(1) : target),
-              ));
+              if (file != null) {
+                // Create a unique font name for each variant
+                final variantSuffix = embedType
+                    .replaceFirst('w:embed', '')
+                    .toLowerCase(); // regular, bold, italic, bolditalic
+                final fontName =
+                    variantSuffix == 'regular' ? name : '$name-$variantSuffix';
+
+                String cleanKey = key.replaceAll(RegExp(r'[{}]'), '');
+                fonts.add(EmbeddedFont.fromObfuscated(
+                  familyName: fontName,
+                  obfuscatedBytes:
+                      Uint8List.fromList(file.content as List<int>),
+                  obfuscationKey: cleanKey,
+                  // Store the exact filename used in the archive for proper re-export
+                  preservedFilename: target.startsWith('word/')
+                      ? target.substring(5)
+                      : (target.startsWith('/') ? target.substring(1) : target),
+                ));
+              }
             }
           }
         }

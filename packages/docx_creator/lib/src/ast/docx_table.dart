@@ -238,6 +238,9 @@ class DocxTable extends DocxBlock {
   /// Table style ID (e.g., "TableGrid", "MediumShading1-Accent1").
   final String? styleId;
 
+  /// Table overlap setting (e.g., "never" for floating tables).
+  final String? tblOverlap;
+
   final List<int>? gridColumns;
 
   /// Returns effective grid columns.
@@ -283,6 +286,7 @@ class DocxTable extends DocxBlock {
     this.alignment,
     this.position,
     this.styleId,
+    this.tblOverlap,
     this.look = const DocxTableLook(),
     this.gridColumns,
     super.id,
@@ -331,6 +335,7 @@ class DocxTable extends DocxBlock {
     DocxAlign? alignment,
     DocxTablePosition? position,
     String? styleId,
+    String? tblOverlap,
     DocxTableLook? look,
     List<int>? gridColumns,
   }) {
@@ -343,6 +348,7 @@ class DocxTable extends DocxBlock {
       alignment: alignment ?? this.alignment,
       position: position ?? this.position,
       styleId: styleId ?? this.styleId,
+      tblOverlap: tblOverlap ?? this.tblOverlap,
       look: look ?? this.look,
       gridColumns: gridColumns ?? this.gridColumns,
       id: id,
@@ -380,6 +386,13 @@ class DocxTable extends DocxBlock {
               builder.attribute('w:noHBand', look.noHBand ? '1' : '0');
               builder.attribute('w:noVBand', look.noVBand ? '1' : '0');
             });
+
+            // Table Overlap (for floating tables)
+            if (tblOverlap != null) {
+              builder.element('w:tblOverlap', nest: () {
+                builder.attribute('w:val', tblOverlap!);
+              });
+            }
 
             // Table shading (global)
             if (style.fill != null) {
@@ -428,48 +441,57 @@ class DocxTable extends DocxBlock {
                 },
               );
             }
-            // Borders
-            builder.element(
-              'w:tblBorders',
-              nest: () {
-                // If specific side is provided, use it. Otherwise fall back to global border settings if not none.
+            // Borders - only emit if explicitly set or no style ID (relying on default)
+            // If a styleId is set, the borders come from the style definition
+            final hasExplicitBorders = style.borderTop != null ||
+                style.borderBottom != null ||
+                style.borderLeft != null ||
+                style.borderRight != null ||
+                style.borderInsideH != null ||
+                style.borderInsideV != null;
 
-                // Helper to resolve border
-                void buildSide(String tag, DocxBorderSide? side) {
-                  if (side != null) {
-                    builder.element(tag, nest: () {
-                      builder.attribute('w:val', side.xmlStyle);
-                      builder.attribute('w:sz', side.size.toString());
-                      builder.attribute('w:space', side.space.toString());
-                      if (side.color != DocxColor.auto) {
-                        builder.attribute('w:color', side.color.hex);
-                      } else {
-                        builder.attribute('w:color', 'auto');
-                      }
-                      if (side.themeColor != null) {
-                        builder.attribute('w:themeColor', side.themeColor!);
-                      }
-                      if (side.themeTint != null) {
-                        builder.attribute('w:themeTint', side.themeTint!);
-                      }
-                      if (side.themeShade != null) {
-                        builder.attribute('w:themeShade', side.themeShade!);
-                      }
-                    });
-                  } else if (style.border != DocxBorder.none) {
-                    // Fallback to global style
-                    _buildBorder(builder, tag);
+            if (hasExplicitBorders || styleId == null) {
+              builder.element(
+                'w:tblBorders',
+                nest: () {
+                  // Helper to resolve border
+                  void buildSide(String tag, DocxBorderSide? side) {
+                    if (side != null) {
+                      builder.element(tag, nest: () {
+                        builder.attribute('w:val', side.xmlStyle);
+                        builder.attribute('w:sz', side.size.toString());
+                        builder.attribute('w:space', side.space.toString());
+                        if (side.color != DocxColor.auto) {
+                          builder.attribute('w:color', side.color.hex);
+                        } else {
+                          builder.attribute('w:color', 'auto');
+                        }
+                        if (side.themeColor != null) {
+                          builder.attribute('w:themeColor', side.themeColor!);
+                        }
+                        if (side.themeTint != null) {
+                          builder.attribute('w:themeTint', side.themeTint!);
+                        }
+                        if (side.themeShade != null) {
+                          builder.attribute('w:themeShade', side.themeShade!);
+                        }
+                      });
+                    } else if (styleId == null &&
+                        style.border != DocxBorder.none) {
+                      // Fallback to global style only if no styleId
+                      _buildBorder(builder, tag);
+                    }
                   }
-                }
 
-                buildSide('w:top', style.borderTop);
-                buildSide('w:bottom', style.borderBottom);
-                buildSide('w:left', style.borderLeft);
-                buildSide('w:right', style.borderRight);
-                buildSide('w:insideH', style.borderInsideH);
-                buildSide('w:insideV', style.borderInsideV);
-              },
-            );
+                  buildSide('w:top', style.borderTop);
+                  buildSide('w:bottom', style.borderBottom);
+                  buildSide('w:left', style.borderLeft);
+                  buildSide('w:right', style.borderRight);
+                  buildSide('w:insideH', style.borderInsideH);
+                  buildSide('w:insideV', style.borderInsideV);
+                },
+              );
+            }
             // Cell margins/padding - only emit if explicitly set
             if (style.cellPadding != null) {
               builder.element(

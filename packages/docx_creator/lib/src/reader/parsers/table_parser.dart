@@ -23,6 +23,7 @@ class TableParser {
     DocxAlign? alignment;
     DocxTablePosition? position;
     String? styleId;
+    String? tblOverlap;
 
     if (tblPr != null) {
       final tblBorders = tblPr.getElement('w:tblBorders');
@@ -102,6 +103,12 @@ class TableParser {
               int.tryParse(tblpPr.getAttribute('w:bottomFromText') ?? '') ?? 0,
         );
       }
+
+      // Parse table overlap
+      final tblOverlapElem = tblPr.getElement('w:tblOverlap');
+      if (tblOverlapElem != null) {
+        tblOverlap = tblOverlapElem.getAttribute('w:val');
+      }
     }
 
     // Parse table look (conditional formatting)
@@ -168,8 +175,9 @@ class TableParser {
         final cells = <_TempCell>[];
         bool isHeader = false;
         String? cnfStyle;
+        int? height;
 
-        // Check for header row property and cnfStyle
+        // Check for header row property, cnfStyle, and row height
         final trPr = child.getElement('w:trPr');
         if (trPr != null) {
           if (trPr.getElement('w:tblHeader') != null) {
@@ -178,6 +186,11 @@ class TableParser {
           final cs = trPr.getElement('w:cnfStyle');
           if (cs != null) {
             cnfStyle = cs.getAttribute('w:val');
+          }
+          // Parse row height
+          final trHeight = trPr.getElement('w:trHeight');
+          if (trHeight != null) {
+            height = int.tryParse(trHeight.getAttribute('w:val') ?? '');
           }
         }
 
@@ -191,6 +204,7 @@ class TableParser {
             cells: cells,
             isHeader: isHeader,
             cnfStyle: cnfStyle,
+            height: height,
           ));
         }
       }
@@ -247,10 +261,12 @@ class TableParser {
         ));
         colIndex += c.gridSpan;
       }
+      final rowHeight = i < rawRows.length ? rawRows[i].height : null;
       finalRows.add(DocxTableRow(
         cells: cells,
         isHeader: isHeaderRow,
         cnfStyle: rowCnfStyle,
+        height: rowHeight,
       ));
     }
 
@@ -266,6 +282,7 @@ class TableParser {
       alignment: alignment,
       position: position,
       styleId: styleId,
+      tblOverlap: tblOverlap,
       look: look,
       gridColumns: gridColumns,
     );
@@ -695,6 +712,12 @@ class _TempRow {
   final List<_TempCell> cells;
   final bool isHeader;
   final String? cnfStyle;
+  final int? height;
 
-  _TempRow({required this.cells, this.isHeader = false, this.cnfStyle});
+  _TempRow({
+    required this.cells,
+    this.isHeader = false,
+    this.cnfStyle,
+    this.height,
+  });
 }

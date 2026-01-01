@@ -1,3 +1,14 @@
+## 1.0.7
+
+### Fixed
+- **Table Row Heights**: Fixed missing `w:trHeight` parsing and export. Calendar tables and other tables with explicit row heights now preserve their dimensions.
+- **Table Overlap**: Added parsing and export for `w:tblOverlap` attribute on floating tables.
+- **Embedded Font Variants**: Fixed font reading to parse all font embed types (`w:embedRegular`, `w:embedBold`, `w:embedItalic`, `w:embedBoldItalic`) instead of only Regular. This fixes missing font files during round-trip.
+- **Table Border Export**: Tables with a `styleId` (e.g., "Calendar3", "LightList-Accent3") no longer emit explicit `<w:tblBorders>` that was incorrectly overriding the named style definition.
+- **Text Style Inheritance**: Fixed inline parser to only emit **direct** run properties (color, font size, fonts), not inherited ones from styles. This allows table cell text to properly inherit styling from table styles via `cnfStyle` conditional formatting.
+
+---
+
 ## 1.0.6
 
 ### Fixed
