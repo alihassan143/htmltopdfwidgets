@@ -54,6 +54,8 @@ class DocxStyle {
   final bool? isEmboss;
   final bool? isImprint;
   final DocxBorderSide? textBorder; // w:bdr element - border around text
+  final double?
+      characterSpacing; // w:spacing w:val - character spacing in twips
 
   // Table Cell Properties (for Table Styles)
   final DocxVerticalAlign? verticalAlign;
@@ -101,6 +103,7 @@ class DocxStyle {
     this.isEmboss,
     this.isImprint,
     this.textBorder,
+    this.characterSpacing,
     this.verticalAlign,
     this.tableConditionals = const {},
   });
@@ -216,6 +219,7 @@ class DocxStyle {
       isEmboss: other.isEmboss ?? isEmboss,
       isImprint: other.isImprint ?? isImprint,
       textBorder: other.textBorder ?? textBorder,
+      characterSpacing: other.characterSpacing ?? characterSpacing,
       verticalAlign: other.verticalAlign ?? verticalAlign,
       tableConditionals: other.tableConditionals.isNotEmpty
           ? other.tableConditionals
@@ -398,6 +402,12 @@ class DocxStyle {
     DocxBorderSide? borderLeft;
     DocxBorderSide? borderRight;
 
+    // Added shading theme props
+    String? themeFill;
+    String? themeFillTint;
+    String? themeFillShade;
+    double? characterSpacing;
+
     if (rPr != null) {
       if (rPr.getElement('w:b') != null) fontWeight = DocxFontWeight.bold;
       if (rPr.getElement('w:i') != null) fontStyle = DocxFontStyle.italic;
@@ -425,6 +435,17 @@ class DocxStyle {
       if (shdElem != null) {
         shadingFill = shdElem.getAttribute('w:fill');
         if (shadingFill == 'auto') shadingFill = null;
+        themeFill = shdElem.getAttribute('w:themeFill');
+        themeFillTint = shdElem.getAttribute('w:themeFillTint');
+        themeFillShade = shdElem.getAttribute('w:themeFillShade');
+      }
+
+      final spacingElem = rPr.getElement('w:spacing');
+      if (spacingElem != null) {
+        final val = spacingElem.getAttribute('w:val');
+        if (val != null) {
+          characterSpacing = int.tryParse(val)?.toDouble();
+        }
       }
 
       final szElem = rPr.getElement('w:sz');
@@ -527,9 +548,13 @@ class DocxStyle {
       decoration: decoration,
       color: color,
       shadingFill: shadingFill,
+      themeFill: themeFill,
+      themeFillTint: themeFillTint,
+      themeFillShade: themeFillShade,
       fontSize: fontSize,
       fonts: fonts,
       highlight: highlight,
+      characterSpacing: characterSpacing,
       isSuperscript: isSuperscript,
       isSubscript: isSubscript,
       isAllCaps: isAllCaps,

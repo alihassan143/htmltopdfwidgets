@@ -41,6 +41,7 @@ export 'src/exporters/html_exporter.dart';
 export 'src/parsers/html_parser.dart';
 export 'src/parsers/markdown_parser.dart';
 export 'src/reader/docx_reader.dart';
+export 'src/reader/models/docx_style.dart';
 // Reader Models
 export 'src/reader/models/docx_theme.dart';
 // Utilities

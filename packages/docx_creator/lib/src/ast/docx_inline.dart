@@ -37,6 +37,11 @@ class DocxText extends DocxInline {
   /// Theme color shade.
   final String? themeShade;
 
+  /// Theme fill (shading) for background.
+  final String? themeFill;
+  final String? themeFillTint;
+  final String? themeFillShade;
+
   /// Legacy font family (single string). Use [fonts] for granular control.
   final String? fontFamily;
 
@@ -70,6 +75,9 @@ class DocxText extends DocxInline {
     this.themeColor,
     this.themeTint,
     this.themeShade,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     this.fontFamily,
     this.fonts,
     this.characterSpacing,
@@ -100,6 +108,9 @@ class DocxText extends DocxInline {
     this.fontSize,
     this.fontFamily,
     this.fonts,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.bold,
         fontStyle = DocxFontStyle.normal,
@@ -129,6 +140,9 @@ class DocxText extends DocxInline {
     this.fontSize,
     this.fontFamily,
     this.fonts,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.italic,
@@ -158,6 +172,9 @@ class DocxText extends DocxInline {
     this.fontSize,
     this.fontFamily,
     this.fonts,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.bold,
         fontStyle = DocxFontStyle.italic,
@@ -187,6 +204,9 @@ class DocxText extends DocxInline {
     this.fontSize,
     this.fontFamily,
     this.fonts,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -216,6 +236,9 @@ class DocxText extends DocxInline {
     this.fontSize,
     this.fontFamily,
     this.fonts,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -244,6 +267,9 @@ class DocxText extends DocxInline {
     this.fontFamily,
     this.fonts,
     this.shadingFill,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -267,7 +293,13 @@ class DocxText extends DocxInline {
 
   /// Inline code text.
   const DocxText.code(this.content,
-      {this.fontSize, this.shadingFill, this.color, super.id})
+      {this.fontSize,
+      this.shadingFill,
+      this.color,
+      this.themeFill,
+      this.themeFillTint,
+      this.themeFillShade,
+      super.id})
       : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
@@ -299,6 +331,9 @@ class DocxText extends DocxInline {
     this.fontFamily,
     this.fonts,
     this.color = DocxColor.black,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -321,7 +356,12 @@ class DocxText extends DocxInline {
 
   /// Superscript text (e.g., x²).
   const DocxText.superscript(this.content,
-      {this.fontSize, this.shadingFill, super.id})
+      {this.fontSize,
+      this.shadingFill,
+      this.themeFill,
+      this.themeFillTint,
+      this.themeFillShade,
+      super.id})
       : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
@@ -347,7 +387,12 @@ class DocxText extends DocxInline {
 
   /// Subscript text (e.g., H₂O).
   const DocxText.subscript(this.content,
-      {this.fontSize, this.shadingFill, super.id})
+      {this.fontSize,
+      this.shadingFill,
+      this.themeFill,
+      this.themeFillTint,
+      this.themeFillShade,
+      super.id})
       : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
         decoration = DocxTextDecoration.none,
@@ -378,6 +423,9 @@ class DocxText extends DocxInline {
     this.fontFamily,
     this.fonts,
     this.shadingFill,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -407,6 +455,9 @@ class DocxText extends DocxInline {
     this.fontFamily,
     this.fonts,
     this.shadingFill,
+    this.themeFill,
+    this.themeFillTint,
+    this.themeFillShade,
     super.id,
   })  : fontWeight = DocxFontWeight.normal,
         fontStyle = DocxFontStyle.normal,
@@ -445,6 +496,9 @@ class DocxText extends DocxInline {
     String? themeColor,
     String? themeTint,
     String? themeShade,
+    String? themeFill,
+    String? themeFillTint,
+    String? themeFillShade,
     String? fontFamily,
     DocxFont? fonts,
     double? characterSpacing,
@@ -472,6 +526,9 @@ class DocxText extends DocxInline {
       themeColor: themeColor ?? this.themeColor,
       themeTint: themeTint ?? this.themeTint,
       themeShade: themeShade ?? this.themeShade,
+      themeFill: themeFill ?? this.themeFill,
+      themeFillTint: themeFillTint ?? this.themeFillTint,
+      themeFillShade: themeFillShade ?? this.themeFillShade,
       fontFamily: fontFamily ?? this.fontFamily,
       fonts: fonts ?? this.fonts,
       characterSpacing: characterSpacing ?? this.characterSpacing,
@@ -622,13 +679,24 @@ class DocxText extends DocxInline {
                   },
                 );
               }
-              if (shadingFill != null) {
+              if (shadingFill != null || themeFill != null) {
                 builder.element(
                   'w:shd',
                   nest: () {
                     builder.attribute('w:val', 'clear');
                     builder.attribute('w:color', 'auto');
-                    builder.attribute('w:fill', shadingFill!);
+                    if (shadingFill != null) {
+                      builder.attribute('w:fill', shadingFill!);
+                    }
+                    if (themeFill != null) {
+                      builder.attribute('w:themeFill', themeFill!);
+                    }
+                    if (themeFillTint != null) {
+                      builder.attribute('w:themeFillTint', themeFillTint!);
+                    }
+                    if (themeFillShade != null) {
+                      builder.attribute('w:themeFillShade', themeFillShade!);
+                    }
                   },
                 );
               }
@@ -692,7 +760,11 @@ class DocxText extends DocxInline {
       fonts != null ||
       highlight != DocxHighlight.none ||
       characterSpacing != null ||
-      textBorder != null;
+      characterSpacing != null ||
+      textBorder != null ||
+      themeFill != null ||
+      themeFillTint != null ||
+      themeFillShade != null;
 }
 
 /// A line break.

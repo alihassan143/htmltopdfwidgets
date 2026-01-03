@@ -108,24 +108,54 @@ class TableBuilder {
     final look = table.look;
     final totalColumns = colWidths.length;
 
+    // Resolve named table style
+    DocxStyle? namedStyle;
+    if (table.styleId != null && docxTheme != null) {
+      namedStyle = docxTheme!.styles[table.styleId];
+    }
+
     // Determine row-level conditions
     final isHeaderRow = rowIndex == 0 && table.hasHeader && look.firstRow;
     final isLastRow = rowIndex == totalRows - 1 && look.lastRow;
+    final isEvenRow = rowIndex % 2 != 0; // 0-indexed, so row 1 is even "band"
 
-    // Determine row-level background based on styling
-    Color? rowBackground;
-
-    if (isHeaderRow && style.headerFill != null) {
-      rowBackground = _resolveColor(style.headerFill, null, null, null);
+    // Resolve conditional styles for this row
+    DocxStyle? rowCondStyle;
+    if (isHeaderRow) {
+      rowCondStyle = namedStyle?.tableConditionals['firstRow'];
+    } else if (isLastRow) {
+      rowCondStyle = namedStyle?.tableConditionals['lastRow'];
+    } else if (!look.noHBand) {
+      // Band styling
+      if (isEvenRow) {
+        rowCondStyle = namedStyle?.tableConditionals['band2Horz']; // Even row
+      } else {
+        rowCondStyle = namedStyle?.tableConditionals['band1Horz']; // Odd row
+      }
     }
 
-    // Row banding (alternating colors) if not header and banding is enabled
-    if (rowBackground == null && !isHeaderRow && !look.noHBand) {
-      final isEvenRow = rowIndex.isEven;
-      if (isEvenRow && style.evenRowFill != null) {
-        rowBackground = _resolveColor(style.evenRowFill, null, null, null);
-      } else if (!isEvenRow && style.oddRowFill != null) {
-        rowBackground = _resolveColor(style.oddRowFill, null, null, null);
+    // Determine row-level background based on styling (Prioritize Conditional > Direct Table Style)
+    Color? rowBackground;
+
+    if (rowCondStyle?.shadingFill != null || rowCondStyle?.themeFill != null) {
+      rowBackground = _resolveColor(
+          rowCondStyle!.shadingFill,
+          rowCondStyle.themeFill,
+          rowCondStyle.themeFillTint,
+          rowCondStyle.themeFillShade);
+    }
+
+    // Fallback to direct style properties (legacy support) if no conditional override
+    if (rowBackground == null) {
+      if (isHeaderRow && style.headerFill != null) {
+        rowBackground = _resolveColor(style.headerFill, null, null, null);
+      }
+      if (!isHeaderRow && !look.noHBand) {
+        if (isEvenRow && style.evenRowFill != null) {
+          rowBackground = _resolveColor(style.evenRowFill, null, null, null);
+        } else if (!isEvenRow && style.oddRowFill != null) {
+          rowBackground = _resolveColor(style.oddRowFill, null, null, null);
+        }
       }
     }
 
@@ -194,6 +224,14 @@ class TableBuilder {
           final cellIsLastColumn =
               (gridIndex + span - 1) >= totalColumns - 1 && look.lastColumn;
 
+          // Determine column conditional style
+          DocxStyle? colCondStyle;
+          if (isFirstColumn) {
+            colCondStyle = namedStyle?.tableConditionals['firstColumn'];
+          } else if (cellIsLastColumn) {
+            colCondStyle = namedStyle?.tableConditionals['lastColumn'];
+          }
+
           cells.add(_buildCell(
             cell,
             width,
@@ -203,6 +241,8 @@ class TableBuilder {
             tableStyle: style,
             tableLook: look,
             rowBackground: rowBackground,
+            rowCondStyle: rowCondStyle,
+            colCondStyle: colCondStyle,
             isHeaderRow: isHeaderRow,
             isLastRow: isLastRow,
             isFirstColumn: isFirstColumn,
@@ -249,6 +289,8 @@ class TableBuilder {
     bool isLastRowActual = false,
     bool isFirstColumnActual = false,
     bool isLastColumnActual = false,
+    DocxStyle? rowCondStyle,
+    DocxStyle? colCondStyle,
   }) {
     // Helper to get side with proper merging of cell and table-level borders
     BorderSide getSide(DocxBorderSide? cellSide, DocxBorderSide? tableSide,
@@ -372,8 +414,52 @@ class TableBuilder {
         }
       }
 
-      // Apply conditional text styling (bold for header row or first column)
-      if (isHeaderRow || isFirstColumn) {
+      // Apply conditional text styling (from named style or default header logic)
+      TextStyle? cellTextStyle;
+
+      // 1. Try Conditional Style (Row Priority then Column Priority)
+      // Merge column properties on top of row properties? Or vice versa?
+      // Usually First Column > Header Row in some cases, but Header Row > Banding.
+
+      if (rowCondStyle != null) {
+        if (rowCondStyle.fontWeight == DocxFontWeight.bold) {
+          cellTextStyle = (cellTextStyle ?? const TextStyle())
+              .copyWith(fontWeight: FontWeight.bold);
+        }
+        if (rowCondStyle.color != null) {
+          final color = _resolveColor(
+              rowCondStyle.color!.hex,
+              rowCondStyle.color!.themeColor,
+              rowCondStyle.color!.themeTint,
+              rowCondStyle.color!.themeShade);
+          if (color != null) {
+            cellTextStyle =
+                (cellTextStyle ?? const TextStyle()).copyWith(color: color);
+          }
+        }
+      }
+
+      if (colCondStyle != null) {
+        if (colCondStyle.fontWeight == DocxFontWeight.bold) {
+          cellTextStyle = (cellTextStyle ?? const TextStyle())
+              .copyWith(fontWeight: FontWeight.bold);
+        }
+        if (colCondStyle.color != null) {
+          final color = _resolveColor(
+              colCondStyle.color!.hex,
+              colCondStyle.color!.themeColor,
+              colCondStyle.color!.themeTint,
+              colCondStyle.color!.themeShade);
+          if (color != null) {
+            cellTextStyle =
+                (cellTextStyle ?? const TextStyle()).copyWith(color: color);
+          }
+        }
+      }
+
+      // 2. Fallback to Hardcoded Header/FirstCol logic ONLY if no conditional style was found/applied
+      // AND we are in a header/first-col scenario
+      if (cellTextStyle == null && (isHeaderRow || isFirstColumn)) {
         // Determine text color for contrast (white text on dark backgrounds)
         Color? textColor;
         if (color != null) {
@@ -383,11 +469,15 @@ class TableBuilder {
           }
         }
 
+        cellTextStyle = TextStyle(
+          fontWeight: FontWeight.bold,
+          color: textColor,
+        );
+      }
+
+      if (cellTextStyle != null) {
         contentWidget = DefaultTextStyle.merge(
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: textColor,
-          ),
+          style: cellTextStyle,
           child: contentWidget,
         );
       }
@@ -430,15 +520,27 @@ class TableBuilder {
     if (baseColor == null) return null;
 
     // 3. Apply Tint/Shade
-    // Note: The OOXML tint/shade specification is complex and the simple
-    // alphaBlend approach was incorrect (e.g., black became gray).
-    // For now, skip tint/shade processing and use the base color directly.
-    // A proper implementation would use HSL color space calculations.
-    //
-    // TODO: Implement proper OOXML tint/shade logic if needed:
-    // - Tint: Lighten color towards white
-    // - Shade: Darken color towards black
-    // The current values in DOCX indicate the "amount" of the base color to preserve.
+    if (themeTint != null) {
+      final tintVal = int.tryParse(themeTint, radix: 16);
+      if (tintVal != null) {
+        // In OOXML, tint is amount of color to keep, rest is white
+        // Actually, alphaBlend logic:
+        // tint/shade values in OOXML are complex 0-255 scaling.
+        // Assuming typical implementation:
+        final factor = tintVal / 255.0;
+        baseColor = Color.alphaBlend(
+            Colors.white.withValues(alpha: 1 - factor), baseColor);
+      }
+    }
+
+    if (themeShade != null) {
+      final shadeVal = int.tryParse(themeShade, radix: 16);
+      if (shadeVal != null) {
+        final factor = shadeVal / 255.0;
+        baseColor = Color.alphaBlend(
+            Colors.black.withValues(alpha: 1 - factor), baseColor);
+      }
+    }
 
     return baseColor;
   }

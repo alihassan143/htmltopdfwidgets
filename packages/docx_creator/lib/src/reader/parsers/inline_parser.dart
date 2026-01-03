@@ -107,16 +107,23 @@ class InlineParser {
       final directFontFamily = parsedProps.fontFamily;
       final directColor = parsedProps.color;
 
+      // For fonts: use direct if specified, otherwise use inherited from style
+      final effectiveFonts = directFonts ?? finalProps.fonts;
+      final effectiveFontFamily = directFontFamily ?? finalProps.fontFamily;
+
+      final effectiveColor = directColor ?? finalProps.color;
+
       return DocxText(
         textElem.innerText,
         fontWeight: finalProps.fontWeight ?? DocxFontWeight.normal,
         fontStyle: finalProps.fontStyle ?? DocxFontStyle.normal,
         decoration: finalProps.decoration ?? DocxTextDecoration.none,
-        color: directColor, // Only direct color
+        color: effectiveColor,
         shadingFill: parsedProps.shadingFill, // Only direct shading
-        fontSize: directFontSize, // Only direct font size
-        fontFamily: directFontFamily, // Only direct font family
-        fonts: directFonts, // Only direct fonts
+        fontSize: directFontSize ??
+            finalProps.fontSize, // Use inherited if not direct
+        fontFamily: effectiveFontFamily, // Use inherited if not direct
+        fonts: effectiveFonts, // Use inherited if not direct
         highlight: finalProps.highlight ?? DocxHighlight.none,
         isSuperscript: finalProps.isSuperscript ?? false,
         isSubscript: finalProps.isSubscript ?? false,
@@ -128,6 +135,13 @@ class InlineParser {
         isEmboss: finalProps.isEmboss ?? false,
         isImprint: finalProps.isImprint ?? false,
         textBorder: finalProps.textBorder,
+        themeColor: effectiveColor?.themeColor,
+        themeTint: effectiveColor?.themeTint,
+        themeShade: effectiveColor?.themeShade,
+        themeFill: parsedProps.themeFill,
+        themeFillTint: parsedProps.themeFillTint,
+        themeFillShade: parsedProps.themeFillShade,
+        characterSpacing: finalProps.characterSpacing,
       );
     }
 

@@ -147,18 +147,14 @@ class ParagraphBuilder {
 
         columnChildren.add(Center(child: centerWidget));
       } else if (align == DocxAlign.left) {
-        // Only flush if we have pending text (which should appear above)
-        // OR if we have pending right floats (prevent left+right squeeze)
-        if (currentInlines.isNotEmpty || currentRightFloats.isNotEmpty) {
-          flushBuffer();
-        }
+        // Accumulate left floats for the current "row section".
+        // We do NOT flush here because we want the float to sit alongside
+        // the text that might already be in the buffer (or come after).
         currentLeftFloats.add(child);
       } else if (align == DocxAlign.right) {
-        // Only flush if we have pending text (which should appear above)
-        // OR if we have pending left floats (prevent left+right squeeze)
-        if (currentInlines.isNotEmpty || currentLeftFloats.isNotEmpty) {
-          flushBuffer();
-        }
+        // Accumulate right floats.
+        // Don't flush here either; we want to keep accumulating text
+        // to render side-by-side with this right float.
         currentRightFloats.add(child);
       } else {
         // align is null -> it's a standard inline element
@@ -509,9 +505,16 @@ class ParagraphBuilder {
     }
 
     Color? backgroundColor;
-    if (text.shadingFill != null) {
-      backgroundColor = _parseHexColor(text.shadingFill!);
-    } else if (text.highlight != DocxHighlight.none) {
+    if (text.shadingFill != null || text.themeFill != null) {
+      backgroundColor = _resolveColor(
+        text.shadingFill,
+        text.themeFill,
+        text.themeFillTint,
+        text.themeFillShade,
+      );
+    }
+
+    if (backgroundColor == null && text.highlight != DocxHighlight.none) {
       backgroundColor = _highlightToColor(text.highlight);
     }
 
@@ -635,11 +638,12 @@ class ParagraphBuilder {
           : null,
       foreground: foreground,
       backgroundColor: backgroundColor,
+      letterSpacing:
+          text.characterSpacing != null ? text.characterSpacing! / 20.0 : null,
       fontSize: fontSize,
       fontFamily: fontFamily,
       fontFamilyFallback: config.customFontFallbacks,
       height: lineHeight ?? theme.defaultTextStyle.height,
-      letterSpacing: text.characterSpacing,
       shadows: shadows,
       fontFeatures: (text.isSuperscript || text.isSubscript)
           ? [

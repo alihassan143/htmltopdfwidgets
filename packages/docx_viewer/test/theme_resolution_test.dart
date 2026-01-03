@@ -1,4 +1,5 @@
 import 'package:docx_creator/docx_creator.dart';
+import 'package:docx_creator/src/reader/models/docx_font.dart';
 import 'package:docx_viewer/src/docx_view_config.dart';
 import 'package:docx_viewer/src/theme/docx_view_theme.dart';
 import 'package:docx_viewer/src/widget_generator/list_builder.dart';
@@ -55,7 +56,8 @@ void main() {
     testWidgets('ParagraphBuilder resolves theme font', (tester) async {
       final text = DocxText(
         'Hello',
-        fontFamily: 'majorHAnsi', // Theme reference
+        // Theme font reference - should be via fonts.hAnsiTheme, not fontFamily
+        fonts: const DocxFont(hAnsiTheme: 'majorHAnsi'),
       );
 
       final para = DocxParagraph(children: [text]);

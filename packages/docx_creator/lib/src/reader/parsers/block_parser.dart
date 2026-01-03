@@ -135,14 +135,16 @@ class BlockParser {
     final effectiveStyle = context.resolveStyle(pStyle ?? 'Normal');
 
     // Parse direct properties (override styles)
-    final parsedProps = DocxStyle.fromXml('temp', pPr: pPr);
+    // Extract rPr from pPr if present (paragraph mark properties which act as run defaults)
+    final rPr = pPr?.getElement('w:rPr');
+    final parsedProps = DocxStyle.fromXml('temp', pPr: pPr, rPr: rPr);
 
     // Merge: Style < Direct
     final finalProps = effectiveStyle.merge(parsedProps);
 
     // Parse runs and other inline content
     final children =
-        inlineParser.parseChildren(xml.children, parentStyle: effectiveStyle);
+        inlineParser.parseChildren(xml.children, parentStyle: finalProps);
 
     return DocxParagraph(
       children: children,

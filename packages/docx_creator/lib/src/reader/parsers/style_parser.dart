@@ -66,6 +66,7 @@ class StyleParser {
           '__docDefault_pPr',
           pPr: pPr,
         );
+        context.defaultParagraphStyle = _defaultParagraphStyle;
       }
     }
 
@@ -78,6 +79,7 @@ class StyleParser {
           '__docDefault_rPr',
           rPr: rPr,
         );
+        context.defaultRunStyle = _defaultRunStyle;
       }
     }
   }

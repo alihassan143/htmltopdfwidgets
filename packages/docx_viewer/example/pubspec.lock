@@ -95,7 +95,7 @@ packages:
       path: "../../docx_creator"
       relative: true
     source: path
-    version: "1.0.6"
+    version: "1.0.7"
   docx_viewer:
     dependency: "direct main"
     description:

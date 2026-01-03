@@ -1,7 +1,6 @@
 import 'package:docx_creator/docx_creator.dart';
 import 'package:xml/xml.dart';
 
-import '../models/docx_style.dart';
 import '../reader_context.dart';
 import 'inline_parser.dart';
 
@@ -446,9 +445,17 @@ class TableParser {
     // Resolve style for inheritance
     final effectiveStyle = context.resolveStyle(pStyle ?? 'Normal');
 
+    // Parse direct properties (override styles)
+    // Extract rPr from pPr if present
+    final rPr = pPr?.getElement('w:rPr');
+    final parsedProps = DocxStyle.fromXml('temp', pPr: pPr, rPr: rPr);
+
+    // Merge: Style < Direct
+    final finalProps = effectiveStyle.merge(parsedProps);
+
     // Parse inline children with full formatting
     final children =
-        inlineParser.parseChildren(xml.children, parentStyle: effectiveStyle);
+        inlineParser.parseChildren(xml.children, parentStyle: finalProps);
 
     return DocxParagraph(
       children: children,
