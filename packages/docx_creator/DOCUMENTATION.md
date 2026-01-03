@@ -107,6 +107,10 @@ DocxNode (abstract)
 | `isEmboss` | `bool` | Emboss effect |
 | `isImprint` | `bool` | Imprint effect |
 | `textBorder` | `DocxBorderSide?` | Text border |
+| `themeColor` | `String?` | Theme color reference (e.g. 'accent1') |
+| `themeTint` | `String?` | Theme color tint (hex) |
+| `themeShade` | `String?` | Theme color shade (hex) |
+| `characterSpacing` | `int?` | Character spacing in twips |
 
 ### DocxParagraph Properties
 

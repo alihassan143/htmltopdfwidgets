@@ -22,6 +22,8 @@ A **developer-first DOCX generation library** for Dart. Create, parse, read, and
 | 📄**Sections**           | Headers, footers, page orientation, backgrounds     |
 | 📌**Footnotes**          | Full support for footnotes and endnotes             |
 | 🧢**Drop Caps**          | Stylized drop caps for paragraph beginnings         |
+| 🎨**Theme Support**      | Theme colors, tints, shades, and font themes        |
+| 🧬**Advanced Styling**   | Proper inheritance from docDefaults and style hierarchy |
 
 ---
 

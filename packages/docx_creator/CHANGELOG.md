@@ -1,3 +1,15 @@
+## 1.0.8
+
+### Fixed
+- **Advanced Style Inheritance**: Implemented proper `docDefaults` resolution for paragraph and run properties.
+- **Table Text Styling**: Fixed text styling in tables to respect paragraph-level run properties (`w:rPr`).
+
+### Added
+- **Theme Color Support**: Added support for `themeColor`, `themeTint`, and `themeShade` in text and styling.
+- **Character Spacing**: Added support for parsing `w:spacing` in run properties.
+
+---
+
 ## 1.0.7
 
 ### Fixed
