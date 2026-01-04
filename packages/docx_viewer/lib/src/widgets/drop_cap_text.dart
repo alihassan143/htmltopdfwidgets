@@ -239,8 +239,17 @@ class DropCapText extends StatelessWidget {
     capWidth += dropCapPadding.left + dropCapPadding.right;
     capHeight += dropCapPadding.top + dropCapPadding.bottom;
 
+    // Create a text-only span for layout measurement
+    // (TextPainter cannot handle WidgetSpans during layout phase)
+    final measurementSpan = TextSpan(
+      text: plainTextContent,
+      style: mainSpan.style,
+    );
+
     final textPainter = TextPainter(
-        textDirection: textDirection, text: mainSpan, textAlign: textAlign);
+        textDirection: textDirection,
+        text: measurementSpan,
+        textAlign: textAlign);
     final lineHeight = textPainter.preferredLineHeight;
 
     var rows =
@@ -309,17 +318,11 @@ class DropCapText extends StatelessWidget {
                   child: Container(
                     padding: EdgeInsets.only(top: indentation.dy),
                     width: boundsWidth,
-                    height: mode != DropCapMode.aside
-                        ? (lineHeight * min(maxLines ?? rows, rows)) +
-                            indentation.dy
-                        : null,
+                    // Don't constrain height - let text flow naturally
+                    // The remaining text flows below via the Padding section
                     child: RichText(
-                      overflow: (maxLines == null ||
-                              (maxLines! > rows &&
-                                  overflow == TextOverflow.fade))
-                          ? TextOverflow.clip
-                          : overflow,
-                      maxLines: maxLines,
+                      overflow: TextOverflow.clip,
+                      maxLines: rows > 0 ? rows : null,
                       textDirection: textDirection,
                       textAlign: textAlign,
                       text: _sliceTextSpan(mainSpan, 0, charIndexEnd) ??
@@ -389,15 +392,16 @@ class _DropCapSliceWalker {
   _DropCapSliceWalker(this.start, this.end);
 
   TextSpan? slice(TextSpan root) {
-    visit(root);
+    _visit(root, isRoot: true);
     if (result.isEmpty) return null;
     return TextSpan(style: root.style, children: result);
   }
 
-  void visit(InlineSpan span) {
+  void _visit(InlineSpan span, {bool isRoot = false}) {
     if (span is TextSpan) {
+      // Process this span's own text
       String? text = span.text;
-      if (text != null) {
+      if (text != null && text.isNotEmpty) {
         int len = text.length;
         int sStart = currentPos;
         int sEnd = currentPos + len;
@@ -417,10 +421,14 @@ class _DropCapSliceWalker {
         }
         currentPos += len;
       }
-      span.visitChildren((child) {
-        visit(child);
-        return true;
-      });
+
+      // Process children if any
+      final children = span.children;
+      if (children != null) {
+        for (final child in children) {
+          _visit(child);
+        }
+      }
     } else if (span is WidgetSpan) {
       if (currentPos >= start && (end == null || currentPos < end!)) {
         result.add(span);

@@ -33,8 +33,16 @@ class ParagraphBuilder {
     return _buildNativeParagraph(paragraph);
   }
 
+  /// Build a paragraph widget, excluding specific floating images.
+  /// Used when specific floats are being handled separately at the block level.
+  Widget buildExcludingFloats(
+      DocxParagraph paragraph, Set<DocxInline> excludedFloats) {
+    return _buildNativeParagraph(paragraph, excludedFloats: excludedFloats);
+  }
+
   /// Native Flutter builder for standard paragraphs.
-  Widget _buildNativeParagraph(DocxParagraph paragraph) {
+  Widget _buildNativeParagraph(DocxParagraph paragraph,
+      {Set<DocxInline>? excludedFloats}) {
     List<(DocxInline, DocxAlign?)> textChildren = [];
 
     // Separate content
@@ -44,6 +52,9 @@ class ParagraphBuilder {
 
       if (child is DocxInlineImage &&
           child.positionMode == DocxDrawingPosition.floating) {
+        if (excludedFloats?.contains(child) ?? false) {
+          continue; // Skip specific excluded float
+        }
         isFloating = true;
         if (child.hAlign == DrawingHAlign.center) {
           align = DocxAlign.center;
@@ -54,6 +65,9 @@ class ParagraphBuilder {
         }
       } else if (child is DocxShape &&
           child.position == DocxDrawingPosition.floating) {
+        if (excludedFloats?.contains(child) ?? false) {
+          continue; // Skip specific excluded float
+        }
         isFloating = true;
         if (child.horizontalAlign == DrawingHAlign.center) {
           align = DocxAlign.center;
@@ -67,13 +81,13 @@ class ParagraphBuilder {
       textChildren.add((child, isFloating ? align : null));
     }
 
-    // List of block-level widgets to be rendered vertically
+    // List of block-level widgets (rows or center blocks)
     final List<Widget> columnChildren = [];
 
-    // Buffers for the current text run
-    List<DocxInline> currentInlines = [];
+    // Buffers for the current "Row" context
     List<DocxInline> currentLeftFloats = [];
     List<DocxInline> currentRightFloats = [];
+    List<DocxInline> currentInlines = [];
 
     double? lineHeightScale;
     if (paragraph.lineSpacing != null) {
@@ -81,7 +95,7 @@ class ParagraphBuilder {
     }
     final textAlign = _convertAlign(paragraph.align);
 
-    // Helper to flush current inline buffer to a widget
+    // Helper to flush current buffers into a single layout row
     void flushBuffer() {
       if (currentInlines.isEmpty &&
           currentLeftFloats.isEmpty &&
@@ -91,15 +105,19 @@ class ParagraphBuilder {
 
       final spans =
           _buildTextSpans(currentInlines, lineHeight: lineHeightScale);
-      final fullTextSpan = TextSpan(children: spans);
+      final fullTextSpan =
+          TextSpan(style: theme.defaultTextStyle, children: spans);
 
-      Widget contentWidget;
+      Widget rowWidget;
+
+      // If we have any floating elements, we MUST use the floating layout (Row)
+      // to ensure they sit side-by-side with text.
       if (currentLeftFloats.isNotEmpty || currentRightFloats.isNotEmpty) {
-        // Copy lists to avoid reference issues after clearing
+        // Create copies to separate from buffer
         final lefts = List<DocxInline>.from(currentLeftFloats);
         final rights = List<DocxInline>.from(currentRightFloats);
 
-        contentWidget = _buildFloatingLayout(
+        rowWidget = _buildFloatingLayout(
           textSpan: fullTextSpan,
           leftElements: lefts,
           rightElements: rights,
@@ -107,30 +125,57 @@ class ParagraphBuilder {
           lineHeightScale: lineHeightScale,
         );
       } else {
+        // Standard text layout for efficiency if no floats
         if (config.enableSelection) {
-          contentWidget =
-              SelectableText.rich(fullTextSpan, textAlign: textAlign);
+          rowWidget = SelectableText.rich(
+            fullTextSpan,
+            textAlign: textAlign,
+          );
         } else {
-          contentWidget = RichText(text: fullTextSpan, textAlign: textAlign);
+          rowWidget = RichText(
+            text: fullTextSpan,
+            textAlign: textAlign,
+          );
         }
-        contentWidget = SizedBox(width: double.infinity, child: contentWidget);
+        // Ensure it takes width to respect alignment
+        rowWidget = SizedBox(width: double.infinity, child: rowWidget);
       }
 
-      columnChildren.add(contentWidget);
+      columnChildren.add(rowWidget);
 
-      // Clear buffers
-      currentInlines = [];
-      currentLeftFloats = [];
-      currentRightFloats = [];
+      currentLeftFloats.clear();
+      currentRightFloats.clear();
+      currentInlines.clear();
     }
 
-    // Iterate sequentially
-    for (final (child, align) in textChildren) {
+    // Iterate through children and bucket them into Rows
+    for (var child in paragraph.children) {
+      if (excludedFloats?.contains(child) ?? false) {
+        continue; // Skip specific excluded float
+      }
+      DocxAlign? align;
+      if (child is DocxInlineImage) {
+        if (child.positionMode == DocxDrawingPosition.floating) {
+          align = child.hAlign == DrawingHAlign.left
+              ? DocxAlign.left
+              : (child.hAlign == DrawingHAlign.right
+                  ? DocxAlign.right
+                  : DocxAlign.center);
+        }
+      } else if (child is DocxShape) {
+        if (child.position == DocxDrawingPosition.floating) {
+          align = child.horizontalAlign == DrawingHAlign.left
+              ? DocxAlign.left
+              : (child.horizontalAlign == DrawingHAlign.right
+                  ? DocxAlign.right
+                  : DocxAlign.center);
+        }
+      }
+
       if (align == DocxAlign.center) {
-        // Centered floating element acts as a block break
+        // A Center float breaks the current Row.
         flushBuffer();
 
-        // Build and add the centered element immediately
         Widget centerWidget;
         if (child is DocxInlineImage) {
           centerWidget = Image.memory(
@@ -144,20 +189,12 @@ class ParagraphBuilder {
         } else {
           centerWidget = const SizedBox.shrink();
         }
-
         columnChildren.add(Center(child: centerWidget));
       } else if (align == DocxAlign.left) {
-        // Accumulate left floats for the current "row section".
-        // We do NOT flush here because we want the float to sit alongside
-        // the text that might already be in the buffer (or come after).
         currentLeftFloats.add(child);
       } else if (align == DocxAlign.right) {
-        // Accumulate right floats.
-        // Don't flush here either; we want to keep accumulating text
-        // to render side-by-side with this right float.
         currentRightFloats.add(child);
       } else {
-        // align is null -> it's a standard inline element
         currentInlines.add(child);
       }
     }
@@ -165,7 +202,7 @@ class ParagraphBuilder {
     // Flush any remaining content
     flushBuffer();
 
-    // If we only have one child, return it directly to avoid unnecessary Column
+    // Final Assembly
     Widget finalContent;
     if (columnChildren.isEmpty) {
       finalContent = const SizedBox();
@@ -176,8 +213,7 @@ class ParagraphBuilder {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: columnChildren
             .map((w) => Padding(
-                  padding: const EdgeInsets.only(
-                      bottom: 8.0), // Spacing between blocks
+                  padding: const EdgeInsets.only(bottom: 8.0),
                   child: w,
                 ))
             .toList(),
@@ -189,7 +225,7 @@ class ParagraphBuilder {
 
   /// Builds a layout that wraps text around left and/or right floating elements.
   ///
-  /// Uses a simplified Row layout to ensure elements are strictly side-by-side.
+  /// Uses IntrinsicHeight with Row for proper alignment of floating images and text.
   Widget _buildFloatingLayout({
     required TextSpan textSpan,
     List<DocxInline> leftElements = const [],
@@ -197,8 +233,10 @@ class ParagraphBuilder {
     required TextAlign textAlign,
     double? lineHeightScale,
   }) {
+    const double floatSpacing = 12.0;
+
     // Helper to build the widget for a floating element
-    Widget? buildFloat(DocxInline? element) {
+    Widget? buildFloatWidget(DocxInline? element) {
       if (element == null) return null;
       if (element is DocxInlineImage) {
         return Image.memory(
@@ -213,37 +251,47 @@ class ParagraphBuilder {
       return null;
     }
 
-    Widget buildSideColumn(List<DocxInline> elements) {
+    // Build a column of floating elements
+    Widget buildFloatColumn(List<DocxInline> elements) {
       if (elements.isEmpty) return const SizedBox.shrink();
       return Column(
         mainAxisSize: MainAxisSize.min,
-        children: elements
-            .map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: buildFloat(e) ?? const SizedBox.shrink(),
-                ))
-            .toList(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: elements.map((e) {
+          final widget = buildFloatWidget(e) ?? const SizedBox.shrink();
+          final index = elements.indexOf(e);
+          if (index < elements.length - 1) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: widget,
+            );
+          }
+          return widget;
+        }).toList(),
       );
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (leftElements.isNotEmpty) ...[
-          buildSideColumn(leftElements),
-          const SizedBox(width: 12),
+    // Build the text widget
+    Widget textWidget = config.enableSelection
+        ? SelectableText.rich(textSpan, textAlign: textAlign)
+        : RichText(text: textSpan, textAlign: textAlign);
+
+    // Use IntrinsicHeight to allow text to wrap naturally beside floats
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (leftElements.isNotEmpty) ...[
+            buildFloatColumn(leftElements),
+            const SizedBox(width: floatSpacing),
+          ],
+          Expanded(child: textWidget),
+          if (rightElements.isNotEmpty) ...[
+            const SizedBox(width: floatSpacing),
+            buildFloatColumn(rightElements),
+          ],
         ],
-        Expanded(
-          child: Text.rich(
-            textSpan,
-            textAlign: textAlign,
-          ),
-        ),
-        if (rightElements.isNotEmpty) ...[
-          const SizedBox(width: 12),
-          buildSideColumn(rightElements),
-        ],
-      ],
+      ),
     );
   }
 
@@ -525,9 +573,9 @@ class ParagraphBuilder {
       fontSize = theme.defaultTextStyle.fontSize;
     }
 
-    String? fontFamily = text.fontFamily;
+    String? fontFamily; // Start with null to prioritize granular resolution
 
-    // Resolve Theme Font
+    // Resolve Theme Font if applicable
     if (docxTheme != null) {
       String? themeFontName;
       if (text.fonts?.asciiTheme != null) {
@@ -546,17 +594,17 @@ class ParagraphBuilder {
       }
     }
 
-    // If no theme font resolved, try direct font family from granular properties
-    if (fontFamily == null || fontFamily == text.fontFamily) {
-      // Check granular fonts first
-      if (text.fonts?.ascii != null) {
-        fontFamily = text.fonts!.ascii;
-      } else if (text.fonts?.hAnsi != null) {
-        fontFamily = text.fonts!.hAnsi;
-      } else if (text.fonts?.family != null) {
-        fontFamily = text.fonts!.family;
-      }
+    // granular fonts override theme or base family
+    if (text.fonts?.ascii != null) {
+      fontFamily = text.fonts!.ascii;
+    } else if (text.fonts?.hAnsi != null) {
+      fontFamily = text.fonts!.hAnsi;
+    } else if (text.fonts?.family != null) {
+      fontFamily = text.fonts!.family;
     }
+
+    // Fallback to basic fontFamily property if still null
+    fontFamily ??= text.fontFamily;
 
     // Apply font fallbacks
     if (fontFamily == null && config.customFontFallbacks.isNotEmpty) {
@@ -777,7 +825,7 @@ class ParagraphBuilder {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: DropCapText(
-        dropCap.letter + restPlainText,
+        restPlainText, // Only the rest of paragraph text, matching textSpan
         textSpan: fullTextSpan,
         dropCap: DropCap(
           width: dcWidth,

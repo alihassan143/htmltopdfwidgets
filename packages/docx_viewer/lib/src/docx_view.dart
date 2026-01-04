@@ -301,12 +301,22 @@ class _DocxViewState extends State<DocxView> {
       padding: widget.config.padding,
       itemCount: _widgets!.length,
       itemBuilder: (context, index) {
-        return _widgets![index];
+        final child = _widgets![index];
+        if (widget.config.pageMode == DocxPageMode.paged) {
+          return Center(child: child);
+        }
+        return child;
       },
     );
 
-    if (widget.config.pageWidth != null) {
-      // Page Layout Mode
+    if (widget.config.pageMode == DocxPageMode.paged) {
+      // Paged View: Canvas style
+      content = Container(
+        color: widget.config.backgroundColor ?? const Color(0xFFE0E0E0),
+        child: list,
+      );
+    } else if (widget.config.pageWidth != null) {
+      // Page Layout Mode (Legacy constrained continuous)
       content = Container(
         color: widget.config.backgroundColor ?? const Color(0xFFF0F0F0),
         alignment: Alignment.topCenter,

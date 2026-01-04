@@ -1,7 +1,6 @@
 import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
-import '../models/docx_style.dart';
 import '../reader_context.dart';
 import 'inline_parser.dart';
 import 'table_parser.dart';
@@ -38,7 +37,12 @@ class BlockParser {
       }
     }
 
-    for (var child in children) {
+    // Convert to list for indexed access (needed for drop cap look-ahead)
+    final childList = children.toList();
+    int i = 0;
+
+    while (i < childList.length) {
+      final child = childList[i];
       if (child is XmlElement) {
         if (child.name.local == 'p') {
           // Check for drop cap first
@@ -49,9 +53,33 @@ class BlockParser {
           if (dropCapAttr != null &&
               (dropCapAttr == 'drop' || dropCapAttr == 'margin')) {
             // This is a drop cap paragraph
-            final dropCap = _parseDropCap(child, framePr!, dropCapAttr);
+            // Look ahead to the next paragraph for the "rest of paragraph" content
+            XmlElement? nextParagraph;
+            int nextParaIndex = i + 1;
+            while (nextParaIndex < childList.length) {
+              final nextChild = childList[nextParaIndex];
+              if (nextChild is XmlElement && nextChild.name.local == 'p') {
+                // Check if this next paragraph is also a drop cap (shouldn't be, but check)
+                final nextPPr = nextChild.getElement('w:pPr');
+                final nextFramePr = nextPPr?.getElement('w:framePr');
+                final nextDropCap = nextFramePr?.getAttribute('w:dropCap');
+                if (nextDropCap == null) {
+                  nextParagraph = nextChild;
+                }
+                break;
+              }
+              nextParaIndex++;
+            }
+
+            final dropCap =
+                _parseDropCap(child, framePr!, dropCapAttr, nextParagraph);
             flushPendingList();
             result.add(dropCap);
+
+            // Skip the next paragraph since we consumed it as part of the drop cap
+            if (nextParagraph != null) {
+              i = nextParaIndex;
+            }
           } else {
             final para = parseParagraph(child);
             if (para.numId != null) {
@@ -102,6 +130,7 @@ class BlockParser {
                   cachedContent: tocContent.whereType<DocxBlock>().toList(),
                   instruction: instruction,
                 ));
+                i++;
                 continue; // Skip the generic processing
               }
             } else {
@@ -112,6 +141,7 @@ class BlockParser {
           result.addAll(parseBlocks(contentNodes));
         }
       }
+      i++;
     }
 
     flushPendingList();
@@ -365,8 +395,11 @@ class BlockParser {
   }
 
   /// Parse a drop cap paragraph from w:framePr with w:dropCap.
+  /// The [nextParagraph] parameter is the following paragraph in the document,
+  /// which often contains the "rest of paragraph" text that wraps around the drop cap.
   DocxDropCap _parseDropCap(
-      XmlElement xml, XmlElement framePr, String dropCapAttr) {
+      XmlElement xml, XmlElement framePr, String dropCapAttr,
+      [XmlElement? nextParagraph]) {
     // Get drop cap style
     final style = dropCapAttr == 'margin'
         ? DocxDropCapStyle.margin
@@ -408,41 +441,11 @@ class BlockParser {
       }
     }
 
-    // Parse the rest of the paragraph (everything after the first run's first letter)
-    // Complexity: The first run might have more text than just the letter.
-    // If so, we need to split it.
-    // But usually Word puts the Drop Cap in its own Frame/Run.
-    // We will assume the remaining runs are the rest of the paragraph.
-
+    // Parse the rest of the paragraph content
     final restOfChildren = <DocxInline>[];
+    final effectiveStyle = context.resolveStyle('Normal');
 
-    // If first run has more text, add it
-    if (runs.isNotEmpty) {
-      final firstRun = runs.first;
-      final textElem = firstRun.getElement('w:t');
-      if (textElem != null && textElem.innerText.length > 1) {
-        // This case is rare for Drop Caps produced by Word (usually strict separation),
-        // but if it happens, we should technically keep the rest.
-        // However, for now, we rely on standard Word behavior where Drop Cap is isolated.
-      }
-
-      // Add all subsequent runs
-      for (var i = 1; i < runs.length; i++) {
-        restOfChildren.add(inlineParser.parseRun(runs.elementAt(i)));
-      }
-    }
-
-    // Also need to parse any other non-run children that might follow?
-    // Usually Drop Cap frame is tight.
-    // BUT the real 'rest of paragraph' is often in the *next* logical paragraph in the XML
-    // if the Frame is separate, or within the same paragraph if it's a framePr on the paragraph.
-    // When w:dropCap is used, it's a paragraph property.
-    // So the paragraph contains the drop cap AND the text wrapping around it.
-
-    // We need to parse all other children of 'xml' that are not the first run, using inlineParser.
-    // Filter out the first run we consumed.
-
-    // Get all child nodes of the paragraph
+    // First, check if there's content in the current paragraph after the drop cap
     final allChildren = xml.children;
     bool skippedFirstRun = false;
     final nodesToParse = <XmlNode>[];
@@ -460,9 +463,38 @@ class BlockParser {
       nodesToParse.add(child);
     }
 
-    final effectiveStyle = context.resolveStyle('Normal'); // Approximation
     restOfChildren.addAll(
         inlineParser.parseChildren(nodesToParse, parentStyle: effectiveStyle));
+
+    // If we have a next paragraph, parse its content as the "rest of paragraph"
+    // This handles the common Word case where the drop cap letter and rest of text
+    // are in separate paragraphs
+    if (nextParagraph != null) {
+      final nextChildren = nextParagraph.children;
+      final nextNodesToParse = <XmlNode>[];
+
+      for (var child in nextChildren) {
+        if (child is XmlElement &&
+            ['pPr', 'sectPr'].contains(child.name.local)) {
+          continue; // Skip properties
+        }
+        nextNodesToParse.add(child);
+      }
+
+      // Resolve style for the next paragraph
+      final nextPPr = nextParagraph.getElement('w:pPr');
+      String? nextPStyle;
+      if (nextPPr != null) {
+        final pStyleElem = nextPPr.getElement('w:pStyle');
+        if (pStyleElem != null) {
+          nextPStyle = pStyleElem.getAttribute('w:val');
+        }
+      }
+      final nextEffectiveStyle = context.resolveStyle(nextPStyle ?? 'Normal');
+
+      restOfChildren.addAll(inlineParser.parseChildren(nextNodesToParse,
+          parentStyle: nextEffectiveStyle));
+    }
 
     return DocxDropCap(
       letter: letter,

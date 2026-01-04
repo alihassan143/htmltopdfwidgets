@@ -90,19 +90,27 @@ class DocxWidgetGenerator {
       docxTheme: doc.theme,
     );
 
+    if (config.pageMode == DocxPageMode.paged) {
+      return _generatePagedWidgets(doc);
+    }
+
+    return _generateContinuousWidgets(doc);
+  }
+
+  /// Original continuous generation logic
+  List<Widget> _generateContinuousWidgets(DocxBuiltDocument doc) {
     final widgets = <Widget>[];
 
     // 1. Header
     if (doc.section?.header != null) {
       widgets.addAll(_generateBlockWidgets(doc.section!.header!.children));
-      // Add visual separation for header
       widgets.add(const Divider(height: 32, thickness: 1, color: Colors.grey));
     }
 
     // 2. Body
     widgets.addAll(_generateBlockWidgets(doc.elements));
 
-    // 3. Footnotes (Appended to end for continuous view)
+    // 3. Footnotes
     if (doc.footnotes != null && doc.footnotes!.isNotEmpty) {
       widgets.add(const Divider(height: 32, thickness: 1));
       widgets.add(Padding(
@@ -113,23 +121,7 @@ class DocxWidgetGenerator {
       ));
 
       for (var footnote in doc.footnotes!) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${footnote.footnoteId}. ',
-                  style: theme.defaultTextStyle
-                      .copyWith(fontSize: 12, fontWeight: FontWeight.bold)),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _generateBlockWidgets(footnote.content),
-                ),
-              ),
-            ],
-          ),
-        ));
+        widgets.add(_buildNoteWidget(footnote.footnoteId, footnote.content));
       }
     }
 
@@ -144,23 +136,7 @@ class DocxWidgetGenerator {
       ));
 
       for (var endnote in doc.endnotes!) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${endnote.endnoteId}. ',
-                  style: theme.defaultTextStyle
-                      .copyWith(fontSize: 12, fontWeight: FontWeight.bold)),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _generateBlockWidgets(endnote.content),
-                ),
-              ),
-            ],
-          ),
-        ));
+        widgets.add(_buildNoteWidget(endnote.endnoteId, endnote.content));
       }
     }
 
@@ -173,10 +149,127 @@ class DocxWidgetGenerator {
     return widgets;
   }
 
+  /// Generate widgets grouped into Pages.
+  List<Widget> _generatePagedWidgets(DocxBuiltDocument doc) {
+    final pages = <List<Widget>>[];
+    var currentPageContent = <Widget>[];
+
+    void startNewPage() {
+      if (currentPageContent.isNotEmpty) {
+        pages.add(List.from(currentPageContent));
+        currentPageContent.clear();
+      }
+    }
+
+    // Iterate elements to detect breaks
+    List<DocxNode> currentBatch = [];
+
+    void flushBatch() {
+      if (currentBatch.isNotEmpty) {
+        currentPageContent.addAll(_generateBlockWidgets(currentBatch));
+        currentBatch.clear();
+      }
+    }
+
+    for (var element in doc.elements) {
+      bool isPageBreak = false;
+
+      if (element is DocxSectionBreakBlock) {
+        isPageBreak = true;
+      } else if (element is DocxParagraph) {
+        if (element.pageBreakBefore) {
+          isPageBreak = true;
+        }
+      }
+
+      if (isPageBreak) {
+        flushBatch();
+        startNewPage();
+        // Don't add the break element itself if it's just a signal
+        if (element is! DocxSectionBreakBlock) {
+          currentBatch.add(element);
+        }
+      } else {
+        currentBatch.add(element);
+      }
+    }
+    flushBatch();
+    startNewPage(); // Finish last page
+
+    // Wrap pages in visual containers
+    return pages
+        .map((pageContent) => _buildPageContainer(pageContent, doc))
+        .toList();
+  }
+
+  Widget _buildNoteWidget(int id, List<DocxNode> content) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$id. ',
+              style: theme.defaultTextStyle
+                  .copyWith(fontSize: 12, fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _generateBlockWidgets(content),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPageContainer(List<Widget> content, DocxBuiltDocument doc) {
+    List<Widget> pageChildren = [];
+
+    // Header
+    if (doc.section?.header != null) {
+      pageChildren.addAll(_generateBlockWidgets(doc.section!.header!.children));
+      pageChildren.add(const SizedBox(height: 20)); // Header margin
+    }
+
+    pageChildren.addAll(content);
+
+    if (doc.section?.footer != null) {
+      // Use SizedBox for margin
+      pageChildren.add(const SizedBox(height: 40));
+      pageChildren.add(const Divider());
+      pageChildren.addAll(_generateBlockWidgets(doc.section!.footer!.children));
+    }
+
+    return Container(
+      width: config.pageWidth ?? 794,
+      constraints: const BoxConstraints(minHeight: 1123),
+      margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: const EdgeInsets.all(48), // Page margins
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // allow growth
+        children: pageChildren,
+      ),
+    );
+  }
+
   /// Generate widgets for a list of blocks.
   List<Widget> _generateBlockWidgets(List<DocxNode> elements) {
     final widgets = <Widget>[];
     int i = 0;
+
+    // Track floats that have been "consumed" by a previous paragraph's grouping
+    final consumedFloats = <DocxInline>{};
 
     while (i < elements.length) {
       final element = elements[i];
@@ -188,8 +281,6 @@ class DocxWidgetGenerator {
         final followingParagraphs = <DocxNode>[];
 
         // Collect paragraphs that should wrap around this table
-        // We take paragraphs until we hit another block-level element (table, list, image)
-        // or until we've collected enough content (heuristic: ~5 paragraphs max)
         int j = i + 1;
         while (j < elements.length && followingParagraphs.length < 5) {
           final next = elements[j];
@@ -258,111 +349,124 @@ class DocxWidgetGenerator {
         }
       }
 
-      // Check for float-only paragraph (paragraph with only floating images)
+      // Handle Paragraphs with special float grouping logic
       if (element is DocxParagraph) {
-        final floatOnlyCheck = _extractFloatingImages(element);
-        if (floatOnlyCheck != null) {
-          final (leftFloats, rightFloats) = floatOnlyCheck;
+        final (localLefts, localRights) = getFloatsFromParagraph(element);
 
-          // This paragraph only contains floating images - merge with following content
-          final followingContent = <DocxNode>[];
+        // Filter out floats we already handled in a previous group
+        final activeLefts =
+            localLefts.where((f) => !consumedFloats.contains(f)).toList();
+        final activeRights =
+            localRights.where((f) => !consumedFloats.contains(f)).toList();
+
+        final extraRights = <DocxInline>[];
+
+        // If we have unconsumed left floats, we are a potential anchor for a group
+        // Look ahead for right floats in subsequent paragraphs
+        if (activeLefts.isNotEmpty) {
           int j = i + 1;
-
-          while (j < elements.length && followingContent.length < 5) {
+          // Look ahead a few paragraphs
+          while (j < elements.length && j < i + 5) {
             final next = elements[j];
-            if (next is DocxParagraph || next is DocxDropCap) {
-              followingContent.add(next);
-              j++;
+            if (next is DocxParagraph) {
+              final (nextLefts, nextRights) = getFloatsFromParagraph(next);
+
+              // If next has valid lefts, it starts its own group - stop scanning
+              if (nextLefts.any((f) => !consumedFloats.contains(f))) {
+                break;
+              }
+
+              // Inspect next rights
+              final nextActiveRights =
+                  nextRights.where((f) => !consumedFloats.contains(f)).toList();
+
+              if (nextActiveRights.isNotEmpty) {
+                // Determine if we should group these rights with current lefts
+                extraRights.addAll(nextActiveRights);
+                consumedFloats.addAll(nextActiveRights);
+              }
             } else {
+              // Non-paragraph breaks the group visual flow
               break;
             }
+            j++;
           }
+        }
 
-          if (followingContent.isNotEmpty) {
-            final contentWidgets = followingContent.map((node) {
-              if (node is DocxParagraph) return _paragraphBuilder.build(node);
-              if (node is DocxDropCap) {
-                return _paragraphBuilder.buildDropCap(node);
-              }
-              return const SizedBox.shrink();
-            }).toList();
+        final finalRights = [...activeRights, ...extraRights];
 
-            Widget floatWidget(DocxInline img) {
+        // If we have active floats (either our own or adopted ones), render a Float Row
+        if (activeLefts.isNotEmpty || finalRights.isNotEmpty) {
+          // Mark our own floats as consumed
+          consumedFloats.addAll(activeLefts);
+          consumedFloats.addAll(activeRights);
+
+          // Build the content WITHOUT the floats we are displaying here
+          // We must exclude both activeLefts and activeRights from the content rendering
+          final floatsToExclude = {...activeLefts, ...activeRights};
+
+          final contentWidget =
+              _paragraphBuilder.buildExcludingFloats(element, floatsToExclude);
+
+          // Helper to build a column of floats
+          List<Widget> buildFloatColumn(List<DocxInline> floats) {
+            return floats.map((img) {
+              Widget child;
               if (img is DocxInlineImage) {
-                return Image.memory(img.bytes,
+                child = Image.memory(img.bytes,
                     width: img.width, height: img.height, fit: BoxFit.contain);
               } else if (img is DocxShape) {
-                return _shapeBuilder.buildInlineShape(img);
+                child = _shapeBuilder.buildInlineShape(img);
+              } else {
+                child = const SizedBox.shrink();
               }
-              return const SizedBox.shrink();
-            }
-
-            List<Widget> buildFloatColumn(List<DocxInline> floats) {
-              return floats
-                  .map((f) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: floatWidget(f),
-                      ))
-                  .toList();
-            }
-
-            Widget rowWidget;
-            if (rightFloats.isNotEmpty && leftFloats.isEmpty) {
-              // Right-only float
-              rowWidget = Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: contentWidgets)),
-                  const SizedBox(width: 12),
-                  Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: buildFloatColumn(rightFloats)),
-                ],
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: child,
               );
-            } else if (leftFloats.isNotEmpty && rightFloats.isEmpty) {
-              // Left-only float
-              rowWidget = Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: buildFloatColumn(leftFloats)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: contentWidgets)),
-                ],
-              );
-            } else {
-              // Both sides floats
-              rowWidget = Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: buildFloatColumn(leftFloats)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: contentWidgets)),
-                  const SizedBox(width: 12),
-                  Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: buildFloatColumn(rightFloats)),
-                ],
-              );
-            }
+            }).toList();
+          }
 
-            widgets.add(Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: rowWidget,
-            ));
-            i = j;
+          final rowWidget = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (activeLefts.isNotEmpty) ...[
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: buildFloatColumn(activeLefts),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(child: contentWidget),
+              if (finalRights.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: buildFloatColumn(finalRights),
+                ),
+              ]
+            ],
+          );
+
+          widgets.add(Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: rowWidget,
+          ));
+
+          i++;
+          continue;
+        } else {
+          // No active floats to render in the custom layout -- check for hidden consumed floats
+          if (localLefts.any((f) => consumedFloats.contains(f)) ||
+              localRights.any((f) => consumedFloats.contains(f))) {
+            final floatsToExclude = {...localLefts, ...localRights}
+                .where((f) => consumedFloats.contains(f))
+                .toSet();
+
+            widgets.add(_paragraphBuilder.buildExcludingFloats(
+                element, floatsToExclude));
+
+            i++;
             continue;
           }
         }
@@ -379,48 +483,29 @@ class DocxWidgetGenerator {
     return widgets;
   }
 
-  /// Check if a paragraph contains ONLY floating images (no text).
-  /// Returns (leftFloats, rightFloats) or null if paragraph has text content.
-  (List<DocxInline>, List<DocxInline>)? _extractFloatingImages(
+  /// Extract floating images from ANY paragraph, including those with text.
+  /// Returns (leftFloats, rightFloats).
+  (List<DocxInline>, List<DocxInline>) getFloatsFromParagraph(
       DocxParagraph paragraph) {
     final leftFloats = <DocxInline>[];
     final rightFloats = <DocxInline>[];
-    bool hasTextContent = false;
 
     for (final child in paragraph.children) {
-      if (child is DocxText) {
-        if (child.content.trim().isNotEmpty) {
-          hasTextContent = true;
-          break;
-        }
-      } else if (child is DocxInlineImage &&
+      if (child is DocxInlineImage &&
           child.positionMode == DocxDrawingPosition.floating) {
         if (child.hAlign == DrawingHAlign.right) {
           rightFloats.add(child);
-        } else if (child.hAlign == DrawingHAlign.center) {
-          // Center floats don't trigger cross-paragraph merge
-          return null;
-        } else {
+        } else if (child.hAlign != DrawingHAlign.center) {
           leftFloats.add(child);
         }
       } else if (child is DocxShape &&
           child.position == DocxDrawingPosition.floating) {
         if (child.horizontalAlign == DrawingHAlign.right) {
           rightFloats.add(child);
-        } else if (child.horizontalAlign == DrawingHAlign.center) {
-          return null;
-        } else {
+        } else if (child.horizontalAlign != DrawingHAlign.center) {
           leftFloats.add(child);
         }
-      } else if (child is! DocxLineBreak && child is! DocxTab) {
-        // Non-floating content
-        hasTextContent = true;
-        break;
       }
-    }
-
-    if (hasTextContent || (leftFloats.isEmpty && rightFloats.isEmpty)) {
-      return null;
     }
 
     return (leftFloats, rightFloats);
@@ -446,13 +531,13 @@ class DocxWidgetGenerator {
         return const Divider(height: 24, thickness: 1);
       } else if (node is DocxRawXml) {
         return config.showDebugInfo
-            ? _buildDebugPlaceholder('[Unsupported element]')
+            ? buildDebugPlaceholder('[Unsupported element]')
             : const SizedBox.shrink();
       }
     } catch (e, stack) {
       // Silent failure: return debug widget or empty space
       if (config.showDebugInfo) {
-        return _buildDebugPlaceholder('Error: $e\n$stack',
+        return buildDebugPlaceholder('Error: $e\n$stack',
             color: Colors.red.shade100);
       }
       return const SizedBox.shrink();
@@ -460,7 +545,7 @@ class DocxWidgetGenerator {
     return null;
   }
 
-  Widget _buildDebugPlaceholder(String message, {Color? color}) {
+  Widget buildDebugPlaceholder(String message, {Color? color}) {
     return Container(
       padding: const EdgeInsets.all(8),
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -487,27 +572,27 @@ class DocxWidgetGenerator {
     // Header
     if (doc.section?.header != null) {
       for (var element in doc.section!.header!.children) {
-        texts.add(_extractText(element));
+        texts.add(extractText(element));
       }
     }
 
     // Body
     for (final element in doc.elements) {
-      final text = _extractText(element);
+      final text = extractText(element);
       texts.add(text);
     }
 
     // Footer
     if (doc.section?.footer != null) {
       for (var element in doc.section!.footer!.children) {
-        texts.add(_extractText(element));
+        texts.add(extractText(element));
       }
     }
 
     return texts;
   }
 
-  String _extractText(DocxNode node) {
+  String extractText(DocxNode node) {
     if (node is DocxParagraph) {
       return node.children.whereType<DocxText>().map((t) => t.content).join();
     } else if (node is DocxDropCap) {

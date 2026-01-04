@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 
 import 'theme/docx_view_theme.dart';
 
+/// Defines the layout rendering mode.
+enum DocxPageMode {
+  /// Renders content in a single continuous scroll view (standard web/mobile style).
+  continuous,
+
+  /// Renders content in distinct page blocks (print layout style).
+  paged,
+}
+
 /// Configuration for [DocxView] widget.
 class DocxViewConfig {
   /// Enable search functionality with highlighting.
@@ -47,6 +56,9 @@ class DocxViewConfig {
   /// If null, content fills the available width (web/mobile responsive style).
   final double? pageWidth;
 
+  /// The layout mode of the document (continuous or paged).
+  final DocxPageMode pageMode;
+
   const DocxViewConfig({
     this.enableSearch = true,
     this.enableZoom = true,
@@ -62,6 +74,7 @@ class DocxViewConfig {
     this.searchHighlightColor = const Color(0xFFFFEB3B),
     this.currentSearchHighlightColor = const Color(0xFFFF9800),
     this.pageWidth,
+    this.pageMode = DocxPageMode.paged,
   });
 
   DocxViewConfig copyWith({
