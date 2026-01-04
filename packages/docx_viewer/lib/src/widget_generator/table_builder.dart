@@ -114,6 +114,37 @@ class TableBuilder {
       namedStyle = docxTheme!.styles[table.styleId];
     }
 
+    // Merge named style base definition into effective table style if needed
+    DocxTableStyle effectiveTableStyle = style;
+    if (namedStyle != null) {
+      effectiveTableStyle = style.copyWith(
+        borderTop: style.borderTop ?? namedStyle.borderTop,
+        borderBottom: style.borderBottom ??
+            namedStyle
+                .borderBottomSide, // Note: DocxStyle uses borderBottomSide for pPr/tblPr
+        borderLeft: style.borderLeft ?? namedStyle.borderLeft,
+        borderRight: style.borderRight ?? namedStyle.borderRight,
+        borderInsideH: style.borderInsideH ??
+            namedStyle.borderBetween, // Mapping between to InsideH
+        borderInsideV: style
+            .borderInsideV, // DocxStyle might not have InsideV explicitly mapped same way, need verification
+      );
+
+      // DocxStyle uses `borderBottom` sometimes too, check model.
+      // DocxStyle AST has: borderTop, borderBottomSide, borderLeft, borderRight, borderBetween, borderBottom
+      // We map DocxStyle.borderBetween -> borderInsideH usually for paragraphs, but for tables it helps to overlap.
+      // Actually, Table Styles in styles.xml usually use tblPr > tblBorders which map to top/left/bottom/right/insideH/insideV.
+      // The DocxStyle model has properties: borderTop, borderBottomSide, borderLeft, borderRight, borderBetween, borderBottom.
+      // It seems DocxStyle might need better mapping for tables if it was primarily built for Paragraphs.
+      // However, looking at DocxStyle definition, it has `borderTop`, `borderBottomSide`, etc.
+      // Let's assume standard mapping for now and refine if needed.
+      if (namedStyle.borderBetween != null &&
+          effectiveTableStyle.borderInsideH == null) {
+        effectiveTableStyle = effectiveTableStyle.copyWith(
+            borderInsideH: namedStyle.borderBetween);
+      }
+    }
+
     // Determine row-level conditions
     final isHeaderRow = rowIndex == 0 && table.hasHeader && look.firstRow;
     final isLastRow = rowIndex == totalRows - 1 && look.lastRow;
@@ -181,7 +212,7 @@ class TableBuilder {
           drawTop: false,
           drawBottom: isLastRowOfMerge,
           isEmpty: true,
-          tableStyle: style,
+          tableStyle: effectiveTableStyle, // Pass effective style
           tableLook: look,
           rowBackground: rowBackground,
           isHeaderRow: isHeaderRow,
@@ -238,7 +269,7 @@ class TableBuilder {
             drawTop: true,
             drawBottom: !hasVMerge,
             isEmpty: false,
-            tableStyle: style,
+            tableStyle: effectiveTableStyle, // Pass effective style
             tableLook: look,
             rowBackground: rowBackground,
             rowCondStyle: rowCondStyle,
@@ -264,12 +295,21 @@ class TableBuilder {
       }
     }
 
-    return IntrinsicHeight(
+    Widget rowWidget = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: cells,
       ),
     );
+
+    if (row.height != null) {
+      rowWidget = ConstrainedBox(
+        constraints: BoxConstraints(minHeight: row.height! * _twipsToPx),
+        child: rowWidget,
+      );
+    }
+
+    return rowWidget;
   }
 
   Widget _buildCell(
@@ -293,13 +333,31 @@ class TableBuilder {
     DocxStyle? colCondStyle,
   }) {
     // Helper to get side with proper merging of cell and table-level borders
-    BorderSide getSide(DocxBorderSide? cellSide, DocxBorderSide? tableSide,
-        {bool forceSkip = false}) {
+    BorderSide getSide(
+      DocxBorderSide? cellSide,
+      DocxBorderSide? tableSide, {
+      DocxBorderSide? rowSide,
+      DocxBorderSide? colSide,
+      bool forceSkip = false,
+      bool prioritizeCol = false,
+    }) {
       if (forceSkip) return BorderSide.none;
-      // Use cell border if available, otherwise fall back to table border
-      final effectiveSide = cellSide ?? tableSide;
 
-      // If no border defined at either level, return none
+      // Determine effective side based on precedence:
+      // Cell > Primary Conditional > Secondary Conditional > Table
+      DocxBorderSide? effectiveSide = cellSide;
+
+      if (effectiveSide == null) {
+        if (prioritizeCol) {
+          effectiveSide = colSide ?? rowSide;
+        } else {
+          effectiveSide = rowSide ?? colSide;
+        }
+      }
+
+      effectiveSide ??= tableSide;
+
+      // If no border defined at any level, return none
       if (effectiveSide == null) {
         return BorderSide.none;
       }
@@ -329,6 +387,9 @@ class TableBuilder {
       // Fall back to table's default border color
       borderColor ??= _resolveColor(tableStyle.borderColor, null, null, null);
 
+      // Final fallback: If color is still null (e.g. 'auto'), use Black for visible borders
+      borderColor ??= Colors.black;
+
       // Determine effective width
       double borderWidth;
       if (effectiveSide.size > 0) {
@@ -338,7 +399,7 @@ class TableBuilder {
       }
 
       return BorderSide(
-        color: borderColor ?? Colors.transparent,
+        color: borderColor,
         width: borderWidth,
         style: effectiveSide.style == DocxBorder.dotted ||
                 effectiveSide.style == DocxBorder.dashed
@@ -362,10 +423,32 @@ class TableBuilder {
         isLastColumnActual ? tableStyle.borderRight : tableStyle.borderInsideV;
 
     Border sideBorder = Border(
-      top: getSide(cell?.borderTop, topTableBorder),
-      bottom: getSide(cell?.borderBottom, bottomTableBorder),
-      left: getSide(cell?.borderLeft, leftTableBorder),
-      right: getSide(cell?.borderRight, rightTableBorder),
+      top: getSide(
+        cell?.borderTop,
+        topTableBorder,
+        rowSide: rowCondStyle?.borderTop,
+        colSide: colCondStyle?.borderTop,
+      ),
+      bottom: getSide(
+        cell?.borderBottom,
+        bottomTableBorder,
+        rowSide: rowCondStyle?.borderBottomSide,
+        colSide: colCondStyle?.borderBottomSide,
+      ),
+      left: getSide(
+        cell?.borderLeft,
+        leftTableBorder,
+        rowSide: rowCondStyle?.borderLeft,
+        colSide: colCondStyle?.borderLeft,
+        prioritizeCol: true,
+      ),
+      right: getSide(
+        cell?.borderRight,
+        rightTableBorder,
+        rowSide: rowCondStyle?.borderRight,
+        colSide: colCondStyle?.borderRight,
+        prioritizeCol: true,
+      ),
     );
 
     // Background: Cell shading takes priority, then row background
