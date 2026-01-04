@@ -220,24 +220,36 @@ class DocxList extends DocxBlock {
 class DocxListItem extends DocxNode {
   final List<DocxInline> children;
   final int level;
+  final DocxListStyle? overrideStyle;
 
-  const DocxListItem(this.children, {this.level = 0, super.id});
+  const DocxListItem(
+    this.children, {
+    this.level = 0,
+    this.overrideStyle,
+    super.id,
+  });
 
   factory DocxListItem.text(String text, {int level = 0}) {
     return DocxListItem([DocxText(text)], level: level);
   }
 
-  factory DocxListItem.rich(List<DocxInline> content, {int level = 0}) {
-    return DocxListItem(content, level: level);
+  factory DocxListItem.rich(
+    List<DocxInline> content, {
+    int level = 0,
+    DocxListStyle? overrideStyle,
+  }) {
+    return DocxListItem(content, level: level, overrideStyle: overrideStyle);
   }
 
   DocxListItem copyWith({
     List<DocxInline>? children,
     int? level,
+    DocxListStyle? overrideStyle,
   }) {
     return DocxListItem(
       children ?? this.children,
       level: level ?? this.level,
+      overrideStyle: overrideStyle ?? this.overrideStyle,
       id: id,
     );
   }

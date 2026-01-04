@@ -205,76 +205,92 @@ class BlockParser {
   /// Create a DocxList from collected list paragraphs.
   DocxList _createListFromParagraphs(
       List<DocxParagraph> paragraphs, int numId) {
-    final items = paragraphs
-        .map((p) => DocxListItem(
-              p.children,
-              level: p.ilvl ?? 0,
-            ))
-        .toList();
+    // Look up numbering definition once
+    final numberingDef = context.parsedNumberings[numId];
+
+    // Helper to resolve style for a given level
+    DocxListStyle resolveStyleForLevel(int level) {
+      if (numberingDef != null) {
+        final levelDef =
+            numberingDef.levels.where((l) => l.level == level).firstOrNull;
+
+        if (levelDef != null) {
+          DocxNumberFormat format = DocxNumberFormat.decimal;
+          switch (levelDef.numFmt) {
+            case 'bullet':
+              format = DocxNumberFormat.bullet;
+              break;
+            case 'lowerLetter':
+            case 'lowerAlpha':
+              format = DocxNumberFormat.lowerAlpha;
+              break;
+            case 'upperLetter':
+            case 'upperAlpha':
+              format = DocxNumberFormat.upperAlpha;
+              break;
+            case 'lowerRoman':
+              format = DocxNumberFormat.lowerRoman;
+              break;
+            case 'upperRoman':
+              format = DocxNumberFormat.upperRoman;
+              break;
+            default:
+              format = DocxNumberFormat.decimal;
+          }
+
+          return DocxListStyle(
+            imageBulletBytes: levelDef.picBulletImage,
+            bullet: levelDef.bulletChar ?? '•',
+            numberFormat: format,
+            indentPerLevel: levelDef.indentLeft ?? 720,
+            hangingIndent: levelDef.hanging ?? 360,
+            themeColor: levelDef.themeColor,
+            themeTint: levelDef.themeTint,
+            themeShade: levelDef.themeShade,
+            themeFont: levelDef.themeFont,
+            fontFamily: levelDef.bulletFont,
+          );
+        }
+      }
+      return const DocxListStyle();
+    }
+
+    // Determine base style from the first item (legacy behavior compat)
+    final firstLevel = paragraphs.first.ilvl ?? 0;
+    final baseStyle = resolveStyleForLevel(firstLevel);
+
+    final items = paragraphs.map((p) {
+      final level = p.ilvl ?? 0;
+
+      // If this item's level differs from the base, or if we want to be safe,
+      // we resolve its specific style.
+      // If it differs from the base list style, we set it as an override.
+      // For simplicity/correctness, if it's not the first item's level, or if it has image bullets,
+      // we attach the override.
+      DocxListStyle? override;
+      if (level != firstLevel) {
+        override = resolveStyleForLevel(level);
+      }
+
+      return DocxListItem(
+        p.children,
+        level: level,
+        overrideStyle: override,
+      );
+    }).toList();
 
     // Calculate start index for continuity
     int start = 1;
     if (_numIdItemCounts.containsKey(numId)) {
-      // If we've seen this numId before, continue from where we left off
       start = _numIdItemCounts[numId]! + 1;
     }
 
-    // Update the count for this numId
     _numIdItemCounts[numId] = (start - 1) + items.length;
-
-    // Determine list style (specifically image bullets)
-    DocxListStyle listStyle = const DocxListStyle();
-    final numberingDef = context.parsedNumberings[numId];
-    if (numberingDef != null) {
-      // Check the level of the first item to determine style
-      // Ideally we'd handle mixed styles, but DocxList takes one style
-      final firstLevel = paragraphs.first.ilvl ?? 0;
-      final levelDef =
-          numberingDef.levels.where((l) => l.level == firstLevel).firstOrNull;
-
-      if (levelDef != null) {
-        DocxNumberFormat format = DocxNumberFormat.decimal;
-        switch (levelDef.numFmt) {
-          case 'bullet':
-            format = DocxNumberFormat.bullet;
-            break;
-          case 'lowerLetter':
-          case 'lowerAlpha':
-            format = DocxNumberFormat.lowerAlpha;
-            break;
-          case 'upperLetter':
-          case 'upperAlpha':
-            format = DocxNumberFormat.upperAlpha;
-            break;
-          case 'lowerRoman':
-            format = DocxNumberFormat.lowerRoman;
-            break;
-          case 'upperRoman':
-            format = DocxNumberFormat.upperRoman;
-            break;
-          default:
-            format = DocxNumberFormat.decimal;
-        }
-
-        listStyle = DocxListStyle(
-          imageBulletBytes: levelDef.picBulletImage,
-          bullet: levelDef.bulletChar ?? '•',
-          numberFormat: format,
-          indentPerLevel: levelDef.indentLeft ?? 720,
-          hangingIndent: levelDef.hanging ?? 360,
-          themeColor: levelDef.themeColor,
-          themeTint: levelDef.themeTint,
-          themeShade: levelDef.themeShade,
-          themeFont: levelDef.themeFont,
-          fontFamily: levelDef.bulletFont,
-        );
-      }
-    }
 
     return DocxList(
       items: items,
       isOrdered: _isOrderedList(numId),
-      style: listStyle,
+      style: baseStyle,
       startIndex: start,
       numId: numId,
     );

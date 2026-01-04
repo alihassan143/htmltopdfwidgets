@@ -67,7 +67,8 @@ class ListBuilder {
     required int number,
   }) {
     final level = item.level.clamp(0, 8);
-    final style = list.style;
+    // Use override style if available, otherwise fall back to list style
+    final style = item.overrideStyle ?? list.style;
 
     // Calculate indent from list style or default
     final indentPerLevel =
@@ -128,7 +129,15 @@ class ListBuilder {
     } else {
       String markerText;
       if (list.isOrdered) {
-        markerText = _getOrderedMarker(number, level, style.numberFormat);
+        // For mixed ordered/unordered in one list, this is simplified.
+        // Ideally isOrdered should be per level too if complex.
+        // But typically the whole list block shares order type or splits.
+        // If overrideStyle provides numberFormat.bullet, we should treat as unordered bullet.
+        if (style.numberFormat == DocxNumberFormat.bullet) {
+          markerText = _getBulletMarker(level, style);
+        } else {
+          markerText = _getOrderedMarker(number, level, style.numberFormat);
+        }
       } else {
         markerText = _getBulletMarker(level, style);
       }
