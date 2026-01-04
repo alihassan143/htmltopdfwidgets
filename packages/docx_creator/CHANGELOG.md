@@ -1,3 +1,17 @@
+## 1.0.9
+
+### Fixed
+- **Table Border Fidelity**: Fixed critical issues with conditional table borders (first row, last row, first column, last column, banding) not being correctly applied or inherited.
+  - Resolved conflicts between cell-level borders, table-level borders, and named style borders.
+  - Ensures correct visual rendering of complex table styles like "Grid Table 4 - Accent 1".
+- **Table Color Resolution**: Fixed logic where 'auto' colors in tables were not correctly resolving to black/transparent based on context.
+- **Fallback Logic**: Improved fallback logic for table borders when specific side borders are undefined.
+
+### Improved
+- **High-Fidelity Round-Trip**: Enhanced the preservation of table style properties during read/write cycles.
+
+---
+
 ## 1.0.8
 
 ### Fixed

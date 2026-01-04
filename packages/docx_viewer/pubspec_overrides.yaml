@@ -1,5 +1,0 @@
-# melos_managed_dependency_overrides: docx_creator,meta
-dependency_overrides:
-  docx_creator:
-    path: ../docx_creator
-  meta: 1.17.0

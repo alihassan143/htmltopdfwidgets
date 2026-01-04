@@ -823,7 +823,13 @@ DocxTable(
 )
 ```
 
-The parser correctly interprets these properties, resolving shading and borders for every cell, preserving them during read/edit operations.
+The parser provides **High-Fidelity Resolution** for these properties. It correctly resolves complex conflicts between:
+- Cell-level borders/shading
+- Table-level borders/shading
+- Named Table Style definitions (including conditional formatting)
+- Document defaults
+
+This ensures that tables render exactly as they appear in Microsoft Word during read/edit operations, preserving all visual styling details.
 
 ---
 

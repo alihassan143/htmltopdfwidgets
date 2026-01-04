@@ -1,0 +1,23 @@
+name: docx_file_viewer_example
+description: Example app for docx_file_viewer package.
+
+publish_to: "none"
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  docx_file_viewer:
+    path: ../
+  file_picker: ^10.3.8
+dependency_overrides:
+  meta:
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

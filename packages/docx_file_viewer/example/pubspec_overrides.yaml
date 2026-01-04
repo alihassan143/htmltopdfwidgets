@@ -1,0 +1,6 @@
+dependency_overrides:
+  docx_creator:
+    path: ../../docx_creator
+  docx_file_viewer:
+    path: ../
+  meta: 1.17.0
