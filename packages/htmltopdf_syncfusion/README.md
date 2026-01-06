@@ -18,9 +18,9 @@ A robust Flutter package that simplifies the process of converting HTML and Mark
     -   Supports inline CSS (`style="..."`).
     -   Supports basic CSS classes and tag-based styling.
     -   Customizable font sizes, colors, and alignments.
--   **Images**: Render images from **Network** URLs and **Asset** paths.
+-   **Images**: Render images from **Network** URLs (with validation) and **Asset** paths.
 -   **Tables**: Render HTML tables with borders and background colors.
--   **Checkboxes**: Render `<input type="checkbox">` as visual elements.
+-   **Checkboxes**: Render `<input type="checkbox">` and Markdown task lists (`- [x]`) as visual elements.
 
 ## Installation
 
@@ -64,7 +64,34 @@ void main() async {
 }
 ```
 
-### 2. Advanced Usage (Add to existing PdfDocument)
+### 2. Markdown to PDF
+
+Convert Markdown text directly to PDF bytes.
+
+```dart
+import 'dart:io';
+import 'package:htmltopdf_syncfusion/htmltopdf_syncfusion.dart';
+
+void main() async {
+  const String markdownContent = '''
+# Hello, PDF!
+
+This is a paragraph with **bold** and *italic* text.
+
+## Lists
+- [x] Task 1
+- [ ] Task 2
+  - Nested item
+''';
+
+  final List<int> bytes = await HtmlToPdf().convertMarkdown(markdownContent);
+
+  final File file = File('output.pdf');
+  await file.writeAsBytes(bytes);
+}
+```
+
+### 3. Advanced Usage (Add to existing PdfDocument)
 
 Useful if you want to add pages or content to an existing Syncfusion `PdfDocument`.
 

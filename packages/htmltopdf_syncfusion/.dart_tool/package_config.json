@@ -81,9 +81,9 @@
     },
     {
       "name": "flutter_lints",
-      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/flutter_lints-3.0.2",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/flutter_lints-6.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.1"
+      "languageVersion": "3.8"
     },
     {
       "name": "flutter_test",
@@ -135,9 +135,9 @@
     },
     {
       "name": "lints",
-      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/lints-3.0.0",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/lints-6.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.8"
     },
     {
       "name": "markdown",
@@ -213,15 +213,15 @@
     },
     {
       "name": "syncfusion_flutter_core",
-      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/syncfusion_flutter_core-24.2.9",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/syncfusion_flutter_core-32.1.22",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.7"
     },
     {
       "name": "syncfusion_flutter_pdf",
-      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/syncfusion_flutter_pdf-24.2.9",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/syncfusion_flutter_pdf-32.1.22",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.7"
     },
     {
       "name": "term_glyph",

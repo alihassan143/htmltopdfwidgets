@@ -312,57 +312,178 @@ class CSSStyle {
     }
 
     // Handle named colors
-    switch (trimmed) {
-      case 'red':
-        return Colors.red;
-      case 'green':
-        return Colors.green;
-      case 'blue':
-        return Colors.blue;
-      case 'black':
-        return Colors.black;
-      case 'white':
-        return Colors.white;
-      case 'grey':
-      case 'gray':
-        return Colors.grey;
-      case 'yellow':
-        return Colors.yellow;
-      case 'cyan':
-        return Colors.cyan;
-      case 'magenta':
-      case 'purple':
-        return Colors.purple;
-      case 'orange':
-        return Colors.orange;
-      case 'pink':
-        return Colors.pink;
-      case 'brown':
-        return Colors.brown;
-      case 'lime':
-        return Colors.lime;
-      case 'teal':
-        return Colors.teal;
-      case 'indigo':
-        return Colors.indigo;
-      case 'navy':
-        return const Color(0xFF37474F); // BlueGrey800
-      case 'maroon':
-        return const Color(0xFFC62828); // Red800
-      case 'olive':
-        return const Color(0xFF9E9D24); // Lime800
-      case 'aqua':
-        return Colors.cyan;
-      case 'fuchsia':
-        return Colors.pink;
-      case 'silver':
-        return const Color(0xFFBDBDBD); // Grey400
-      case 'transparent':
-        return Colors.transparent;
-      default:
-        return null;
+    if (_cssColors.containsKey(trimmed)) {
+      final hex = _cssColors[trimmed]!;
+      return Color(int.parse('0xFF$hex'));
     }
+
+    // Fallback for special case 'transparent'
+    if (trimmed == 'transparent') {
+      return Colors.transparent;
+    }
+
+    return null;
   }
+
+  /// W3C CSS3 Extended Color Keywords (141 named colors).
+  static const _cssColors = <String, String>{
+    // Basic colors
+    'black': '000000',
+    'white': 'FFFFFF',
+    'red': 'FF0000',
+    'green': '008000',
+    'blue': '0000FF',
+    'yellow': 'FFFF00',
+    'cyan': '00FFFF',
+    'magenta': 'FF00FF',
+    'aqua': '00FFFF',
+    'fuchsia': 'FF00FF',
+    'lime': '00FF00',
+    'maroon': '800000',
+    'navy': '000080',
+    'olive': '808000',
+    'purple': '800080',
+    'silver': 'C0C0C0',
+    'teal': '008080',
+    // Gray variations
+    'gray': '808080',
+    'grey': '808080',
+    'darkgray': 'A9A9A9',
+    'darkgrey': 'A9A9A9',
+    'dimgray': '696969',
+    'dimgrey': '696969',
+    'lightgray': 'D3D3D3',
+    'lightgrey': 'D3D3D3',
+    'gainsboro': 'DCDCDC',
+    'slategray': '708090',
+    'slategrey': '708090',
+    'lightslategray': '778899',
+    'lightslategrey': '778899',
+    'darkslategray': '2F4F4F',
+    'darkslategrey': '2F4F4F',
+    // Reds
+    'indianred': 'CD5C5C',
+    'lightcoral': 'F08080',
+    'salmon': 'FA8072',
+    'darksalmon': 'E9967A',
+    'lightsalmon': 'FFA07A',
+    'crimson': 'DC143C',
+    'firebrick': 'B22222',
+    'darkred': '8B0000',
+    // Oranges
+    'coral': 'FF7F50',
+    'tomato': 'FF6347',
+    'orangered': 'FF4500',
+    'darkorange': 'FF8C00',
+    'orange': 'FFA500',
+    // Yellows
+    'gold': 'FFD700',
+    'lightyellow': 'FFFFE0',
+    'lemonchiffon': 'FFFACD',
+    'lightgoldenrodyellow': 'FAFAD2',
+    'papayawhip': 'FFEFD5',
+    'moccasin': 'FFE4B5',
+    'peachpuff': 'FFDAB9',
+    'palegoldenrod': 'EEE8AA',
+    'khaki': 'F0E68C',
+    'darkkhaki': 'BDB76B',
+    // Greens
+    'lawngreen': '7CFC00',
+    'chartreuse': '7FFF00',
+    'limegreen': '32CD32',
+    'forestgreen': '228B22',
+    'darkgreen': '006400',
+    'greenyellow': 'ADFF2F',
+    'yellowgreen': '9ACD32',
+    'springgreen': '00FF7F',
+    'mediumspringgreen': '00FA9A',
+    'lightgreen': '90EE90',
+    'palegreen': '98FB98',
+    'darkseagreen': '8FBC8F',
+    'mediumseagreen': '3CB371',
+    'seagreen': '2E8B57',
+    'olivedrab': '6B8E23',
+    'darkolivegreen': '556B2F',
+    // Blues
+    'lightcyan': 'E0FFFF',
+    'paleturquoise': 'AFEEEE',
+    'aquamarine': '7FFFD4',
+    'turquoise': '40E0D0',
+    'mediumturquoise': '48D1CC',
+    'darkturquoise': '00CED1',
+    'cadetblue': '5F9EA0',
+    'steelblue': '4682B4',
+    'lightsteelblue': 'B0C4DE',
+    'powderblue': 'B0E0E6',
+    'lightblue': 'ADD8E6',
+    'skyblue': '87CEEB',
+    'lightskyblue': '87CEFA',
+    'deepskyblue': '00BFFF',
+    'dodgerblue': '1E90FF',
+    'cornflowerblue': '6495ED',
+    'royalblue': '4169E1',
+    'mediumblue': '0000CD',
+    'darkblue': '00008B',
+    'midnightblue': '191970',
+    // Purples
+    'lavender': 'E6E6FA',
+    'thistle': 'D8BFD8',
+    'plum': 'DDA0DD',
+    'violet': 'EE82EE',
+    'orchid': 'DA70D6',
+    'mediumorchid': 'BA55D3',
+    'mediumpurple': '9370DB',
+    'rebeccapurple': '663399',
+    'blueviolet': '8A2BE2',
+    'darkviolet': '9400D3',
+    'darkorchid': '9932CC',
+    'darkmagenta': '8B008B',
+    'indigo': '4B0082',
+    'slateblue': '6A5ACD',
+    'darkslateblue': '483D8B',
+    'mediumslateblue': '7B68EE',
+    // Pinks
+    'pink': 'FFC0CB',
+    'lightpink': 'FFB6C1',
+    'hotpink': 'FF69B4',
+    'deeppink': 'FF1493',
+    'mediumvioletred': 'C71585',
+    'palevioletred': 'DB7093',
+    // Browns
+    'cornsilk': 'FFF8DC',
+    'blanchedalmond': 'FFEBCD',
+    'bisque': 'FFE4C4',
+    'navajowhite': 'FFDEAD',
+    'wheat': 'F5DEB3',
+    'burlywood': 'DEB887',
+    'tan': 'D2B48C',
+    'rosybrown': 'BC8F8F',
+    'sandybrown': 'F4A460',
+    'goldenrod': 'DAA520',
+    'darkgoldenrod': 'B8860B',
+    'peru': 'CD853F',
+    'chocolate': 'D2691E',
+    'saddlebrown': '8B4513',
+    'sienna': 'A0522D',
+    'brown': 'A52A2A',
+    // Whites
+    'snow': 'FFFAFA',
+    'honeydew': 'F0FFF0',
+    'mintcream': 'F5FFFA',
+    'azure': 'F0FFFF',
+    'aliceblue': 'F0F8FF',
+    'ghostwhite': 'F8F8FF',
+    'whitesmoke': 'F5F5F5',
+    'seashell': 'FFF5EE',
+    'beige': 'F5F5DC',
+    'oldlace': 'FDF5E6',
+    'floralwhite': 'FFFAF0',
+    'ivory': 'FFFFF0',
+    'antiquewhite': 'FAEBD7',
+    'linen': 'FAF0E6',
+    'lavenderblush': 'FFF0F5',
+    'mistyrose': 'FFE4E1',
+  };
 
   static double? _parseLength(String value) {
     if (value.endsWith('px')) {

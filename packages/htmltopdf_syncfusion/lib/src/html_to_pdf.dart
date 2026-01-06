@@ -8,6 +8,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'htmltagstyles.dart';
 import 'parser/css_style.dart';
 import 'parser/html_parser.dart';
+import 'parser/markdown_parser.dart';
 import 'pdf_builder.dart';
 
 export 'htmltagstyles.dart';
@@ -39,6 +40,46 @@ class HtmlToPdf {
             ));
 
     final root = parser.parse();
+
+    final document = targetDocument ?? PdfDocument();
+    final builder =
+        PdfBuilder(root: root, document: document, tagStyle: tagStyle);
+
+    await builder.build();
+
+    final List<int> bytes = await document.save();
+
+    // Dispose only if we created it
+    if (targetDocument == null) {
+      document.dispose();
+    }
+
+    return Uint8List.fromList(bytes);
+  }
+
+  /// Converts the given [markdown] string into PDF elements and adds them to [document].
+  ///
+  /// [markdown] The Markdown string to convert.
+  /// [targetDocument] Optional Syncfusion [PdfDocument] to add the content to.
+  /// [tagStyle] Optional custom styles for tags.
+  /// [baseStyle] Optional base style for the document.
+  Future<Uint8List> convertMarkdown(
+    String markdown, {
+    PdfDocument? targetDocument,
+    HtmlTagStyle tagStyle = const HtmlTagStyle(),
+    CSSStyle? baseStyle,
+  }) async {
+    final parser = MarkdownParser(
+        baseStyle: baseStyle ??
+            const CSSStyle(
+              fontSize: 12.0,
+              fontFamily: 'Helvetica',
+              fontWeight: FontWeight.normal,
+              fontStyle: FontStyle.normal,
+              textDecoration: TextDecoration.none,
+            ));
+
+    final root = parser.parse(markdown);
 
     final document = targetDocument ?? PdfDocument();
     final builder =

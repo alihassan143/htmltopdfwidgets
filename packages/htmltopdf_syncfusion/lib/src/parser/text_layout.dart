@@ -93,9 +93,17 @@ class TextLayout {
       // RegExp exp = RegExp(r"([^\s]+)|(\s+)");
       // Unused
 
-      final words = span.text.split(' ');
+      // Pre-process text to handle newlines
+      // Split by spaces but preserve newlines?
+      // Simpler: Replace \n with a special placeholder or handle it in the loop
+      // If we blindly split by ' ', \n might lay inside.
+      // Let's replace \n with " \n " so it becomes a separate token when splitting by space?
+      // No, split(' ') on "A\nB" -> "A\nB".
+      // Let's replace \n with " \n " first.
+      final treatedText = span.text.replaceAll('\n', ' \n ');
+      final words = treatedText.split(' ');
+
       double spaceWidth = _measureText(' ', span.font);
-      // Ensure spaceWidth is reasonable (fallback if 0)
       if (spaceWidth <= 0.001) {
         spaceWidth = span.font.size * 0.25;
       }
@@ -104,20 +112,26 @@ class TextLayout {
         final word = words[i];
 
         if (word.isEmpty) {
-          // This happens if we have multiple spaces "  ". split gives empty strings.
-          // Just add space width for it?
-          if (i < words.length - 1) {
-            currentLineWidth += spaceWidth;
-          }
+          // Double space case
+          if (i < words.length - 1) currentLineWidth += spaceWidth;
+          continue;
+        }
+
+        if (word == '\n') {
+          // Force line break
+          lines.add(_createLine(currentLineSpans, maxAscent, maxLineHeight));
+          currentLineSpans = [];
+          currentLineWidth = 0.0;
+          maxLineHeight = 0.0;
+          maxAscent = 0.0;
           continue;
         }
 
         double wordWidth = _measureText(word, span.font);
         double wordHeight = span.font.height;
 
-        // Wrap if needed
+        // Wrap if needed (normal wrapping)
         if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
-          // New Line
           lines.add(_createLine(currentLineSpans, maxAscent, maxLineHeight));
           currentLineSpans = [];
           currentLineWidth = 0;
@@ -125,19 +139,15 @@ class TextLayout {
           maxAscent = 0;
         }
 
-        // Update line metrics
-        // PdfFont in Syncfusion doesn't expose ascender directly in public API easily?
-        // Use height for now.
         if (span.font.size > maxAscent) maxAscent = span.font.size;
 
-        // Add to line
         PositionedSpan posSpan = PositionedSpan(
           text: word,
           style: span.style,
           font: span.font,
           format: span.format,
           x: currentLineWidth,
-          y: 0, // Will settle later relative to baseline
+          y: 0,
           width: wordWidth,
           height: wordHeight,
         );
@@ -147,16 +157,8 @@ class TextLayout {
 
         if (wordHeight > maxLineHeight) maxLineHeight = wordHeight;
 
-        // Add space after word if it's not the last word logic
-        // actually split(' ') "A B" -> ["A", "B"].
-        // i=0 "A". Add space after? Yes.
-        // i=1 "B". Last. No space after?
-        // What if text was "A B "? ["A", "B", ""].
-        // i=1 "B". i < len-1 (2<3). Add space.
-        // i=2 "". word is empty. loop continues.
-        // Correct.
-
-        if (i < words.length - 1) {
+        if (i < words.length - 1 && words[i + 1] != '\n') {
+          // Add space only if next token is not a newline
           currentLineWidth += spaceWidth;
         }
       }

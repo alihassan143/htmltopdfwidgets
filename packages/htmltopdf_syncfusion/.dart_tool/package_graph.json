@@ -5,7 +5,7 @@
   "packages": [
     {
       "name": "htmltopdf_syncfusion",
-      "version": "0.0.6",
+      "version": "0.1.0",
       "dependencies": [
         "bidi",
         "csslib",
@@ -23,7 +23,7 @@
     },
     {
       "name": "flutter_lints",
-      "version": "3.0.2",
+      "version": "6.0.0",
       "dependencies": [
         "lints"
       ]
@@ -94,11 +94,12 @@
     },
     {
       "name": "syncfusion_flutter_pdf",
-      "version": "24.2.9",
+      "version": "32.1.22",
       "dependencies": [
         "convert",
         "crypto",
         "flutter",
+        "http",
         "intl",
         "syncfusion_flutter_core",
         "xml"
@@ -118,7 +119,7 @@
     },
     {
       "name": "lints",
-      "version": "3.0.0",
+      "version": "6.0.0",
       "dependencies": []
     },
     {
@@ -253,10 +254,29 @@
       ]
     },
     {
-      "name": "convert",
-      "version": "3.1.2",
+      "name": "xml",
+      "version": "6.6.1",
       "dependencies": [
-        "typed_data"
+        "collection",
+        "meta",
+        "petitparser"
+      ]
+    },
+    {
+      "name": "syncfusion_flutter_core",
+      "version": "32.1.22",
+      "dependencies": [
+        "flutter",
+        "vector_math"
+      ]
+    },
+    {
+      "name": "intl",
+      "version": "0.19.0",
+      "dependencies": [
+        "clock",
+        "meta",
+        "path"
       ]
     },
     {
@@ -267,29 +287,10 @@
       ]
     },
     {
-      "name": "syncfusion_flutter_core",
-      "version": "24.2.9",
+      "name": "convert",
+      "version": "3.1.2",
       "dependencies": [
-        "flutter",
-        "vector_math"
-      ]
-    },
-    {
-      "name": "xml",
-      "version": "6.6.1",
-      "dependencies": [
-        "collection",
-        "meta",
-        "petitparser"
-      ]
-    },
-    {
-      "name": "intl",
-      "version": "0.19.0",
-      "dependencies": [
-        "clock",
-        "meta",
-        "path"
+        "typed_data"
       ]
     },
     {

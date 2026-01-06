@@ -118,8 +118,16 @@ class PdfBuilder {
   }
 
   Future<void> _drawNode(RenderNode node,
-      {String? listType, int? listIndex}) async {
+      {String? listType, int? listIndex, double parentX = 0}) async {
     if (node.display == Display.none) return;
+
+    // Calculate current content offset
+    double currentX = parentX;
+    final margin = node.style.margin;
+    if (margin != null) currentX += margin.left;
+    final padding = node.style.padding;
+    double contentX = currentX;
+    if (padding != null) contentX += padding.left;
 
     // Detect Block vs Inline
     bool isBlock = node.display == Display.block ||
@@ -132,23 +140,31 @@ class PdfBuilder {
         node.tagName == 'blockquote' ||
         node.tagName == 'body';
 
+    // Check for checkbox child to suppress marker
+    bool hasCheckbox =
+        node.children.isNotEmpty && node.children.first.tagName == 'checkbox';
+
     // Draw List Marker if this is an LI
-    if (node.tagName == 'li' && listType != null) {
+    if (node.tagName == 'li' && listType != null && !hasCheckbox) {
       String marker = '';
       if (listType == 'ul') {
-        marker = '•';
+        marker =
+            '-'; // Unicode bullet \u2022 fails in some contexts, hyphen is safer
       } else if (listType == 'ol' && listIndex != null) {
         marker = '$listIndex.';
       }
 
       if (marker.isNotEmpty) {
         final font = await _resolveFont(node.style);
-        double x = 0;
-        final margin = node.style.margin;
-        if (margin != null) x += margin.left;
 
-        // Indent for marker (rough approximation)
-        x += 10;
+        // Marker Indent: relative to currentX (which includes margin)
+        // We want to draw it slightly into the margin area.
+        // If margin was 20, currentX is parentX + 20.
+        // We want marker at parentX + 5.
+        // So (currentX - 15).
+
+        // Ensure we don't go below parentX (or 0)
+        double markerX = currentX >= 15 ? currentX - 15 : currentX;
 
         double y = _currentY;
         if (margin != null) y += margin.top;
@@ -156,17 +172,22 @@ class PdfBuilder {
         PdfPage page = _currentPage;
         page.graphics.drawString(marker, font,
             brush: PdfSolidBrush(PdfColor(0, 0, 0)),
-            bounds: Rect.fromLTWH(x, y, 20, 0));
+            bounds: Rect.fromLTWH(markerX, y, 20, 0));
       }
     }
 
     if (node.tagName == 'img') {
-      await _drawImage(node);
+      await _drawImage(node, parentX: parentX);
+      return;
+    }
+
+    if (node.tagName == 'checkbox') {
+      await _drawCheckbox(node, parentX: parentX);
       return;
     }
 
     if (node.tagName == 'table') {
-      await _drawTable(node);
+      await _drawTable(node, parentX: parentX);
       return;
     }
 
@@ -183,7 +204,9 @@ class PdfBuilder {
 
       if (!hasBlockChildren) {
         // Leaf Block: Layout text and draw
-        await _drawLeafBlock(node);
+        await _drawLeafBlock(node,
+            parentX:
+                currentX); // Use currentX (with margin, logic inside handles padding)
       } else {
         // Determine list context for children
         String? nextListType = listType;
@@ -206,47 +229,68 @@ class PdfBuilder {
             childIndex = nextListIndex;
           }
 
-          await _drawNode(child, listType: nextListType, listIndex: childIndex);
+          await _drawNode(child,
+              listType: nextListType,
+              listIndex: childIndex,
+              parentX: contentX); // Pass contentX as parentX for children
         }
       }
     } else {
       if (node.tagName == '#text') {
-        await _drawLeafBlock(RenderNode(
-            tagName: 'span', style: node.style, text: node.text, children: []));
+        // Should use parent contentX?
+        // Inline nodes usually flow inside block.
+        // _drawLeafBlock handles flow.
+        // But if we call _drawLeafBlock for individual text, it assumes block-like behavior?
+        // Wait, inline #text usually handled by parent block unless top level.
+        // If parent called us, we are inside a block probably.
+        // But if node is #text directly (child of block), we shouldn't create new block?
+        // The parser groups text into blocks usually.
+        // If we found #text here, it might be stray text?
+        // Creating spans...
+
+        await _drawLeafBlock(
+            RenderNode(
+                tagName: 'span',
+                style: node.style,
+                text: node.text,
+                children: []),
+            parentX: parentX); // Just pass parentX if inline
       } else {
         for (var child in node.children) {
-          await _drawNode(child);
+          await _drawNode(child, parentX: parentX);
         }
       }
     }
   }
 
-  Future<void> _drawLeafBlock(RenderNode node) async {
+  Future<void> _drawLeafBlock(RenderNode node, {double parentX = 0}) async {
     // 1. Flatten children to Spans (with font fallback)
     List<LayoutSpan> spans = [];
     await _collectSpansWithFallback(node, spans);
 
     if (spans.isEmpty) {
-      // Even if empty, we might need to draw background/borders (e.g. empty div)
-      // For now, continue if we have style??
-      // If purely empty text, return.
-      // But if it has dimensions...
       if (node.style.height == null && node.style.padding == null) return;
     }
 
     // 2. Perform Layout
-    double indent = 0;
+    // Global X for block start
+    double globalX = parentX;
 
     // Null safety access
     final padding = node.style.padding;
     final margin = node.style.margin;
 
-    if (padding != null) indent += padding.left;
-    if (margin != null) indent += margin.left;
+    if (margin != null) globalX += margin.left;
 
-    double maxWidth = _pageWidth - indent;
-    if (padding != null) maxWidth -= padding.right;
+    // Width calculation
+    // Max width is Page Width - globalX - right margins
+    double maxWidth = _pageWidth - globalX;
+
     if (margin != null) maxWidth -= margin.right;
+    if (padding != null) maxWidth -= padding.right;
+
+    // Remove padding left from maxWidth available for TEXT (since indent is added to text start)
+    if (padding != null) maxWidth -= padding.left;
 
     LayoutResult layout =
         TextLayout.performLayout(spans: spans, maxWidth: maxWidth);
@@ -260,8 +304,7 @@ class PdfBuilder {
     PdfPage currentPage = _currentPage;
     double currentY = startY;
 
-    double globalX = 0;
-    if (margin != null) globalX += margin.left;
+    // ...
 
     // Pagination Split Calculation
     List<List<LayoutLine>> pagesOfLines = [];
@@ -394,12 +437,33 @@ class PdfBuilder {
   }
 
   /// Collect spans with character-level font fallback
+  /// Collect spans with character-level font fallback
   Future<void> _collectSpansWithFallback(
-      RenderNode node, List<LayoutSpan> spans) async {
+      RenderNode node, List<LayoutSpan> spans,
+      {CSSStyle? parentStyle}) async {
+    // Inherit styles from parent if available
+    CSSStyle effectiveStyle = node.style;
+    if (parentStyle != null) {
+      effectiveStyle = node.style.inheritFrom(parentStyle);
+    }
+
+    // Handle br tag specifically
+    if (node.tagName == 'br') {
+      final baseFont = await _resolveFont(effectiveStyle);
+      spans.add(LayoutSpan(text: '\n', style: effectiveStyle, font: baseFont));
+      return;
+    }
+
     if (node.text != null && node.text!.isNotEmpty) {
       final text = node.text!;
-      final baseFont = await _resolveFont(node.style);
-      final fontSize = node.style.fontSize ?? 12;
+      final baseFont = await _resolveFont(effectiveStyle);
+      final fontSize = effectiveStyle.fontSize ?? 12;
+
+      // Handle checkbox specially if text is [ ] or [x] and tag is checkbox
+      if (node.tagName == 'checkbox') {
+        // We can use a specific font symbol if available, or just text.
+        // For now, text is fine as parser sets it to [ ] or [x].
+      }
 
       // Split text into segments by character type
       List<_TextSegment> segments = _segmentTextByCharType(text);
@@ -411,10 +475,8 @@ class PdfBuilder {
         switch (segment.type) {
           case _CharType.arabic:
             font = _getFallbackFont(_notoArabicFontData, fontSize) ?? baseFont;
-            // Reshape Arabic text to fix disjointed characters
             try {
               if (spanText.trim().isNotEmpty) {
-                // TODO: Fix Arabic reshaping API. 'Arabic' class found but method unknown.
                 // spanText = Arabic.convert(spanText);
               }
             } catch (e) {
@@ -425,13 +487,11 @@ class PdfBuilder {
             font = _getFallbackFont(_notoCJKFontData, fontSize) ?? baseFont;
             break;
           case _CharType.emoji:
-            // Use Noto Emoji font for emoji characters
             font = _getFallbackFont(_notoEmojiFontData, fontSize) ??
                 _getFallbackFont(_notoSansFontData, fontSize) ??
                 baseFont;
             break;
           case _CharType.extended:
-            // Extended Latin, Cyrillic, etc.
             font = _getFallbackFont(_notoSansFontData, fontSize) ?? baseFont;
             break;
           case _CharType.standard:
@@ -440,7 +500,7 @@ class PdfBuilder {
 
         PdfStringFormat? format;
         if (segment.type == _CharType.arabic ||
-            node.style.textDirection == TextDirection.rtl) {
+            effectiveStyle.textDirection == TextDirection.rtl) {
           format = PdfStringFormat(
             textDirection: PdfTextDirection.rightToLeft,
             alignment: PdfTextAlignment.right,
@@ -450,7 +510,7 @@ class PdfBuilder {
 
         spans.add(LayoutSpan(
           text: spanText,
-          style: node.style,
+          style: effectiveStyle,
           font: font,
           format: format,
         ));
@@ -458,8 +518,122 @@ class PdfBuilder {
     }
 
     for (var child in node.children) {
-      await _collectSpansWithFallback(child, spans);
+      await _collectSpansWithFallback(child, spans,
+          parentStyle: effectiveStyle);
     }
+  }
+
+  Future<void> _drawTable(RenderNode node, {double parentX = 0}) async {
+    // ... Simplified Table implementation using PdfGrid
+    final grid = PdfGrid();
+
+    // Define columns based on max cells in a row (simplified)
+    // We need to parse structure properly.
+
+    // Find rows
+    List<RenderNode> rows = [];
+    if (node.tagName == 'table') {
+      for (var child in node.children) {
+        if (child.tagName == 'thead' || child.tagName == 'tbody') {
+          rows.addAll(child.children.where((c) => c.tagName == 'tr'));
+        } else if (child.tagName == 'tr') {
+          rows.add(child);
+        }
+      }
+    }
+
+    if (rows.isEmpty) return;
+
+    // Determine columns
+    int maxCols = 0;
+    for (var row in rows) {
+      int currentCols = 0;
+      for (var cell in row.children) {
+        if (cell.tagName == 'td' || cell.tagName == 'th') {
+          int colspan = int.tryParse(cell.attributes['colspan'] ?? '1') ?? 1;
+          currentCols += colspan;
+        }
+      }
+      if (currentCols > maxCols) maxCols = currentCols;
+    }
+
+    grid.columns.add(count: maxCols);
+
+    // Add rows and cells
+    for (var rowNode in rows) {
+      final pdfRow = grid.rows.add();
+      int colIndex = 0;
+
+      for (var cellNode in rowNode.children) {
+        if (cellNode.tagName != 'td' && cellNode.tagName != 'th') continue;
+
+        if (colIndex >= maxCols) break;
+
+        final pdfCell = pdfRow.cells[colIndex];
+
+        // Set colspan/rowspan
+        int colspan = int.tryParse(cellNode.attributes['colspan'] ?? '1') ?? 1;
+        int rowspan = int.tryParse(cellNode.attributes['rowspan'] ?? '1') ?? 1;
+
+        if (colspan > 1) pdfCell.columnSpan = colspan;
+        if (rowspan > 1) pdfCell.rowSpan = rowspan;
+
+        // Content
+        // Complex content in cell? PdfGridCell supports text or PdfGrid (nested).
+        // For rich text, we might need a custom renderer inside the cell or just plain text if simple.
+        // Syncfusion PdfGridCell has `value` which can be String or PdfGrid.
+        // But we have formatted text.
+        // We can set `pdfCell.value = PdfTextElement(...)`? No.
+        // We can use `pdfCell.graphics`? No, PdfGrid handles drawing.
+        // If we have complex content, we might have to use nested tables or text extraction.
+        // For now, let's extract text but try to preserve basic styling (bg color).
+        // A better approach for rich text in cells involves `PdfGridCell.style.cellPadding` and drawing manually using `BeginCellLayout` event, which is complex.
+        // Given the constraints, we will convert cell content to plain text but respect cell styles.
+
+        pdfCell.value = _extractText(cellNode);
+
+        // Styles
+        final bgColor =
+            cellNode.style.backgroundColor ?? node.style.backgroundColor;
+        if (bgColor != null) {
+          pdfCell.style.backgroundBrush = PdfSolidBrush(_resolveColor(bgColor));
+        }
+
+        // Borders
+        // Syncfusion PdfGrid handles borders via PdfBorders.
+        // We can map CSS borders to PdfBorders.
+        // Currently simplified to general grid style or cell style.
+        final border = cellNode.style.border;
+        if (border != null) {
+          // Map border
+          // pdfCell.style.borders = ...
+        }
+
+        // Padding
+        // pdfCell.style.cellPadding = ...
+
+        colIndex += colspan;
+      }
+    }
+
+    // Apply table-wide border if present
+    final tableBorder = node.style.border;
+    if (tableBorder != null && tableBorder.top.width > 0) {
+      grid.style.borderOverlapStyle = PdfBorderOverlapStyle.overlap;
+      // grid.style.borders = ...
+    }
+
+    PdfPage? page = _lastResult?.page ?? document.pages[0];
+    double y = _lastResult?.bounds.bottom ?? 0;
+
+    // Incorporate parentX
+    double x = parentX;
+    if (node.style.margin != null) x += node.style.margin!.left;
+
+    // Draw
+    _lastResult = grid.draw(
+        page: page,
+        bounds: Rect.fromLTWH(x, y + (node.style.margin?.top ?? 0), 0, 0));
   }
 
   /// Get a fallback font with the correct size
@@ -580,95 +754,122 @@ class PdfBuilder {
         (codePoint >= 0xAC00 && codePoint <= 0xD7AF); // Korean Hangul
   }
 
-  Future<void> _drawImage(RenderNode node) async {
+  Future<void> _drawCheckbox(RenderNode node, {double parentX = 0}) async {
+    final page = _lastResult?.page ?? document.pages[0];
+    double y = _lastResult?.bounds.bottom ?? 0;
+
+    final margin = node.style.margin;
+    if (margin != null) y += margin.top;
+
+    double x = parentX;
+    if (margin != null) x += margin.left;
+
+    final width = node.style.width ?? 15.0; // Default size
+    final height = node.style.height ?? 15.0;
+
+    final isChecked = node.attributes['checked'] == 'true';
+    final name = 'Checkbox_${DateTime.now().microsecondsSinceEpoch}';
+
+    final checkbox = PdfCheckBoxField(
+      page,
+      name,
+      Rect.fromLTWH(x, y, width, height),
+      isChecked: isChecked,
+      style: PdfCheckBoxStyle.cross,
+      borderWidth: 1,
+      borderColor: PdfColor(0, 0, 0),
+    );
+
+    document.form.fields.add(checkbox);
+
+    var element = PdfTextElement(
+      text: " ",
+      font: PdfStandardFont(PdfFontFamily.helvetica, 1),
+    );
+
+    _lastResult = element.draw(
+        page: page,
+        bounds: Rect.fromLTWH(x, y + height + (margin?.bottom ?? 0), 0, 0));
+  }
+
+  Future<void> _drawImage(RenderNode node, {double parentX = 0}) async {
     final src = node.attributes['src'];
     if (src == null) return;
 
     Uint8List? imageBytes;
 
-    if (src.startsWith('http')) {
-      final response = await http.get(Uri.parse(src));
-      if (response.statusCode == 200) {
-        imageBytes = response.bodyBytes;
-      }
-    } else if (src.startsWith('assets/')) {
-      try {
+    try {
+      if (src.startsWith('http')) {
+        final response = await http.get(Uri.parse(src));
+        if (response.statusCode == 200) {
+          final contentType = response.headers['content-type'];
+          if (contentType != null && contentType.startsWith('image/')) {
+            imageBytes = response.bodyBytes;
+          } else {
+            debugPrint(
+                'Skipping image with non-image content-type: $contentType for url: $src');
+          }
+        } else {
+          debugPrint(
+              'Failed to load image, status code: ${response.statusCode} for url: $src');
+        }
+      } else if (src.startsWith('assets/')) {
         final data = await rootBundle.load(src);
         imageBytes = data.buffer.asUint8List();
-      } catch (e) {
-        debugPrint('Error loading asset: $e');
       }
+    } catch (e) {
+      debugPrint('Error loading image source: $e');
     }
 
-    if (imageBytes != null) {
-      final bitmap = PdfBitmap(imageBytes);
-      double width = node.style.width ?? bitmap.width.toDouble();
-      double height = node.style.height ?? bitmap.height.toDouble();
-
-      PdfPage? page = _lastResult?.page ?? document.pages[0];
-      double y = _lastResult?.bounds.bottom ?? 0;
-
-      _lastResult =
-          bitmap.draw(page: page, bounds: Rect.fromLTWH(0, y, width, height));
-    }
-  }
-
-  Future<void> _drawTable(RenderNode node) async {
-    final grid = PdfGrid();
-
-    List<RenderNode> trs = [];
-    void findTrs(RenderNode n) {
-      if (n.tagName == 'tr') {
-        trs.add(n);
-      } else {
-        n.children.forEach(findTrs);
-      }
-    }
-
-    findTrs(node);
-
-    if (trs.isEmpty) return;
-
-    int maxCols = 0;
-    for (var tr in trs) {
-      int cols = tr.children
-          .where((c) => c.tagName == 'td' || c.tagName == 'th')
-          .length;
-      if (cols > maxCols) {
-        maxCols = cols;
-      }
-    }
-
-    grid.columns.add(count: maxCols);
-
-    for (var tr in trs) {
-      final row = grid.rows.add();
-      int colIndex = 0;
-      for (var child in tr.children) {
-        if (child.tagName == 'td' || child.tagName == 'th') {
-          if (colIndex >= maxCols) {
-            break;
-          }
-
-          row.cells[colIndex].value = child.text ?? _extractText(child);
-
-          if (child.style.backgroundColor != null) {
-            row.cells[colIndex].style.backgroundBrush =
-                PdfSolidBrush(_resolveColor(child.style.backgroundColor!));
-          } else if (node.style.backgroundColor != null) {
-            row.cells[colIndex].style.backgroundBrush =
-                PdfSolidBrush(_resolveColor(node.style.backgroundColor!));
-          }
-
-          colIndex++;
-        }
-      }
-    }
-
-    PdfPage? page = _lastResult?.page ?? document.pages[0];
+    final page = _lastResult?.page ?? document.pages[0];
     double y = _lastResult?.bounds.bottom ?? 0;
 
-    _lastResult = grid.draw(page: page, bounds: Rect.fromLTWH(0, y, 0, 0));
+    final margin = node.style.margin;
+    if (margin != null) y += margin.top;
+
+    double x = parentX;
+    if (margin != null) x += margin.left;
+
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      try {
+        final bitmap = PdfBitmap(imageBytes);
+        double width = node.style.width ?? bitmap.width.toDouble();
+        double height = node.style.height ?? bitmap.height.toDouble();
+
+        // Ensure it fits within page width
+        // maxWidth = _pageWidth - x - (margin?.right ?? 0)
+
+        // Draw Image
+        page.graphics.drawImage(bitmap, Rect.fromLTWH(x, y, width, height));
+
+        // Adance Y by height
+        // To sync _lastResult, draw dummy
+        var element = PdfTextElement(
+          text: " ",
+          font: PdfStandardFont(PdfFontFamily.helvetica, 1),
+        );
+        _lastResult = element.draw(
+            page: page,
+            bounds: Rect.fromLTWH(x, y + height + (margin?.bottom ?? 0), 0, 0));
+      } catch (e) {
+        debugPrint('Error creating/drawing PdfBitmap: $e');
+        // Optionally draw a placeholder or error text
+        page.graphics.drawString(
+            "Image Error",
+            PdfStandardFont(PdfFontFamily.helvetica, 8,
+                style: PdfFontStyle.italic),
+            brush: PdfBrushes.red,
+            bounds: Rect.fromLTWH(x, y, 100, 15));
+
+        // Advance cursor slightly so it's not overlapping
+        var element = PdfTextElement(text: " ");
+        _lastResult =
+            element.draw(page: page, bounds: Rect.fromLTWH(x, y + 20, 0, 0));
+      }
+    } else {
+      // Failed to load, maybe draw placeholder or nothing?
+      // Just return for now to avoid crash
+    }
   }
 
   String _extractText(RenderNode node) {

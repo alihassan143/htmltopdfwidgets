@@ -1,3 +1,10 @@
+## 0.1.0
+*   **Feature**: Added Markdown to PDF conversion support (`HtmlToPdf.convertMarkdown`).
+*   **Feature**: Added Checkbox support in lists (`[ ]`, `[x]`).
+*   **Fix**: Improved robustness of image loading (checking `Content-Type` to avoid crashes on non-image URLs).
+*   **Fix**: Fixed nested list indentation and switched to safer bullet markers.
+*   **Fix**: Implemented style inheritance for correct header rendering (font sizes/weights).
+
 ## 0.0.6
 
 *   **Fixed**: Resolved OIDC authentication for automated publishing by injecting Dart credentials.

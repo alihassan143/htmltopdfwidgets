@@ -11,10 +11,10 @@ dependencies:
     sdk: flutter
   htmltopdf_syncfusion:
     path: ../
-  syncfusion_flutter_pdf: ^24.1.41
-  path_provider: ^2.1.1
-  open_file: ^3.3.2
-  syncfusion_flutter_pdfviewer: ^24.2.9
+  syncfusion_flutter_pdf: ^32.1.22
+  path_provider: ^2.1.5
+  open_file: ^3.5.10
+  syncfusion_flutter_pdfviewer: ^32.1.22
 
 dev_dependencies:
   flutter_test:
