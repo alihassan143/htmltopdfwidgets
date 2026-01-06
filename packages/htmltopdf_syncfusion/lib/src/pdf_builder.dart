@@ -27,8 +27,8 @@ class PdfBuilder {
   Uint8List? _notoEmojiFontData;
   bool _fontsLoaded = false;
 
-  get _currentPage => _lastResult?.page ?? document.pages[0];
-  get _currentY => _lastResult?.bounds.bottom ?? 0;
+  PdfPage get _currentPage => _lastResult?.page ?? document.pages[0];
+  double get _currentY => _lastResult?.bounds.bottom ?? 0;
 
   PdfBuilder({
     required this.root,
