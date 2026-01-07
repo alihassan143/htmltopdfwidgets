@@ -115,7 +115,7 @@ void main() {
         effectiveColor = span.style?.color;
       }
 
-      print('Effective Color Found: $effectiveColor');
+      debugPrint('Effective Color Found: $effectiveColor');
       // Should stay red
       expect(effectiveColor, const Color(0xFFFF0000));
     });
