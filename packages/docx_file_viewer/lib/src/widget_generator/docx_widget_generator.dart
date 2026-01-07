@@ -164,26 +164,31 @@ class DocxWidgetGenerator {
     return widgets;
   }
 
-  /// Generate widgets grouped into Pages.
+  /// Generate widgets grouped into Pages with content-aware pagination.
   List<Widget> _generatePagedWidgets(DocxBuiltDocument doc) {
     final pages = <List<Widget>>[];
     var currentPageContent = <Widget>[];
-    final counter =
-        BlockIndexCounter(); // Counter for body content across pages
+    final counter = BlockIndexCounter();
     _lastCounter = counter;
+
+    // Page dimensions
+    final pageWidth = config.pageWidth ?? 794;
+    final pageHeight = config.pageHeight ?? (pageWidth * 1.414);
+    const pagePadding = 48.0 * 2;
+    const headerFooterEstimate = 100.0;
+    final availableHeight = pageHeight - pagePadding - headerFooterEstimate;
+
+    double currentPageHeight = 0;
 
     void startNewPage() {
       if (currentPageContent.isNotEmpty) {
         pages.add(List.from(currentPageContent));
         currentPageContent.clear();
+        currentPageHeight = 0;
       }
     }
 
-    // Iterate elements to detect breaks
-    List<DocxNode> currentBatch = [];
-
-    // Pre-calculate Header widgets for the first page to sync BlockIndexCounter
-    // We must "consume" the header indices even if we don't use the widgets for every page
+    // Pre-calculate Header widgets for the first page
     List<Widget>? firstPageHeaderWidgets;
     if (doc.section?.header != null) {
       firstPageHeaderWidgets = _generateBlockWidgets(
@@ -192,57 +197,117 @@ class DocxWidgetGenerator {
       );
     }
 
+    // Batch elements between page breaks, then generate widgets for each batch
+    List<DocxNode> currentBatch = [];
+
+    double estimateBatchHeight(List<DocxNode> batch) {
+      double height = 0;
+      for (var element in batch) {
+        height += _estimateElementHeight(element, pageWidth);
+      }
+      return height;
+    }
+
     void flushBatch() {
       if (currentBatch.isNotEmpty) {
-        currentPageContent
-            .addAll(_generateBlockWidgets(currentBatch, counter: counter));
+        final batchHeight = estimateBatchHeight(currentBatch);
+
+        // Check if batch would overflow current page
+        if (currentPageHeight + batchHeight > availableHeight &&
+            currentPageContent.isNotEmpty) {
+          startNewPage();
+        }
+
+        // Generate widgets for the batch (preserves floating element grouping)
+        final widgets = _generateBlockWidgets(currentBatch, counter: counter);
+        currentPageContent.addAll(widgets);
+        currentPageHeight += batchHeight;
         currentBatch.clear();
       }
     }
 
     for (var element in doc.elements) {
+      // Check for explicit page breaks
       bool isPageBreak = false;
-
       if (element is DocxSectionBreakBlock) {
         isPageBreak = true;
-      } else if (element is DocxParagraph) {
-        if (element.pageBreakBefore) {
-          isPageBreak = true;
-        }
+      } else if (element is DocxParagraph && element.pageBreakBefore) {
+        isPageBreak = true;
       }
 
       if (isPageBreak) {
         flushBatch();
         startNewPage();
-        // Don't add the break element itself if it's just a signal
         if (element is! DocxSectionBreakBlock) {
           currentBatch.add(element);
         }
       } else {
         currentBatch.add(element);
+
+        // Check if we should flush (content getting too tall)
+        // But don't flush right after adding a floating table - let it group with next paragraphs
+        bool lastWasFloatingTable =
+            element is DocxTable && element.position != null;
+
+        if (!lastWasFloatingTable) {
+          final batchHeight = estimateBatchHeight(currentBatch);
+          if (batchHeight > availableHeight) {
+            flushBatch();
+          }
+        }
       }
     }
-    flushBatch();
-    startNewPage(); // Finish last page
 
-    // Wrap pages in visual containers
-    // We use index to determine if we should use the pre-calculated (indexed) header
+    flushBatch();
+    startNewPage();
+
+    if (pages.isEmpty) {
+      pages.add([]);
+    }
+
     return pages.asMap().entries.map((entry) {
       final index = entry.key;
       final content = entry.value;
-
-      // For the first page, use the header widgets that have the valid keys/indices
       final headerWidgets = (index == 0) ? firstPageHeaderWidgets : null;
-
-      // For the last page, we could potentially index the footer, but currently we don't.
-      // If we wanted to, we would generate footer widgets here if index == pages.length - 1
-      // and pass counter. But the body generation has already finished, so counter is ready.
-      // However, _buildPageContainer generates footer internally.
-      // We will leave footer un-indexed for now in Paged Mode to avoid complexity,
-      // as Body index is the priority.
-
       return _buildPageContainer(content, doc, headerWidgets: headerWidgets);
     }).toList();
+  }
+
+  /// Estimate the height of a document element for pagination.
+  double _estimateElementHeight(DocxNode element, double pageWidth) {
+    const lineHeight = 24.0; // Approximate line height
+    const paragraphSpacing = 16.0;
+
+    if (element is DocxParagraph) {
+      // Estimate based on text content
+      int totalChars = 0;
+      for (var child in element.children) {
+        if (child is DocxText) {
+          totalChars += child.content.length;
+        }
+      }
+      // Estimate characters per line based on page width
+      final charsPerLine = ((pageWidth - 96) / 8).floor(); // ~8px per char
+      final lines = (totalChars / charsPerLine).ceil().clamp(1, 100);
+      return (lines * lineHeight) + paragraphSpacing;
+    } else if (element is DocxTable) {
+      // Simple row-based estimate - more accurate for most tables
+      final rowCount = element.rows.length;
+      return (rowCount * 30.0) + 16.0; // ~30px per row + margins
+    } else if (element is DocxList) {
+      // Estimate based on item count
+      return element.items.length * 30.0 + 10.0;
+    } else if (element is DocxImage) {
+      // Use actual dimensions if available
+      final height = element.height > 0 ? element.height.toDouble() : 200.0;
+      return height + 16.0;
+    } else if (element is DocxShapeBlock) {
+      return 100.0; // Default shape height
+    } else if (element is DocxDropCap) {
+      return 80.0; // Drop cap height
+    }
+
+    return lineHeight + paragraphSpacing; // Default
   }
 
   Widget _buildNoteWidget(int id, List<DocxNode> content) {
@@ -290,11 +355,16 @@ class DocxWidgetGenerator {
       pageChildren.addAll(_generateBlockWidgets(doc.section!.footer!.children));
     }
 
+    // Calculate page dimensions
+    final pageWidth = config.pageWidth ?? 794;
+    final pageHeight = config.pageHeight ?? (pageWidth * 1.414); // A4 ratio
+    const pagePadding = 48.0;
+
     return Container(
-      width: config.pageWidth ?? 794,
-      constraints: const BoxConstraints(minHeight: 1123),
+      width: pageWidth,
+      height: pageHeight,
       margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-      padding: const EdgeInsets.all(48), // Page margins
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: theme.backgroundColor ?? Colors.white,
         boxShadow: [
@@ -305,10 +375,16 @@ class DocxWidgetGenerator {
           )
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min, // allow growth
-        children: pageChildren,
+      child: Padding(
+        padding: const EdgeInsets.all(pagePadding),
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: pageChildren,
+          ),
+        ),
       ),
     );
   }

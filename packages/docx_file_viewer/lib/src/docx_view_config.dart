@@ -59,6 +59,10 @@ class DocxViewConfig {
   /// The layout mode of the document (continuous or paged).
   final DocxPageMode pageMode;
 
+  /// Optional fixed page height for paged mode (e.g. 1123 for A4 at 794 width).
+  /// If null, defaults to page width * 1.414 (A4 ratio).
+  final double? pageHeight;
+
   const DocxViewConfig({
     this.enableSearch = true,
     this.enableZoom = true,
@@ -74,6 +78,7 @@ class DocxViewConfig {
     this.searchHighlightColor = const Color(0xFFFFEB3B),
     this.currentSearchHighlightColor = const Color(0xFFFF9800),
     this.pageWidth,
+    this.pageHeight,
     this.pageMode = DocxPageMode.paged,
   });
 
