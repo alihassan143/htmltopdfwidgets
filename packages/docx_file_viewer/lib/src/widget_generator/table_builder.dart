@@ -1,15 +1,22 @@
 import 'package:docx_creator/docx_creator.dart';
+import 'package:docx_file_viewer/src/utils/block_index_counter.dart';
 import 'package:flutter/material.dart';
 
 import '../docx_view_config.dart';
 import '../theme/docx_view_theme.dart';
+import 'image_builder.dart';
+import 'list_builder.dart';
 import 'paragraph_builder.dart';
+import 'shape_builder.dart';
 
 /// Builds Flutter widgets from [DocxTable] elements using native layout.
 class TableBuilder {
   final DocxViewTheme theme;
   final DocxViewConfig config;
   final ParagraphBuilder paragraphBuilder;
+  final ListBuilder listBuilder;
+  final ImageBuilder imageBuilder;
+  final ShapeBuilder shapeBuilder;
   final DocxTheme? docxTheme;
 
   // Constants
@@ -19,14 +26,20 @@ class TableBuilder {
     required this.theme,
     required this.config,
     required this.paragraphBuilder,
+    required this.listBuilder,
+    required this.imageBuilder,
+    required this.shapeBuilder,
     this.docxTheme,
   });
 
   /// Build a widget from a [DocxTable].
-  Widget build(DocxTable table) {
+  Widget build(DocxTable table, {BlockIndexCounter? counter}) {
     if (table.rows.isEmpty) {
       return const SizedBox.shrink();
     }
+// ... (rest of build method unchanged until we hit _buildCell logic, but imports and class def are change)
+// Wait, I cannot use '...' in replacement content safely if I am replacing the top of the file.
+// I need to provide the full content for the replaced section.
 
     // 1. Resolve Grid Columns (Widths)
     final gridCols = table.resolvedGridColumns;
@@ -57,6 +70,7 @@ class TableBuilder {
         table: table,
         rowIndex: r,
         totalRows: table.rows.length,
+        counter: counter,
       ));
     }
 
@@ -102,6 +116,7 @@ class TableBuilder {
     required DocxTable table,
     required int rowIndex,
     required int totalRows,
+    BlockIndexCounter? counter,
   }) {
     final cells = <Widget>[];
     final style = table.style;
@@ -331,6 +346,7 @@ class TableBuilder {
     bool isLastColumnActual = false,
     DocxStyle? rowCondStyle,
     DocxStyle? colCondStyle,
+    BlockIndexCounter? counter,
   }) {
     // Helper to get side with proper merging of cell and table-level borders
     BorderSide getSide(
@@ -466,9 +482,22 @@ class TableBuilder {
       final children = <Widget>[];
       for (final child in cell.children) {
         if (child is DocxParagraph) {
-          children.add(paragraphBuilder.build(child));
+          children.add(paragraphBuilder.build(child, counter: counter));
         } else if (child is DocxTable) {
-          children.add(build(child)); // Recursive
+          children.add(build(child, counter: counter)); // Recursive
+        } else if (child is DocxList) {
+          children.add(listBuilder.build(child, counter: counter));
+        } else if (child is DocxImage) {
+          // Extraction skips images, so we shouldn't increment counter for them
+          // BUT wait, extractTextForSearch (in DocxWidgetGenerator) only extracts from Paragraph and List inside Table.
+          // It does NOT extract from Image or ShapeBlock.
+          // So we should NOT pass counter to these builders if they don't consume it.
+          // ImageBuilder and ShapeBuilder don't take counter in their build methods currently.
+          children.add(imageBuilder.buildBlockImage(child));
+        } else if (child is DocxShapeBlock) {
+          children.add(shapeBuilder.buildBlockShape(child));
+        } else if (child is DocxDropCap) {
+          children.add(paragraphBuilder.buildDropCap(child));
         }
       }
 

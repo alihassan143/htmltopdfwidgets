@@ -1,10 +1,7 @@
 import 'package:docx_creator/docx_creator.dart';
-import 'package:flutter/gestures.dart';
+import 'package:docx_file_viewer/docx_file_viewer.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../docx_view_config.dart';
-import '../theme/docx_view_theme.dart';
 import 'paragraph_builder.dart';
 
 /// Builds Flutter widgets from [DocxList] elements.
@@ -27,7 +24,7 @@ class ListBuilder {
   });
 
   /// Build a widget from a [DocxList].
-  Widget build(DocxList list) {
+  Widget build(DocxList list, {BlockIndexCounter? counter}) {
     final itemWidgets = <Widget>[];
 
     // Track numbering per level for nested lists
@@ -48,6 +45,7 @@ class ListBuilder {
         item,
         list: list,
         number: numberingByLevel[level]!,
+        counter: counter,
       );
       itemWidgets.add(widget);
     }
@@ -65,6 +63,7 @@ class ListBuilder {
     DocxListItem item, {
     required DocxList list,
     required int number,
+    BlockIndexCounter? counter,
   }) {
     final level = item.level.clamp(0, 8);
     // Use override style if available, otherwise fall back to list style
@@ -85,8 +84,27 @@ class ListBuilder {
       // Here we just accept that 'indent' is the start of content.
     }
 
-    // Build content from all inline children
-    final spans = _buildInlineSpans(item.children);
+    // Build content from all inline children with search support
+    List<InlineSpan> spans;
+    Key? key;
+    if (counter != null && paragraphBuilder.searchController != null) {
+      final blockIndex = counter.value;
+      final matches = paragraphBuilder.searchController!.matches
+          .where((m) => m.blockIndex == blockIndex)
+          .toList();
+
+      if (matches.isNotEmpty) {
+        key = counter.registerKey(blockIndex);
+      }
+      counter.increment();
+
+      spans =
+          paragraphBuilder.buildInlineSpans(item.children, matches: matches);
+    } else {
+      spans = paragraphBuilder.buildInlineSpans(item.children);
+    }
+
+    // ... (rest of method)
 
     // Apply style properties from DocxListStyle to the marker
 
@@ -97,8 +115,7 @@ class ListBuilder {
           style.themeTint,
           style.themeShade,
         ) ??
-        _parseHexColor(style.color
-            .hex); // Fallback to raw hex if resolving fails but it shouldn't if hex is valid
+        _parseHexColor(style.color.hex); // Fallback
 
     // Resolve theme font for marker
     final markerFont = docxTheme != null && style.themeFont != null
@@ -145,6 +162,7 @@ class ListBuilder {
     }
 
     return Padding(
+      key: key,
       padding: EdgeInsets.only(left: indent, top: 2, bottom: 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,37 +179,6 @@ class ListBuilder {
         ],
       ),
     );
-  }
-
-  /// Build InlineSpans for all types of inline content.
-  List<InlineSpan> _buildInlineSpans(List<DocxInline> inlines) {
-    final spans = <InlineSpan>[];
-
-    for (final inline in inlines) {
-      if (inline is DocxText) {
-        spans.add(_buildTextSpan(inline));
-      } else if (inline is DocxLineBreak) {
-        spans.add(const TextSpan(text: '\n'));
-      } else if (inline is DocxTab) {
-        spans.add(const TextSpan(text: '    '));
-      } else if (inline is DocxCheckbox) {
-        spans.add(_buildCheckboxSpan(inline));
-      } else if (inline is DocxInlineImage) {
-        spans.add(WidgetSpan(
-          child: Image.memory(
-            inline.bytes,
-            width: inline.width,
-            height: inline.height,
-          ),
-        ));
-      } else if (inline is DocxShape) {
-        spans.add(WidgetSpan(
-          child: _buildInlineShape(inline),
-        ));
-      }
-    }
-
-    return spans;
   }
 
   /// Get bullet marker based on level and style.
@@ -264,176 +251,6 @@ class ListBuilder {
     return buffer.toString();
   }
 
-  TextSpan _buildTextSpan(DocxText text) {
-    // Transform content for caps effects
-    String content = text.content;
-    if (text.isAllCaps) {
-      content = content.toUpperCase();
-    } else if (text.isSmallCaps) {
-      content = content.toUpperCase();
-    }
-
-    FontWeight fontWeight = text.fontWeight == DocxFontWeight.bold
-        ? FontWeight.bold
-        : FontWeight.normal;
-
-    FontStyle fontStyle = text.fontStyle == DocxFontStyle.italic
-        ? FontStyle.italic
-        : FontStyle.normal;
-
-    // Handle decorations
-    final decorations = <TextDecoration>[];
-    if (text.decoration == DocxTextDecoration.underline) {
-      decorations.add(TextDecoration.underline);
-    }
-    if (text.decoration == DocxTextDecoration.strikethrough ||
-        text.isDoubleStrike) {
-      decorations.add(TextDecoration.lineThrough);
-    }
-    final decoration = decorations.isEmpty
-        ? TextDecoration.none
-        : TextDecoration.combine(decorations);
-
-    Color? textColor;
-    textColor = _resolveColor(
-      text.color?.hex,
-      text.themeColor ?? text.color?.themeColor,
-      text.themeTint ?? text.color?.themeTint,
-      text.themeShade ?? text.color?.themeShade,
-    );
-    if (textColor == null && text.color != null) {
-      textColor = _parseHexColor(text.color!.hex);
-    }
-
-    Color? backgroundColor;
-    if (text.shadingFill != null) {
-      backgroundColor = _parseHexColor(text.shadingFill!);
-    } else if (text.highlight != DocxHighlight.none) {
-      backgroundColor = _highlightToColor(text.highlight);
-    }
-
-    double? fontSize = text.fontSize;
-    if (fontSize != null) {
-      fontSize = fontSize * 1.333;
-    } else {
-      fontSize = theme.defaultTextStyle.fontSize;
-    }
-    if (text.isSmallCaps && !text.isAllCaps) {
-      fontSize = (fontSize ?? 14) * 0.85;
-    }
-
-    final style = TextStyle(
-      fontWeight: fontWeight,
-      fontStyle: fontStyle,
-      decoration: decoration,
-      decorationStyle: text.isDoubleStrike
-          ? TextDecorationStyle.double
-          : TextDecorationStyle.solid,
-      color: textColor ?? theme.defaultTextStyle.color,
-      backgroundColor: backgroundColor,
-      fontSize: fontSize,
-      fontFamily: text.fontFamily,
-      fontFamilyFallback: config.customFontFallbacks,
-      letterSpacing: text.characterSpacing,
-    );
-
-    // Handle hyperlinks
-    if (text.href != null && text.href!.isNotEmpty) {
-      return TextSpan(
-        text: content,
-        style: style.copyWith(
-          color: theme.linkStyle.color,
-          decoration: TextDecoration.underline,
-        ),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () => _launchUrl(text.href!),
-      );
-    }
-
-    return TextSpan(text: content, style: style);
-  }
-
-  TextSpan _buildCheckboxSpan(DocxCheckbox checkbox) {
-    final content = checkbox.isChecked ? '☒ ' : '☐ ';
-
-    return TextSpan(
-      text: content,
-      style: TextStyle(
-        fontWeight: checkbox.fontWeight == DocxFontWeight.bold
-            ? FontWeight.bold
-            : FontWeight.normal,
-        fontStyle: checkbox.fontStyle == DocxFontStyle.italic
-            ? FontStyle.italic
-            : FontStyle.normal,
-        color: checkbox.color != null
-            ? _parseHexColor(checkbox.color!.hex)
-            : theme.defaultTextStyle.color,
-        fontSize: checkbox.fontSize != null
-            ? checkbox.fontSize! * 1.333
-            : theme.defaultTextStyle.fontSize,
-      ),
-    );
-  }
-
-  Widget _buildInlineShape(DocxShape shape) {
-    return Container(
-      width: shape.width,
-      height: shape.height,
-      decoration: BoxDecoration(
-        color: shape.fillColor != null
-            ? _parseHexColor(shape.fillColor!.hex)
-            : Colors.grey.shade200,
-        border: shape.outlineColor != null
-            ? Border.all(
-                color: _parseHexColor(shape.outlineColor!.hex),
-                width: shape.outlineWidth,
-              )
-            : null,
-        borderRadius: shape.preset == DocxShapePreset.ellipse ||
-                shape.preset == DocxShapePreset.roundRect
-            ? BorderRadius.circular(shape.height / 2)
-            : null,
-      ),
-    );
-  }
-
-  Color _highlightToColor(DocxHighlight highlight) {
-    switch (highlight) {
-      case DocxHighlight.yellow:
-        return Colors.yellow.shade200;
-      case DocxHighlight.green:
-        return Colors.green.shade200;
-      case DocxHighlight.cyan:
-        return Colors.cyan.shade200;
-      case DocxHighlight.magenta:
-        return Colors.pink.shade200;
-      case DocxHighlight.blue:
-        return Colors.blue.shade200;
-      case DocxHighlight.red:
-        return Colors.red.shade200;
-      case DocxHighlight.darkBlue:
-        return Colors.blue.shade700;
-      case DocxHighlight.darkCyan:
-        return Colors.cyan.shade700;
-      case DocxHighlight.darkGreen:
-        return Colors.green.shade700;
-      case DocxHighlight.darkMagenta:
-        return Colors.pink.shade700;
-      case DocxHighlight.darkRed:
-        return Colors.red.shade700;
-      case DocxHighlight.darkYellow:
-        return Colors.yellow.shade700;
-      case DocxHighlight.darkGray:
-        return Colors.grey.shade700;
-      case DocxHighlight.lightGray:
-        return Colors.grey.shade300;
-      case DocxHighlight.black:
-        return Colors.black;
-      default:
-        return Colors.transparent;
-    }
-  }
-
   Color? _resolveColor(
       String? hex, String? themeColor, String? themeTint, String? themeShade) {
     Color? baseColor;
@@ -484,12 +301,5 @@ class ListBuilder {
       return Color(int.parse(cleanHex, radix: 16));
     }
     return Colors.black;
-  }
-
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
   }
 }

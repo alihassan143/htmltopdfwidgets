@@ -1,10 +1,11 @@
 import 'package:docx_creator/docx_creator.dart';
+import 'package:docx_file_viewer/src/search/docx_search_controller.dart';
+import 'package:docx_file_viewer/src/utils/block_index_counter.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../docx_view_config.dart';
-import '../search/docx_search_controller.dart';
 import '../theme/docx_view_theme.dart';
 import '../widgets/drop_cap_text.dart';
 
@@ -29,20 +30,54 @@ class ParagraphBuilder {
   });
 
   /// Build a widget from a [DocxParagraph].
-  Widget build(DocxParagraph paragraph, {int? blockIndex}) {
-    return _buildNativeParagraph(paragraph);
+  Widget build(DocxParagraph paragraph, {BlockIndexCounter? counter}) {
+    List<SearchMatch>? matches;
+    Key? key;
+
+    if (counter != null && searchController != null) {
+      final blockIndex = counter.value;
+      matches = searchController!.matches
+          .where((m) => m.blockIndex == blockIndex)
+          .toList();
+
+      if (matches.isNotEmpty) {
+        key = counter.registerKey(blockIndex);
+      }
+
+      counter.increment();
+    }
+
+    return _buildNativeParagraph(paragraph, matches: matches, key: key);
   }
 
   /// Build a paragraph widget, excluding specific floating images.
   /// Used when specific floats are being handled separately at the block level.
   Widget buildExcludingFloats(
-      DocxParagraph paragraph, Set<DocxInline> excludedFloats) {
-    return _buildNativeParagraph(paragraph, excludedFloats: excludedFloats);
+      DocxParagraph paragraph, Set<DocxInline> excludedFloats,
+      {BlockIndexCounter? counter}) {
+    List<SearchMatch>? matches;
+    Key? key;
+
+    if (counter != null && searchController != null) {
+      final blockIndex = counter.value;
+      matches = searchController!.matches
+          .where((m) => m.blockIndex == blockIndex)
+          .toList();
+
+      if (matches.isNotEmpty) {
+        key = counter.registerKey(blockIndex);
+      }
+
+      counter.increment();
+    }
+
+    return _buildNativeParagraph(paragraph,
+        excludedFloats: excludedFloats, matches: matches, key: key);
   }
 
   /// Native Flutter builder for standard paragraphs.
   Widget _buildNativeParagraph(DocxParagraph paragraph,
-      {Set<DocxInline>? excludedFloats}) {
+      {Set<DocxInline>? excludedFloats, List<SearchMatch>? matches, Key? key}) {
     List<(DocxInline, DocxAlign?)> textChildren = [];
 
     // Separate content
@@ -95,6 +130,9 @@ class ParagraphBuilder {
     }
     final textAlign = _convertAlign(paragraph.align);
 
+    // Track current text offset for highlighting
+    int currentTextOffset = 0;
+
     // Helper to flush current buffers into a single layout row
     void flushBuffer() {
       if (currentInlines.isEmpty &&
@@ -103,8 +141,26 @@ class ParagraphBuilder {
         return;
       }
 
-      final spans =
-          _buildTextSpans(currentInlines, lineHeight: lineHeightScale);
+      final spans = buildInlineSpans(
+        currentInlines,
+        lineHeight: lineHeightScale,
+        matches: matches,
+        startOffset: currentTextOffset,
+      );
+
+      // Update offset
+      for (final inline in currentInlines) {
+        if (inline is DocxText) {
+          currentTextOffset += inline.content.length;
+        } else if (inline is DocxTab) {
+          currentTextOffset += 4; // '    '.length
+        } else if (inline is DocxLineBreak) {
+          currentTextOffset += 1;
+        } else if (inline is DocxCheckbox) {
+          currentTextOffset += 2; // '☒ '
+        }
+      }
+
       final fullTextSpan =
           TextSpan(style: theme.defaultTextStyle, children: spans);
 
@@ -220,8 +276,36 @@ class ParagraphBuilder {
       );
     }
 
-    return _wrapWithParagraphStyle(paragraph, finalContent);
+    return _wrapWithParagraphStyle(paragraph, finalContent, key: key);
   }
+
+  // ... (keeping internal helper structures same) ...
+  // [Lines 226-433 omitted in replace request to save space if unchanged, assuming tool can handle partial replacments.
+  // Wait, I am replacing a large chunk. I should just update _buildTextSpans separately?
+  // No, I need _buildNativeParagraph to manage currentTextOffset.
+  // So I'll assume lines 226-432 are safe or I'll just use the provided range carefully.]
+  // NOTE: I am replacing `build`, `buildExcludingFloats`, `_buildNativeParagraph` fully.
+  // I need to skip `_buildFloatingLayout`, `_wrapWithParagraphStyle`, `_buildParagraphDecoration`, `_buildBorderSide`.
+  // The provided `_buildNativeParagraph` implementation above ends around line 224 which is correct.
+  // Below I will implement `_buildTextSpans` and `_buildTextSpan`.
+
+  // ... (omitting lines 226-433 in this prompt, I will assume I only replace up to 224 and then replace 433 separately)
+  // THE TOOL replace_file_content replaces a CONTIGUOUS BLOCK.
+  // So I must provide the whole block or do two calls.
+  // `_buildNativeParagraph` spans lines 44 to 224.
+  // `_buildTextSpans` starts at 434.
+  // So I will split this into two calls or one giant call.
+  // Giant call is risky if I miss lines.
+  // I'll do two calls.
+  // Call 1: Update `build` and `_buildNativeParagraph`
+  // Call 2: Update `_buildTextSpans` and `_buildTextSpan`.
+
+  // Let's refine for Call 1: Replace lines 31 to 224.
+  // I will submit specific content for that.
+
+  // Wait, the `blockIndex` is passed to `build`.
+
+  // Okay, in THIS tool call, I will do Call 1: `build` through `_buildNativeParagraph`.
 
   /// Builds a layout that wraps text around left and/or right floating elements.
   ///
@@ -296,7 +380,8 @@ class ParagraphBuilder {
   }
 
   /// Helper to apply paragraph decorations (indent, padding, shading, borders)
-  Widget _wrapWithParagraphStyle(DocxParagraph paragraph, Widget content) {
+  Widget _wrapWithParagraphStyle(DocxParagraph paragraph, Widget content,
+      {Key? key}) {
     // Apply paragraph styling from DocxParagraph properties
     const double twipsToPixels = 1 / 15.0;
 
@@ -326,6 +411,7 @@ class ParagraphBuilder {
     // Page break
     if (paragraph.pageBreakBefore) {
       return Column(
+        key: key,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Divider(height: 32, thickness: 2),
@@ -344,6 +430,7 @@ class ParagraphBuilder {
     }
 
     return Container(
+      key: key,
       padding: EdgeInsets.only(
         left: leftPadding,
         right: rightPadding,
@@ -431,21 +518,35 @@ class ParagraphBuilder {
   }
 
   /// Build TextSpans from inline elements.
-  List<InlineSpan> _buildTextSpans(List<DocxInline> inlines,
-      {double? lineHeight}) {
+  List<InlineSpan> buildInlineSpans(
+    List<DocxInline> inlines, {
+    double? lineHeight,
+    List<SearchMatch>? matches,
+    int startOffset = 0,
+  }) {
     final spans = <InlineSpan>[];
+    int currentOffset = startOffset;
 
     for (final inline in inlines) {
       if (inline is DocxText) {
-        spans.add(_buildTextSpan(inline, lineHeight: lineHeight));
+        spans.addAll(_buildTextSpan(
+          inline,
+          lineHeight: lineHeight,
+          matches: matches,
+          offset: currentOffset,
+        ));
+        currentOffset += inline.content.length;
       } else if (inline is DocxLineBreak) {
         spans.add(const TextSpan(text: '\n'));
+        currentOffset += 1;
       } else if (inline is DocxTab) {
         // Better tab rendering - use 4 spaces worth of fixed width
         spans.add(const TextSpan(text: '    '));
+        currentOffset += 4;
       } else if (inline is DocxCheckbox) {
         // Render checkbox as unicode character with styling
         spans.add(_buildCheckboxSpan(inline, lineHeight: lineHeight));
+        currentOffset += 2;
       } else if (inline is DocxInlineImage) {
         // Inline images with proper vertical alignment
         spans.add(WidgetSpan(
@@ -478,6 +579,8 @@ class ParagraphBuilder {
     return spans;
   }
 
+  // ... (keep checkbox span same) ...
+
   /// Build a TextSpan for a DocxCheckbox.
   TextSpan _buildCheckboxSpan(DocxCheckbox checkbox, {double? lineHeight}) {
     final content = checkbox.isChecked ? '☒ ' : '☐ ';
@@ -508,7 +611,13 @@ class ParagraphBuilder {
   }
 
   /// Build a TextSpan from a [DocxText] element.
-  InlineSpan _buildTextSpan(DocxText text, {double? lineHeight}) {
+  /// Returns a list because one DocxText might be split into multiple spans for search highlights.
+  List<InlineSpan> _buildTextSpan(
+    DocxText text, {
+    double? lineHeight,
+    List<SearchMatch>? matches,
+    int offset = 0,
+  }) {
     // Transform content based on text effects
     String content = text.content;
     if (text.isAllCaps) {
@@ -517,7 +626,7 @@ class ParagraphBuilder {
       content = content.toUpperCase();
     }
 
-    // Determine text style
+    // Determine text style (common for all segments)
     FontWeight fontWeight = text.fontWeight == DocxFontWeight.bold
         ? FontWeight.bold
         : FontWeight.normal;
@@ -619,6 +728,7 @@ class ParagraphBuilder {
       fontSize = (fontSize ?? 14) * 0.85;
     }
 
+    // ... (Shadows/Emboss/Imprint etc logic reused) ...
     List<Shadow>? shadows;
     if (text.isShadow) {
       shadows = [
@@ -665,16 +775,7 @@ class ParagraphBuilder {
       textColor = null;
     }
 
-    BoxBorder? textBorder;
-    if (text.textBorder != null) {
-      final side = _buildBorderSide(text.textBorder!);
-      if (side != BorderSide.none) {
-        textBorder =
-            Border.all(color: side.color, width: side.width, style: side.style);
-      }
-    }
-
-    final style = TextStyle(
+    final baseStyle = TextStyle(
       fontWeight: fontWeight,
       fontStyle: fontStyle,
       decoration: decoration,
@@ -701,38 +802,137 @@ class ParagraphBuilder {
           : null,
     );
 
+    // Tap handler
+    TapGestureRecognizer? tapRecognizer;
+    Color? linkColor;
+    TextDecoration? linkDecoration;
+
     if (text.href != null && text.href!.isNotEmpty) {
-      return TextSpan(
-        text: content,
-        style: style.copyWith(
-          color: theme.linkStyle.color,
-          decoration: TextDecoration.underline,
-          foreground: null,
+      linkColor = theme.linkStyle.color;
+      linkDecoration = TextDecoration.underline;
+      tapRecognizer = TapGestureRecognizer()
+        ..onTap = () {
+          _launchUrl(text.href!);
+        };
+    }
+
+    // Split text based on matches
+    if (matches == null || matches.isEmpty) {
+      // Normal case
+      // Check for TextBorder
+      if (text.textBorder != null) {
+        final side = _buildBorderSide(text.textBorder!);
+        if (side != BorderSide.none) {
+          final textBorder = Border.all(
+              color: side.color, width: side.width, style: side.style);
+          return [
+            WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+                  decoration: BoxDecoration(
+                    border: textBorder,
+                    color: backgroundColor,
+                  ),
+                  child: Text(content,
+                      style: baseStyle.copyWith(
+                        color: linkColor ?? baseStyle.color,
+                        decoration: linkDecoration ?? baseStyle.decoration,
+                        backgroundColor: null, // moved to container
+                      )),
+                ))
+          ];
+        }
+      }
+
+      return [
+        TextSpan(
+          text: content,
+          style: baseStyle.copyWith(
+            color: linkColor ?? baseStyle.color,
+            decoration: linkDecoration ?? baseStyle.decoration,
+          ),
+          recognizer: tapRecognizer,
+        )
+      ];
+    }
+
+    // Splitting logic
+    final resultSpans = <InlineSpan>[];
+    int currentLocalIndex = 0;
+    final int textLength = content.length;
+    final int globalStart = offset;
+    final int globalEnd = offset + textLength;
+
+    // Filter matches that overlap with this text node
+    final relevantMatches = matches
+        .where((m) => m.endOffset > globalStart && m.startOffset < globalEnd)
+        .toList();
+
+    // Sort matches (should be sorted but ensure)
+    relevantMatches.sort((a, b) => a.startOffset.compareTo(b.startOffset));
+
+    for (final match in relevantMatches) {
+      // Calculate overlap
+      int matchStartInNode = match.startOffset - globalStart;
+      int matchEndInNode = match.endOffset - globalStart;
+
+      // Clamp to node bounds
+      if (matchStartInNode < 0) matchStartInNode = 0;
+      if (matchEndInNode > textLength) matchEndInNode = textLength;
+
+      if (matchStartInNode > currentLocalIndex) {
+        // Unmatched segment before
+        resultSpans.add(TextSpan(
+          text: content.substring(currentLocalIndex, matchStartInNode),
+          style: baseStyle.copyWith(
+            color: linkColor ?? baseStyle.color,
+            decoration: linkDecoration ?? baseStyle.decoration,
+          ),
+          recognizer: tapRecognizer,
+        ));
+      }
+
+      // Matched segment
+      if (matchEndInNode > matchStartInNode) {
+        bool isCurrent = false;
+        if (searchController != null) {
+          // Check if this match is the currently selected one
+          final currentMatchIndex = searchController!.currentMatchIndex;
+          if (currentMatchIndex >= 0 &&
+              currentMatchIndex < searchController!.matches.length) {
+            isCurrent = match == searchController!.matches[currentMatchIndex];
+          }
+        }
+
+        resultSpans.add(TextSpan(
+          text: content.substring(matchStartInNode, matchEndInNode),
+          style: baseStyle.copyWith(
+            color: linkColor ?? baseStyle.color,
+            decoration: linkDecoration ?? baseStyle.decoration,
+            backgroundColor:
+                isCurrent ? Colors.orange.shade300 : Colors.yellow.shade200,
+          ),
+          recognizer: tapRecognizer,
+        ));
+      }
+      currentLocalIndex = matchEndInNode;
+    }
+
+    // Remaining text
+    if (currentLocalIndex < textLength) {
+      resultSpans.add(TextSpan(
+        text: content.substring(currentLocalIndex),
+        style: baseStyle.copyWith(
+          color: linkColor ?? baseStyle.color,
+          decoration: linkDecoration ?? baseStyle.decoration,
         ),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () {
-            _launchUrl(text.href!);
-          },
-      );
+        recognizer: tapRecognizer,
+      ));
     }
 
-    if (textBorder != null) {
-      return WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-            decoration: BoxDecoration(
-              border: textBorder,
-              color: backgroundColor,
-            ),
-            child: Text(content, style: style.copyWith(backgroundColor: null)),
-          ));
-    }
-
-    return TextSpan(
-      text: content,
-      style: style,
-    );
+    return resultSpans;
   }
 
   /// Resolve color from hex or theme properties.
@@ -812,7 +1012,7 @@ class ParagraphBuilder {
       height: theme.defaultTextStyle.height,
     );
 
-    final spans = _buildTextSpans(dropCap.restOfParagraph);
+    final spans = buildInlineSpans(dropCap.restOfParagraph);
     final fullTextSpan = TextSpan(children: spans, style: bodyStyle);
 
     String restPlainText = '';
@@ -906,13 +1106,24 @@ class ParagraphBuilder {
   }
 
   Color? _parseHexColor(String hex) {
-    if (hex == 'auto') return Colors.black;
+    if (hex == 'auto') return theme.defaultTextStyle.color;
     try {
       final buffer = StringBuffer();
       if (hex.length == 6 || hex.length == 8) {
         if (hex.length == 6) buffer.write('ff');
         buffer.write(hex);
-        return Color(int.parse(buffer.toString(), radix: 16));
+        final color = Color(int.parse(buffer.toString(), radix: 16));
+
+        // Smart inversion for dark mode:
+        // If background is dark and text is dark (black), invert text to white.
+        // Leaves other colors (red, green, etc.) untouched.
+        final bg = theme.backgroundColor;
+        if (bg != null && bg.computeLuminance() < 0.5) {
+          if (color.computeLuminance() < 0.179) {
+            return Colors.white;
+          }
+        }
+        return color;
       }
     } catch (_) {}
     return null;

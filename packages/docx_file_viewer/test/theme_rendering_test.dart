@@ -1,7 +1,10 @@
 import 'package:docx_creator/docx_creator.dart';
 import 'package:docx_file_viewer/docx_file_viewer.dart';
 // Internal imports
+import 'package:docx_file_viewer/src/widget_generator/image_builder.dart';
+import 'package:docx_file_viewer/src/widget_generator/list_builder.dart';
 import 'package:docx_file_viewer/src/widget_generator/paragraph_builder.dart';
+import 'package:docx_file_viewer/src/widget_generator/shape_builder.dart';
 import 'package:docx_file_viewer/src/widget_generator/table_builder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +14,9 @@ void main() {
     late TableBuilder tableBuilder;
     late DocxTheme docxTheme;
     late ParagraphBuilder paragraphBuilder;
+    late ListBuilder listBuilder;
+    late ImageBuilder imageBuilder;
+    late ShapeBuilder shapeBuilder;
 
     setUp(() {
       final config = const DocxViewConfig();
@@ -20,6 +26,12 @@ void main() {
         theme: theme,
         config: config,
       );
+
+      // Initialize other builders with defaults for testing
+      listBuilder = ListBuilder(
+          theme: theme, config: config, paragraphBuilder: paragraphBuilder);
+      imageBuilder = ImageBuilder(config: config);
+      shapeBuilder = ShapeBuilder(config: config);
 
       // Define a theme with accent1 = Red (FF0000)
       docxTheme = const DocxTheme(
@@ -33,6 +45,9 @@ void main() {
         theme: theme,
         config: config,
         paragraphBuilder: paragraphBuilder,
+        listBuilder: listBuilder,
+        imageBuilder: imageBuilder,
+        shapeBuilder: shapeBuilder,
         docxTheme: docxTheme,
       );
     });

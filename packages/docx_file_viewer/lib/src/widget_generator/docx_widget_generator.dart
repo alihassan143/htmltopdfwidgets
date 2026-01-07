@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../docx_view_config.dart';
 import '../search/docx_search_controller.dart';
 import '../theme/docx_view_theme.dart';
+import '../utils/block_index_counter.dart';
 import 'image_builder.dart';
 import 'list_builder.dart';
 import 'paragraph_builder.dart';
@@ -37,6 +38,12 @@ class DocxWidgetGenerator {
   /// Shape builder for shape rendering.
   late ShapeBuilder _shapeBuilder;
 
+  /// Store the last used counter to access widget keys after generation.
+  BlockIndexCounter? _lastCounter;
+
+  /// Block keys for navigation.
+  Map<int, GlobalKey> get keys => _lastCounter?.keyRegistry ?? {};
+
   DocxWidgetGenerator({
     required this.config,
     DocxViewTheme? theme,
@@ -69,13 +76,6 @@ class DocxWidgetGenerator {
       docxTheme: doc.theme,
     );
 
-    _tableBuilder = TableBuilder(
-      theme: theme,
-      config: config,
-      paragraphBuilder: _paragraphBuilder,
-      docxTheme: doc.theme,
-    );
-
     _listBuilder = ListBuilder(
       theme: theme,
       config: config,
@@ -90,6 +90,16 @@ class DocxWidgetGenerator {
       docxTheme: doc.theme,
     );
 
+    _tableBuilder = TableBuilder(
+      theme: theme,
+      config: config,
+      paragraphBuilder: _paragraphBuilder,
+      listBuilder: _listBuilder,
+      imageBuilder: _imageBuilder,
+      shapeBuilder: _shapeBuilder,
+      docxTheme: doc.theme,
+    );
+
     if (config.pageMode == DocxPageMode.paged) {
       return _generatePagedWidgets(doc);
     }
@@ -100,15 +110,19 @@ class DocxWidgetGenerator {
   /// Original continuous generation logic
   List<Widget> _generateContinuousWidgets(DocxBuiltDocument doc) {
     final widgets = <Widget>[];
+    final counter = BlockIndexCounter();
 
     // 1. Header
+    // We must pass the counter to align indices with extraction
     if (doc.section?.header != null) {
-      widgets.addAll(_generateBlockWidgets(doc.section!.header!.children));
+      widgets.addAll(_generateBlockWidgets(doc.section!.header!.children,
+          counter: counter));
       widgets.add(const Divider(height: 32, thickness: 1, color: Colors.grey));
     }
 
     // 2. Body
-    widgets.addAll(_generateBlockWidgets(doc.elements));
+    _lastCounter = counter;
+    widgets.addAll(_generateBlockWidgets(doc.elements, counter: counter));
 
     // 3. Footnotes
     if (doc.footnotes != null && doc.footnotes!.isNotEmpty) {
@@ -143,7 +157,8 @@ class DocxWidgetGenerator {
     // 5. Footer
     if (doc.section?.footer != null) {
       widgets.add(const Divider(height: 32, thickness: 1, color: Colors.grey));
-      widgets.addAll(_generateBlockWidgets(doc.section!.footer!.children));
+      widgets.addAll(_generateBlockWidgets(doc.section!.footer!.children,
+          counter: counter));
     }
 
     return widgets;
@@ -153,6 +168,9 @@ class DocxWidgetGenerator {
   List<Widget> _generatePagedWidgets(DocxBuiltDocument doc) {
     final pages = <List<Widget>>[];
     var currentPageContent = <Widget>[];
+    final counter =
+        BlockIndexCounter(); // Counter for body content across pages
+    _lastCounter = counter;
 
     void startNewPage() {
       if (currentPageContent.isNotEmpty) {
@@ -164,9 +182,20 @@ class DocxWidgetGenerator {
     // Iterate elements to detect breaks
     List<DocxNode> currentBatch = [];
 
+    // Pre-calculate Header widgets for the first page to sync BlockIndexCounter
+    // We must "consume" the header indices even if we don't use the widgets for every page
+    List<Widget>? firstPageHeaderWidgets;
+    if (doc.section?.header != null) {
+      firstPageHeaderWidgets = _generateBlockWidgets(
+        doc.section!.header!.children,
+        counter: counter,
+      );
+    }
+
     void flushBatch() {
       if (currentBatch.isNotEmpty) {
-        currentPageContent.addAll(_generateBlockWidgets(currentBatch));
+        currentPageContent
+            .addAll(_generateBlockWidgets(currentBatch, counter: counter));
         currentBatch.clear();
       }
     }
@@ -197,9 +226,23 @@ class DocxWidgetGenerator {
     startNewPage(); // Finish last page
 
     // Wrap pages in visual containers
-    return pages
-        .map((pageContent) => _buildPageContainer(pageContent, doc))
-        .toList();
+    // We use index to determine if we should use the pre-calculated (indexed) header
+    return pages.asMap().entries.map((entry) {
+      final index = entry.key;
+      final content = entry.value;
+
+      // For the first page, use the header widgets that have the valid keys/indices
+      final headerWidgets = (index == 0) ? firstPageHeaderWidgets : null;
+
+      // For the last page, we could potentially index the footer, but currently we don't.
+      // If we wanted to, we would generate footer widgets here if index == pages.length - 1
+      // and pass counter. But the body generation has already finished, so counter is ready.
+      // However, _buildPageContainer generates footer internally.
+      // We will leave footer un-indexed for now in Paged Mode to avoid complexity,
+      // as Body index is the priority.
+
+      return _buildPageContainer(content, doc, headerWidgets: headerWidgets);
+    }).toList();
   }
 
   Widget _buildNoteWidget(int id, List<DocxNode> content) {
@@ -222,12 +265,19 @@ class DocxWidgetGenerator {
     );
   }
 
-  Widget _buildPageContainer(List<Widget> content, DocxBuiltDocument doc) {
+  Widget _buildPageContainer(List<Widget> content, DocxBuiltDocument doc,
+      {List<Widget>? headerWidgets}) {
     List<Widget> pageChildren = [];
 
     // Header
     if (doc.section?.header != null) {
-      pageChildren.addAll(_generateBlockWidgets(doc.section!.header!.children));
+      if (headerWidgets != null) {
+        pageChildren.addAll(headerWidgets);
+      } else {
+        // Regenerate for subsequent pages (no counter, so no indices/keys)
+        pageChildren
+            .addAll(_generateBlockWidgets(doc.section!.header!.children));
+      }
       pageChildren.add(const SizedBox(height: 20)); // Header margin
     }
 
@@ -246,7 +296,7 @@ class DocxWidgetGenerator {
       margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       padding: const EdgeInsets.all(48), // Page margins
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.backgroundColor ?? Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -264,7 +314,8 @@ class DocxWidgetGenerator {
   }
 
   /// Generate widgets for a list of blocks.
-  List<Widget> _generateBlockWidgets(List<DocxNode> elements) {
+  List<Widget> _generateBlockWidgets(List<DocxNode> elements,
+      {BlockIndexCounter? counter}) {
     final widgets = <Widget>[];
     int i = 0;
 
@@ -294,10 +345,11 @@ class DocxWidgetGenerator {
 
         if (followingParagraphs.isNotEmpty) {
           // Build the floating Row layout
-          final tableWidget = _tableBuilder.build(floatingTable);
+          final tableWidget =
+              _tableBuilder.build(floatingTable, counter: counter);
           final paragraphWidgets = followingParagraphs.map((p) {
             if (p is DocxParagraph) {
-              return _paragraphBuilder.build(p);
+              return _paragraphBuilder.build(p, counter: counter);
             } else if (p is DocxDropCap) {
               return _paragraphBuilder.buildDropCap(p);
             }
@@ -405,8 +457,8 @@ class DocxWidgetGenerator {
           // We must exclude both activeLefts and activeRights from the content rendering
           final floatsToExclude = {...activeLefts, ...activeRights};
 
-          final contentWidget =
-              _paragraphBuilder.buildExcludingFloats(element, floatsToExclude);
+          final contentWidget = _paragraphBuilder
+              .buildExcludingFloats(element, floatsToExclude, counter: counter);
 
           // Helper to build a column of floats
           List<Widget> buildFloatColumn(List<DocxInline> floats) {
@@ -464,7 +516,8 @@ class DocxWidgetGenerator {
                 .toSet();
 
             widgets.add(_paragraphBuilder.buildExcludingFloats(
-                element, floatsToExclude));
+                element, floatsToExclude,
+                counter: counter));
 
             i++;
             continue;
@@ -473,7 +526,7 @@ class DocxWidgetGenerator {
       }
 
       // Standard element processing
-      final widget = generateWidget(element);
+      final widget = generateWidget(element, counter: counter);
       if (widget != null) {
         widgets.add(widget);
       }
@@ -512,14 +565,14 @@ class DocxWidgetGenerator {
   }
 
   /// Generate a single widget from a [DocxNode].
-  Widget? generateWidget(DocxNode node) {
+  Widget? generateWidget(DocxNode node, {BlockIndexCounter? counter}) {
     try {
       if (node is DocxParagraph) {
-        return _paragraphBuilder.build(node);
+        return _paragraphBuilder.build(node, counter: counter);
       } else if (node is DocxTable) {
-        return _tableBuilder.build(node);
+        return _tableBuilder.build(node, counter: counter);
       } else if (node is DocxList) {
-        return _listBuilder.build(node);
+        return _listBuilder.build(node, counter: counter);
       } else if (node is DocxImage) {
         return _imageBuilder.buildBlockImage(node);
       } else if (node is DocxShapeBlock) {
@@ -568,54 +621,67 @@ class DocxWidgetGenerator {
   /// Extract all text content for search indexing.
   List<String> extractTextForSearch(DocxBuiltDocument doc) {
     final texts = <String>[];
+    final counter = BlockIndexCounter();
 
     // Header
     if (doc.section?.header != null) {
-      for (var element in doc.section!.header!.children) {
-        texts.add(extractText(element));
-      }
+      _extractFromBlocks(doc.section!.header!.children, texts, counter);
     }
 
     // Body
-    for (final element in doc.elements) {
-      final text = extractText(element);
-      texts.add(text);
-    }
+    _extractFromBlocks(doc.elements, texts, counter);
 
     // Footer
     if (doc.section?.footer != null) {
-      for (var element in doc.section!.footer!.children) {
-        texts.add(extractText(element));
-      }
+      _extractFromBlocks(doc.section!.footer!.children, texts, counter);
     }
 
     return texts;
   }
 
-  String extractText(DocxNode node) {
-    if (node is DocxParagraph) {
-      return node.children.whereType<DocxText>().map((t) => t.content).join();
-    } else if (node is DocxDropCap) {
-      return node.letter +
-          node.restOfParagraph
-              .whereType<DocxText>()
-              .map((t) => t.content)
-              .join();
-    } else if (node is DocxList) {
-      return node.items
-          .map((item) =>
-              item.children.whereType<DocxText>().map((t) => t.content).join())
-          .join(' ');
-    } else if (node is DocxTable) {
-      return node.rows
-          .expand((row) => row.cells)
-          .expand((cell) => cell.children)
-          .whereType<DocxParagraph>()
-          .expand((p) => p.children)
-          .whereType<DocxText>()
-          .map((t) => t.content)
-          .join(' ');
+  void _extractFromBlocks(
+      List<DocxNode> nodes, List<String> texts, BlockIndexCounter counter) {
+    for (final node in nodes) {
+      if (node is DocxParagraph) {
+        texts.add(_extractFromParagraph(node));
+        counter.increment();
+      } else if (node is DocxTable) {
+        for (final row in node.rows) {
+          for (final cell in row.cells) {
+            _extractFromBlocks(cell.children, texts, counter);
+          }
+        }
+      } else if (node is DocxList) {
+        for (final item in node.items) {
+          // List item behaves like a paragraph
+          texts.add(_extractFromInlines(item.children));
+          counter.increment();
+        }
+      } else if (node is DocxSectionBreakBlock) {
+        // Ignored
+      }
+      // Other blocks
     }
-    return '';
+  }
+
+  String _extractFromParagraph(DocxParagraph paragraph) {
+    return _extractFromInlines(paragraph.children);
+  }
+
+  String _extractFromInlines(List<DocxInline> inlines) {
+    final buffer = StringBuffer();
+    for (final inline in inlines) {
+      if (inline is DocxText) {
+        buffer.write(inline.content);
+      } else if (inline is DocxTab) {
+        buffer.write('    ');
+      } else if (inline is DocxLineBreak) {
+        buffer.write('\n');
+      } else if (inline is DocxCheckbox) {
+        buffer.write(inline.isChecked ? '☒ ' : '☐ ');
+      }
+      // Ignore others
+    }
+    return buffer.toString();
   }
 }

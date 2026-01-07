@@ -15,3 +15,5 @@ export 'src/docx_view.dart';
 export 'src/docx_view_config.dart';
 export 'src/search/docx_search_controller.dart';
 export 'src/theme/docx_view_theme.dart';
+export 'src/utils/block_index_counter.dart';
+export 'src/utils/docx_units.dart';

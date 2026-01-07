@@ -111,7 +111,7 @@ class DocxView extends StatefulWidget {
 
 class _DocxViewState extends State<DocxView> {
   List<Widget>? _widgets;
-  List<String>? _textIndex;
+  DocxBuiltDocument? _doc; // Store for re-rendering on search
   bool _isLoading = true;
   Object? _error;
 
@@ -197,9 +197,12 @@ class _DocxViewState extends State<DocxView> {
       // Build search index
       final textIndex = _generator.extractTextForSearch(doc);
 
+      // Update search controller with document text
+      _searchController.setDocument(textIndex);
+
       setState(() {
+        _doc = doc;
         _widgets = widgets;
-        _textIndex = textIndex;
         _isLoading = false;
       });
 
@@ -252,8 +255,73 @@ class _DocxViewState extends State<DocxView> {
   }
 
   void _onSearchChanged() {
-    if (_textIndex != null) {
-      setState(() {});
+    if (_doc != null) {
+      // Regenerate widgets to reflect search highlights
+      final widgets = _generator.generateWidgets(_doc!);
+
+      if (mounted) {
+        setState(() {
+          _widgets = widgets;
+        });
+
+        // Handle navigation
+        final matchIndex = _searchController.currentMatchIndex;
+        if (matchIndex != -1 && matchIndex < _searchController.matches.length) {
+          final match = _searchController.matches[matchIndex];
+          final blockIndex = match.blockIndex;
+
+          final key = _generator.keys[blockIndex];
+          if (key != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (key.currentContext != null) {
+                final context = key.currentContext!;
+                if (!context.mounted) return;
+
+                double alignment = 0.5;
+
+                try {
+                  // For large blocks, calculate dynamic alignment
+                  final renderObject = context.findRenderObject();
+                  if (renderObject is RenderBox) {
+                    final scrollable = Scrollable.of(context);
+                    if (scrollable.position.hasViewportDimension) {
+                      final viewportHeight =
+                          scrollable.position.viewportDimension;
+                      if (renderObject.size.height > viewportHeight) {
+                        final text = _searchController.getBlockText(blockIndex);
+                        if (text.isNotEmpty) {
+                          final relativePos = match.startOffset / text.length;
+                          alignment = relativePos.clamp(0.0, 1.0);
+                        }
+                      }
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('DocxView: Error calculating alignment: $e');
+                }
+
+                debugPrint(
+                    'DocxView: Scrolling to match $matchIndex at block $blockIndex using alignment $alignment');
+
+                Scrollable.ensureVisible(
+                  context,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  alignment: alignment,
+                );
+              } else {
+                debugPrint(
+                    'DocxView: Key found for block $blockIndex but context is null');
+              }
+            });
+          } else {
+            debugPrint('DocxView: No key found for block $blockIndex');
+            // Debug dump keys
+            debugPrint(
+                'DocxView: Available keys: ${_generator.keys.keys.join(', ')}');
+          }
+        }
+      }
     }
   }
 
@@ -296,23 +364,23 @@ class _DocxViewState extends State<DocxView> {
         widget.config.backgroundColor ?? theme.backgroundColor ?? Colors.white;
 
     Widget content;
-    final list = ListView.builder(
-      // If page mode, padding is handled by the page container mostly, but we keep config padding inside
+    final list = SingleChildScrollView(
       padding: widget.config.padding,
-      itemCount: _widgets!.length,
-      itemBuilder: (context, index) {
-        final child = _widgets![index];
-        if (widget.config.pageMode == DocxPageMode.paged) {
-          return Center(child: child);
-        }
-        return child;
-      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _widgets!.map((child) {
+          if (widget.config.pageMode == DocxPageMode.paged) {
+            return Center(child: child);
+          }
+          return child;
+        }).toList(),
+      ),
     );
 
     if (widget.config.pageMode == DocxPageMode.paged) {
       // Paged View: Canvas style
       content = Container(
-        color: widget.config.backgroundColor ?? const Color(0xFFE0E0E0),
+        color: widget.config.backgroundColor ?? Colors.grey.shade200,
         child: list,
       );
     } else if (widget.config.pageWidth != null) {
@@ -324,7 +392,7 @@ class _DocxViewState extends State<DocxView> {
           width: widget.config.pageWidth,
           margin: const EdgeInsets.symmetric(vertical: 24),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.backgroundColor ?? Colors.white,
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
@@ -414,7 +482,11 @@ class _DocxViewWithSearchState extends State<DocxViewWithSearch> {
                       isDense: true,
                     ),
                     onSubmitted: (value) {
-                      // Trigger search
+                      _searchController.search(value);
+                    },
+                    onChanged: (value) {
+                      // Optional: live search
+                      // _searchController.search(value);
                     },
                   ),
                 ),

@@ -1,7 +1,11 @@
 import 'package:docx_creator/docx_creator.dart';
 import 'package:docx_file_viewer/src/docx_view_config.dart';
 import 'package:docx_file_viewer/src/theme/docx_view_theme.dart';
+import 'package:docx_file_viewer/src/utils/block_index_counter.dart';
+import 'package:docx_file_viewer/src/widget_generator/image_builder.dart';
+import 'package:docx_file_viewer/src/widget_generator/list_builder.dart';
 import 'package:docx_file_viewer/src/widget_generator/paragraph_builder.dart';
+import 'package:docx_file_viewer/src/widget_generator/shape_builder.dart';
 import 'package:docx_file_viewer/src/widget_generator/table_builder.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,17 +19,25 @@ class MockParagraphBuilder extends ParagraphBuilder {
         );
 
   @override
-  Widget build(DocxParagraph paragraph, {int? blockIndex}) {
+  Widget build(DocxParagraph paragraph, {BlockIndexCounter? counter}) {
     return const Text('Paragraph');
   }
 }
 
 void main() {
   testWidgets('TableBuilder creates basic table', (WidgetTester tester) async {
+    final theme = DocxViewTheme.light();
+    final config = const DocxViewConfig();
+    final paragraphBuilder = MockParagraphBuilder();
+
     final builder = TableBuilder(
-      theme: DocxViewTheme.light(),
-      config: const DocxViewConfig(),
-      paragraphBuilder: MockParagraphBuilder(),
+      theme: theme,
+      config: config,
+      paragraphBuilder: paragraphBuilder,
+      listBuilder: ListBuilder(
+          theme: theme, config: config, paragraphBuilder: paragraphBuilder),
+      imageBuilder: ImageBuilder(config: config),
+      shapeBuilder: ShapeBuilder(config: config),
     );
 
     final table = DocxTable(
@@ -52,10 +64,18 @@ void main() {
   });
 
   testWidgets('TableBuilder handles gridSpan', (WidgetTester tester) async {
+    final theme = DocxViewTheme.light();
+    final config = const DocxViewConfig();
+    final paragraphBuilder = MockParagraphBuilder();
+
     final builder = TableBuilder(
-      theme: DocxViewTheme.light(),
-      config: const DocxViewConfig(),
-      paragraphBuilder: MockParagraphBuilder(),
+      theme: theme,
+      config: config,
+      paragraphBuilder: paragraphBuilder,
+      listBuilder: ListBuilder(
+          theme: theme, config: config, paragraphBuilder: paragraphBuilder),
+      imageBuilder: ImageBuilder(config: config),
+      shapeBuilder: ShapeBuilder(config: config),
     );
 
     final table = DocxTable(
@@ -86,10 +106,18 @@ void main() {
 
   testWidgets('TableBuilder handles vertical merge',
       (WidgetTester tester) async {
+    final theme = DocxViewTheme.light();
+    final config = const DocxViewConfig();
+    final paragraphBuilder = MockParagraphBuilder();
+
     final builder = TableBuilder(
-      theme: DocxViewTheme.light(),
-      config: const DocxViewConfig(),
-      paragraphBuilder: MockParagraphBuilder(),
+      theme: theme,
+      config: config,
+      paragraphBuilder: paragraphBuilder,
+      listBuilder: ListBuilder(
+          theme: theme, config: config, paragraphBuilder: paragraphBuilder),
+      imageBuilder: ImageBuilder(config: config),
+      shapeBuilder: ShapeBuilder(config: config),
     );
 
     final table = DocxTable(

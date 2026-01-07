@@ -6,6 +6,7 @@ class DocxSearchController extends ChangeNotifier {
   List<SearchMatch> _matches = [];
   int _currentMatchIndex = -1;
   bool _isSearching = false;
+  List<String> _documentTexts = [];
 
   /// Current search query.
   String get query => _query;
@@ -28,8 +29,16 @@ class DocxSearchController extends ChangeNotifier {
           ? _matches[_currentMatchIndex]
           : null;
 
+  /// Set the document text for searching.
+  void setDocument(List<String> texts) {
+    _documentTexts = texts;
+    // If we have a query, re-run search? Or just clear?
+    // Let's clear for now to avoid unexpected state
+    clear();
+  }
+
   /// Search for text in the document.
-  void search(String query, List<String> documentTexts) {
+  void search(String query) {
     _query = query;
     _matches = [];
     _currentMatchIndex = -1;
@@ -43,8 +52,8 @@ class DocxSearchController extends ChangeNotifier {
     _isSearching = true;
     final lowerQuery = query.toLowerCase();
 
-    for (int blockIndex = 0; blockIndex < documentTexts.length; blockIndex++) {
-      final text = documentTexts[blockIndex].toLowerCase();
+    for (int blockIndex = 0; blockIndex < _documentTexts.length; blockIndex++) {
+      final text = _documentTexts[blockIndex].toLowerCase();
       int startIndex = 0;
 
       while (true) {
@@ -56,7 +65,7 @@ class DocxSearchController extends ChangeNotifier {
           startOffset: index,
           endOffset: index + query.length,
           text:
-              documentTexts[blockIndex].substring(index, index + query.length),
+              _documentTexts[blockIndex].substring(index, index + query.length),
         ));
 
         startIndex = index + 1;
@@ -83,6 +92,14 @@ class DocxSearchController extends ChangeNotifier {
     _currentMatchIndex =
         (_currentMatchIndex - 1 + _matches.length) % _matches.length;
     notifyListeners();
+  }
+
+  /// Get text for a specific block index.
+  String getBlockText(int index) {
+    if (index >= 0 && index < _documentTexts.length) {
+      return _documentTexts[index];
+    }
+    return '';
   }
 
   /// Clear search.

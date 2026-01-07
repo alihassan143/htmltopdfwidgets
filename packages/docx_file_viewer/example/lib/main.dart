@@ -36,67 +36,34 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   File? _selectedFile;
   Uint8List? _demoBytes;
-  bool _enableSearch = true;
   bool _enableZoom = true;
   bool _darkMode = false;
-  bool _isLoading = false;
+  final bool _isLoading = false;
   String? _errorMessage;
+
+  // Search state
+  late DocxSearchController _searchController;
+  final TextEditingController _searchTextController = TextEditingController();
+  bool _isSearchActive = false;
 
   @override
   void initState() {
     super.initState();
-    _loadDemoFile();
+    _searchController = DocxSearchController();
+    _searchController.addListener(_onSearchChanged);
   }
 
-  Future<void> _loadDemoFile() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _searchTextController.dispose();
+    super.dispose();
+  }
 
-    try {
-      // Try to load demo.docx from the package directory
-      final demoPath = '${Directory.current.path}/../demo.docx';
-      final demoFile = File(demoPath);
-
-      if (await demoFile.exists()) {
-        setState(() {
-          _selectedFile = demoFile;
-          _isLoading = false;
-        });
-        debugPrint('Demo file loaded from: $demoPath');
-      } else {
-        // Try alternative paths
-        final altPaths = [
-          '${Directory.current.path}/demo.docx',
-          '/Users/mac/Desktop/htmltopdfwidgets/packages/docx_viewer/demo.docx',
-        ];
-
-        for (final path in altPaths) {
-          final file = File(path);
-          if (await file.exists()) {
-            setState(() {
-              _selectedFile = file;
-              _isLoading = false;
-            });
-            debugPrint('Demo file loaded from: $path');
-            return;
-          }
-        }
-
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Demo file not found. Please select a file manually.';
-        });
-        debugPrint('Demo file not found at any location');
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Error loading demo: $e';
-      });
-      debugPrint('Error loading demo file: $e');
-    }
+  void _onSearchChanged() {
+    // Rebuild to update match counts
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickFile() async {
@@ -117,44 +84,99 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('DOCX Viewer'),
-        actions: [
-          // Theme toggle
-          IconButton(
-            icon: Icon(_darkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => setState(() => _darkMode = !_darkMode),
-            tooltip: 'Toggle theme',
-          ),
-          // Settings
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.settings),
-            onSelected: (value) {
-              setState(() {
-                if (value == 'search') _enableSearch = !_enableSearch;
-                if (value == 'zoom') _enableZoom = !_enableZoom;
-              });
-            },
-            itemBuilder: (context) => [
-              CheckedPopupMenuItem(
-                value: 'search',
-                checked: _enableSearch,
-                child: const Text('Enable Search'),
-              ),
-              CheckedPopupMenuItem(
-                value: 'zoom',
-                checked: _enableZoom,
-                child: const Text('Enable Zoom'),
-              ),
-            ],
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(),
       body: _buildBody(),
       floatingActionButton: FloatingActionButton(
         onPressed: _pickFile,
         child: const Icon(Icons.folder_open),
       ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    if (_isSearchActive) {
+      return AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            setState(() {
+              _isSearchActive = false;
+              _searchController.clear();
+              _searchTextController.clear();
+            });
+          },
+        ),
+        title: TextField(
+          controller: _searchTextController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Search text...',
+            border: InputBorder.none,
+          ),
+          onSubmitted: (value) => _searchController.search(value),
+          onChanged: (value) => _searchController.search(value),
+          textInputAction: TextInputAction.search,
+        ),
+        actions: [
+          // Match Counter
+          if (_searchController.matchCount > 0)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Text(
+                  '${_searchController.currentMatchIndex + 1}/${_searchController.matchCount}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ),
+          // Navigation Buttons
+          IconButton(
+            icon: const Icon(Icons.expand_less),
+            onPressed: _searchController.previousMatch,
+            tooltip: 'Previous',
+          ),
+          IconButton(
+            icon: const Icon(Icons.expand_more),
+            onPressed: _searchController.nextMatch,
+            tooltip: 'Next',
+          ),
+        ],
+      );
+    }
+
+    return AppBar(
+      title: const Text('DOCX Viewer'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            setState(() {
+              _isSearchActive = true;
+            });
+          },
+          tooltip: 'Search',
+        ),
+        IconButton(
+          icon: Icon(_darkMode ? Icons.light_mode : Icons.dark_mode),
+          onPressed: () => setState(() => _darkMode = !_darkMode),
+          tooltip: 'Toggle theme',
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.settings),
+          onSelected: (value) {
+            setState(() {
+              if (value == 'zoom') _enableZoom = !_enableZoom;
+            });
+          },
+          itemBuilder: (context) => [
+            CheckedPopupMenuItem(
+              value: 'zoom',
+              checked: _enableZoom,
+              child: const Text('Enable Zoom'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -197,11 +219,6 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.folder_open),
               label: const Text('Open DOCX File'),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: _loadDemoFile,
-              child: const Text('Try loading demo again'),
-            ),
           ],
         ),
       );
@@ -211,21 +228,13 @@ class _HomeScreenState extends State<HomeScreen> {
       file: _selectedFile,
       bytes: _demoBytes,
       config: DocxViewConfig(
-        enableSearch: _enableSearch,
+        enableSearch: true, // Always enable logic, we control interaction
         enableZoom: _enableZoom,
         theme: _darkMode ? DocxViewTheme.dark() : DocxViewTheme.light(),
         backgroundColor: _darkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        showDebugInfo: true, // Enable debug info to see unsupported elements
+        showDebugInfo: true,
       ),
-      onLoaded: () {
-        debugPrint('Document loaded successfully');
-      },
-      onError: (error) {
-        debugPrint('Document loading error: $error');
-        setState(() {
-          _errorMessage = 'Error: $error';
-        });
-      },
+      searchController: _searchController, // Pass explicit controller
     );
   }
 }
