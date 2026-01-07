@@ -37,6 +37,7 @@ export 'src/core/xml_extension.dart';
 // Exporters
 export 'src/exporters/docx_exporter.dart';
 export 'src/exporters/html_exporter.dart';
+export 'src/exporters/pdf/pdf_exporter.dart';
 // Parsers
 export 'src/parsers/html_parser.dart';
 export 'src/parsers/markdown_parser.dart';
