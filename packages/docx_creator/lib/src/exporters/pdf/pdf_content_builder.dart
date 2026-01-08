@@ -85,6 +85,26 @@ class PdfContentBuilder {
     _buffer.writeln('$x1 $y1 m $x2 $y2 l S');
   }
 
+  /// Sets the line width.
+  void setLineWidth(double width) {
+    _buffer.writeln('$width w');
+  }
+
+  /// Moves current point to (x, y).
+  void moveTo(double x, double y) {
+    _buffer.writeln('$x $y m');
+  }
+
+  /// Appends a straight line segment from the current point to (x, y).
+  void lineTo(double x, double y) {
+    _buffer.writeln('$x $y l');
+  }
+
+  /// Strokes the path.
+  void strokePath() {
+    _buffer.writeln('S');
+  }
+
   // --- Text ---
 
   /// Begins a text object.
@@ -160,10 +180,26 @@ class PdfContentBuilder {
   // --- Utilities ---
 
   /// Measures text width.
-  double measureText(String text, double fontSize) {
-    return _fontManager.measureText(text, fontSize);
+  /// [isBold] applies a width scaling factor for bold fonts.
+  double measureText(String text, double fontSize, {bool isBold = false}) {
+    return _fontManager.measureText(text, fontSize, isBold: isBold);
   }
 
   /// Escapes text for PDF.
   String escapeText(String text) => _fontManager.escapeText(text);
+
+  /// Decodes common HTML entities to their character equivalents.
+  static String decodeHtmlEntities(String text) {
+    return text
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'")
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&#34;', '"')
+        .replaceAll('&#60;', '<')
+        .replaceAll('&#62;', '>');
+  }
 }
