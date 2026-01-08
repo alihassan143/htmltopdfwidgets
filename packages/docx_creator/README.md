@@ -14,6 +14,7 @@ A **developer-first DOCX generation library** for Dart. Create, parse, read, and
 | 🌐**HTML Parser**        | Convert HTML to DOCX with 141 CSS named colors      |
 | 📝**Markdown Parser**    | Parse Markdown including tables and nested lists    |
 | 📖**DOCX Reader**        | Load and edit existing .docx files                  |
+| 📄**PDF Export**         | Export documents directly to PDF (pure Dart)        |
 | 🎨**Drawing Shapes**     | 70+ preset shapes (rectangles, arrows, stars, etc.) |
 | 🖼️**Images**           | Embed local, remote, or base64 images (Inline & Floating) |
 | 📊**Tables**             | Styled tables, merged cells, borders, & conditional styles  |
@@ -113,9 +114,68 @@ await DocxExporter().exportToFile(doc, 'from_markdown.docx');
 7. [HTML Parser](#html-parser)
 8. [Markdown Parser](#markdown-parser)
 9. [DOCX Reader &amp; Editor](#docx-reader--editor)
-10. [Sections &amp; Page Layout](#sections--page-layout)
-11. [Font Embedding](#font-embedding)
-12. [API Reference](#api-reference)
+10. [PDF Export](#pdf-export)
+11. [Sections &amp; Page Layout](#sections--page-layout)
+12. [Font Embedding](#font-embedding)
+13. [API Reference](#api-reference)
+
+---
+
+## PDF Export
+
+Export documents directly to PDF with the `PdfExporter`. This is a pure Dart implementation with no native dependencies.
+
+### Basic Usage
+
+```dart
+import 'package:docx_creator/docx_creator.dart';
+
+// Create a document
+final doc = docx()
+  .h1('PDF Export Demo')
+  .p('This document will be exported to PDF.')
+  .bullet(['Feature 1', 'Feature 2', 'Feature 3'])
+  .build();
+
+// Export to PDF file
+await PdfExporter().exportToFile(doc, 'output.pdf');
+
+// Or get as bytes
+final pdfBytes = PdfExporter().exportToBytes(doc);
+```
+
+### From HTML or Markdown
+
+```dart
+// From HTML
+final html = '<h1>Title</h1><p>Content with <b>bold</b>.</p>';
+final htmlDoc = DocxBuiltDocument(elements: await DocxParser.fromHtml(html));
+await PdfExporter().exportToFile(htmlDoc, 'from_html.pdf');
+
+// From Markdown
+final md = '# Title\n\nParagraph with **bold**.';
+final mdDoc = DocxBuiltDocument(elements: await MarkdownParser.parse(md));
+await PdfExporter().exportToFile(mdDoc, 'from_markdown.pdf');
+```
+
+### Supported Features
+
+| Feature | Support |
+|---------|---------|
+| Headings (H1-H6) | ✅ |
+| Bold/Italic | ✅ |
+| Underline/Strikethrough | ✅ |
+| Custom Font Sizes | ✅ |
+| Superscript/Subscript | ✅ |
+| Text Colors | ✅ |
+| Background Colors | ✅ |
+| Text Alignment | ✅ |
+| Bullet Lists | ✅ |
+| Numbered Lists | ✅ |
+| Tables | ✅ |
+| Images (PNG) | ✅ |
+| Page Sizes (A4, Letter) | ✅ |
+| Multi-page | ✅ |
 
 ---
 

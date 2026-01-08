@@ -11,11 +11,12 @@ This document provides in-depth technical documentation for all features of the 
 3. [HTML Parser - Complete Guide](#html-parser---complete-guide)
 4. [Markdown Parser - Complete Guide](#markdown-parser---complete-guide)
 5. [DOCX Reader & Editor - Complete Guide](#docx-reader--editor---complete-guide)
-6. [Drawing & Shapes - Complete Guide](#drawing--shapes---complete-guide)
-7. [Advanced Features](#advanced-features)
-8. [OpenXML Internals](#openxml-internals)
-9. [Advanced Examples](#advanced-examples)
-10. [Troubleshooting](#troubleshooting)
+6. [PDF Export - Complete Guide](#pdf-export---complete-guide)
+7. [Drawing & Shapes - Complete Guide](#drawing--shapes---complete-guide)
+8. [Advanced Features](#advanced-features)
+9. [OpenXML Internals](#openxml-internals)
+10. [Advanced Examples](#advanced-examples)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -640,6 +641,109 @@ Future<void> roundTripExample() async {
   print('Saved modified document');
 }
 ```
+
+---
+
+## PDF Export - Complete Guide
+
+### Overview
+
+The `PdfExporter` class provides pure Dart PDF generation from DocxBuiltDocument objects. No native dependencies are required.
+
+### Basic Usage
+
+```dart
+import 'package:docx_creator/docx_creator.dart';
+
+Future<void> exportToPdf() async {
+  // Create document
+  final doc = docx()
+    .h1('PDF Export Demo')
+    .p('This document will be exported to PDF.')
+    .build();
+
+  // Export to file
+  await PdfExporter().exportToFile(doc, 'output.pdf');
+  
+  // Or get as bytes
+  final pdfBytes = PdfExporter().exportToBytes(doc);
+}
+```
+
+### Architecture
+
+```
+PdfExporter
+├── PdfLayoutEngine      # Page layout and positioning
+├── PdfContentBuilder    # PDF content stream operations
+└── PdfFontManager       # Font selection and text measurement
+```
+
+### Supported Elements
+
+| Element | Support | Notes |
+|---------|---------|-------|
+| `DocxParagraph` | ✅ | Full text formatting |
+| `DocxText` | ✅ | Bold, italic, underline, strikethrough |
+| `DocxTable` | ✅ | Borders, cell backgrounds |
+| `DocxList` | ✅ | Bullet and numbered |
+| `DocxImage` | ✅ | PNG format |
+| `DocxSectionBreak` | ✅ | Page breaks |
+
+### Text Formatting
+
+The PDF exporter supports all common text formatting:
+
+```dart
+DocxParagraph(children: [
+  DocxText('Bold', fontWeight: DocxFontWeight.bold),
+  DocxText('Italic', fontStyle: DocxFontStyle.italic),
+  DocxText('Underline', decoration: DocxTextDecoration.underline),
+  DocxText('Strikethrough', decoration: DocxTextDecoration.strikethrough),
+  DocxText('Red text', color: DocxColor.red),
+  DocxText('Background', shadingFill: 'FFFF00'),
+  DocxText('Large', fontSize: 24),
+  DocxText('2', isSuperscript: true),
+  DocxText('2', isSubscript: true),
+])
+```
+
+### Page Sizes
+
+The exporter supports standard page sizes via section definitions:
+
+```dart
+final doc = docx()
+  .section(pageSize: DocxPageSize.a4)
+  .h1('A4 Document')
+  .p('Content...')
+  .build();
+```
+
+Supported sizes: `DocxPageSize.letter`, `DocxPageSize.a4`
+
+### Font Metrics
+
+The PDF exporter uses accurate Helvetica font metrics:
+
+- Per-character width measurement (95+ ASCII characters)
+- Bold font scaling (1.05x width factor)
+- Proper space width (0.278 em)
+- Mixed font size line height calculation
+
+### Comparison with DocxExporter
+
+| Feature | DocxExporter | PdfExporter |
+|---------|--------------|-------------|
+| Output Format | .docx (Word) | .pdf |
+| Editable | ✅ | ❌ |
+| Embedded Fonts | ✅ | ❌ (Helvetica only) |
+| Shapes | ✅ | ❌ |
+| Custom Styles | ✅ | ❌ |
+| Page Layout | ✅ | ✅ |
+| Tables | ✅ | ✅ |
+| Lists | ✅ | ✅ |
+| Images | ✅ | ✅ (PNG) |
 
 ---
 

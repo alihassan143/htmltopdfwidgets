@@ -1,3 +1,30 @@
+## 1.1.0
+
+### Added
+- **PDF Export**: New `PdfExporter` class for exporting documents directly to PDF format.
+  - Pure Dart implementation with no native dependencies
+  - Supports text formatting (bold, italic, underline, strikethrough)
+  - Per-character font metrics for accurate text measurement (Helvetica)
+  - Bold font width scaling (1.05x) for proper heading layout
+  - Superscript and subscript support with proper positioning
+  - Custom font sizes with per-line height calculation
+  - Background colors for paragraphs and inline text
+  - Table rendering with cell backgrounds and borders
+  - List rendering (bullet and numbered)
+  - Image embedding (PNG format)
+  - Multi-page support with configurable page sizes (Letter, A4)
+  - Text alignment (left, center, right, justify)
+
+### Example
+```dart
+import 'package:docx_creator/docx_creator.dart';
+
+final doc = docx().h1('Title').p('Content').build();
+await PdfExporter().exportToFile(doc, 'output.pdf');
+```
+
+---
+
 ## 1.0.9
 
 ### Fixed

@@ -1,6 +1,6 @@
 name: docx_creator
 description: A developer-first Dart package for creating professional DOCX documents with fluent API, Markdown/HTML parsing, and comprehensive formatting.
-version: 1.0.9
+version: 1.1.0
 repository: https://github.com/alihassan143/htmltopdfwidgets
 homepage: https://github.com/alihassan143/htmltopdfwidgets/tree/main/packages/docx_creator
 topics:
@@ -22,7 +22,7 @@ dependencies:
   html: ^0.15.6
   http: ^1.6.0
   uuid: ^4.5.2
-  equatable: ^2.0.7
+  equatable: ^2.0.8
 
 dev_dependencies:
   lints: ^6.0.0
