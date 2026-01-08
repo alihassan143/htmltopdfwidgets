@@ -1,6 +1,42 @@
+import 'dart:typed_data';
+
+import 'ttf_parser.dart';
+
+/// Represents an embedded TrueType font.
+class EmbeddedFont {
+  final String name;
+  final Uint8List ttfData;
+  final TtfParser metrics;
+  final String fontRef;
+
+  EmbeddedFont({
+    required this.name,
+    required this.ttfData,
+    required this.metrics,
+    required this.fontRef,
+  });
+
+  /// Gets width of a character in font units (scaled to 1000).
+  int getCharWidth(int unicode) {
+    return (metrics.getCharWidth(unicode) * 1000.0 / metrics.unitsPerEm)
+        .round();
+  }
+
+  /// Measures text width in points.
+  double measureText(String text, double fontSize) {
+    var width = 0.0;
+    for (var i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      final charWidth = getCharWidth(code);
+      width += charWidth * fontSize / 1000.0;
+    }
+    return width;
+  }
+}
+
 /// Manages font resources and text encoding for PDF export.
 ///
-/// Handles WinAnsi encoding and font selection.
+/// Handles WinAnsi encoding, font selection, and embedded fonts.
 class PdfFontManager {
   /// Standard PDF Type1 fonts
   static const String helvetica = 'Helvetica';
@@ -126,12 +162,52 @@ class PdfFontManager {
   /// Bold font width scaling factor (Helvetica-Bold is ~5% wider than regular)
   static const double boldWidthFactor = 1.05;
 
+  /// Embedded fonts
+  final List<EmbeddedFont> _embeddedFonts = [];
+
+  /// Gets the list of embedded fonts.
+  List<EmbeddedFont> get embeddedFonts => List.unmodifiable(_embeddedFonts);
+
+  /// Embeds a TrueType font and returns its font reference.
+  String embedFont(String name, Uint8List ttfData) {
+    // Check if already embedded
+    for (final font in _embeddedFonts) {
+      if (font.name == name) return font.fontRef;
+    }
+
+    final parser = TtfParser(ttfData)..parse();
+    final fontRef = '/F${5 + _embeddedFonts.length}';
+    _embeddedFonts.add(EmbeddedFont(
+      name: name,
+      ttfData: ttfData,
+      metrics: parser,
+      fontRef: fontRef,
+    ));
+    return fontRef;
+  }
+
+  /// Gets an embedded font by its reference.
+  EmbeddedFont? getEmbeddedFont(String fontRef) {
+    for (final font in _embeddedFonts) {
+      if (font.fontRef == fontRef) return font;
+    }
+    return null;
+  }
+
   /// Selects the appropriate font reference based on text properties.
   String selectFont({
     bool isBold = false,
     bool isItalic = false,
     bool isMono = false,
+    String? fontFamily,
   }) {
+    // Check for embedded font by family name
+    if (fontFamily != null) {
+      for (final font in _embeddedFonts) {
+        if (font.name == fontFamily) return font.fontRef;
+      }
+    }
+
     if (isMono) return fontMono;
     if (isBold && isItalic) return fontBold; // No bold-italic in standard set
     if (isBold) return fontBold;
@@ -141,7 +217,17 @@ class PdfFontManager {
 
   /// Measures the width of text in points using per-character widths.
   /// [isBold] applies a width scaling factor for bold fonts.
-  double measureText(String text, double fontSize, {bool isBold = false}) {
+  /// [fontRef] uses embedded font metrics if available.
+  double measureText(String text, double fontSize,
+      {bool isBold = false, String? fontRef}) {
+    // Use embedded font metrics if available
+    if (fontRef != null) {
+      final embedded = getEmbeddedFont(fontRef);
+      if (embedded != null) {
+        return embedded.measureText(text, fontSize);
+      }
+    }
+
     var width = 0.0;
     for (var i = 0; i < text.length; i++) {
       final code = text.codeUnitAt(i);
@@ -195,6 +281,16 @@ class PdfFontManager {
     }
 
     return buffer.toString();
+  }
+
+  /// Escapes text as hex string for embedded fonts (UTF-16BE).
+  String escapeTextHex(String text) {
+    final sb = StringBuffer();
+    for (var i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      sb.write(code.toRadixString(16).padLeft(4, '0').toUpperCase());
+    }
+    return sb.toString();
   }
 
   /// Maps common Unicode code points to WinAnsi octal codes.

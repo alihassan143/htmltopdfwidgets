@@ -105,6 +105,126 @@ class PdfContentBuilder {
     _buffer.writeln('S');
   }
 
+  /// Fills the path (using non-zero winding rule).
+  void fillPath() {
+    _buffer.writeln('f');
+  }
+
+  /// Fills and strokes the path.
+  void fillStrokePath() {
+    _buffer.writeln('B');
+  }
+
+  /// Closes the current subpath.
+  void closePath() {
+    _buffer.writeln('h');
+  }
+
+  /// Closes, fills, and strokes the path.
+  void closeFillStrokePath() {
+    _buffer.writeln('b');
+  }
+
+  /// Appends a cubic Bezier curve from current point to (x3, y3).
+  /// Uses (x1, y1) and (x2, y2) as control points.
+  void curveTo(
+      double x1, double y1, double x2, double y2, double x3, double y3) {
+    _buffer.writeln('$x1 $y1 $x2 $y2 $x3 $y3 c');
+  }
+
+  /// Appends a cubic Bezier curve with the first control point at current point.
+  void curveToV(double x2, double y2, double x3, double y3) {
+    _buffer.writeln('$x2 $y2 $x3 $y3 v');
+  }
+
+  /// Appends a cubic Bezier curve with the last control point at end point.
+  void curveToY(double x1, double y1, double x3, double y3) {
+    _buffer.writeln('$x1 $y1 $x3 $y3 y');
+  }
+
+  /// Draws an ellipse approximated with Bezier curves.
+  void drawEllipse(double cx, double cy, double rx, double ry,
+      {bool stroke = true, bool fill = false}) {
+    // Bezier approximation constant for circles
+    const k = 0.5522847498;
+    final kx = rx * k;
+    final ky = ry * k;
+
+    // Start at right side of ellipse
+    moveTo(cx + rx, cy);
+
+    // Draw 4 Bezier curves for each quadrant
+    curveTo(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
+    curveTo(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
+    curveTo(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
+    curveTo(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
+
+    closePath();
+
+    if (fill && stroke) {
+      fillStrokePath();
+    } else if (fill) {
+      fillPath();
+    } else if (stroke) {
+      strokePath();
+    }
+  }
+
+  /// Draws a circle.
+  void drawCircle(double cx, double cy, double radius,
+      {bool stroke = true, bool fill = false}) {
+    drawEllipse(cx, cy, radius, radius, stroke: stroke, fill: fill);
+  }
+
+  /// Draws a rounded rectangle.
+  void drawRoundedRect(
+      double x, double y, double width, double height, double radius,
+      {bool stroke = true, bool fill = false}) {
+    final r = radius.clamp(0, (width / 2).clamp(0, height / 2));
+    const k = 0.5522847498;
+    final kr = r * k;
+
+    moveTo(x + r, y);
+    lineTo(x + width - r, y);
+    curveTo(x + width - r + kr, y, x + width, y + r - kr, x + width, y + r);
+    lineTo(x + width, y + height - r);
+    curveTo(x + width, y + height - r + kr, x + width - r + kr, y + height,
+        x + width - r, y + height);
+    lineTo(x + r, y + height);
+    curveTo(x + r - kr, y + height, x, y + height - r + kr, x, y + height - r);
+    lineTo(x, y + r);
+    curveTo(x, y + r - kr, x + r - kr, y, x + r, y);
+    closePath();
+
+    if (fill && stroke) {
+      fillStrokePath();
+    } else if (fill) {
+      fillPath();
+    } else if (stroke) {
+      strokePath();
+    }
+  }
+
+  /// Draws a polygon from a list of points.
+  void drawPolygon(List<List<double>> points,
+      {bool stroke = true, bool fill = false}) {
+    if (points.isEmpty) return;
+
+    moveTo(points[0][0], points[0][1]);
+    for (var i = 1; i < points.length; i++) {
+      lineTo(points[i][0], points[i][1]);
+    }
+    closePath();
+
+    if (fill && stroke) {
+      fillStrokePath();
+    } else if (fill) {
+      fillPath();
+    } else if (stroke) {
+      strokePath();
+    }
+  }
+
   // --- Text ---
 
   /// Begins a text object.

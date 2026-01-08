@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' show pi, cos, sin;
 import 'dart:typed_data';
 
 import '../../../docx_creator.dart';
@@ -138,8 +139,216 @@ class PdfExporter {
       return _renderList(node, builder, x, y, layout);
     } else if (node is DocxImage) {
       return _renderImage(node, builder, x, y, layout);
+    } else if (node is DocxShapeBlock) {
+      return _renderShapeBlock(node, builder, x, y, layout);
     }
     return y;
+  }
+
+  double _renderShapeBlock(
+    DocxShapeBlock shapeBlock,
+    PdfContentBuilder builder,
+    double startX,
+    double startY,
+    PdfLayoutEngine layout,
+  ) {
+    final shape = shapeBlock.shape;
+    final maxWidth = layout.contentWidth;
+
+    // Calculate X position based on alignment
+    var x = startX;
+    if (shapeBlock.align == DocxAlign.center) {
+      x = startX + (maxWidth - shape.width) / 2;
+    } else if (shapeBlock.align == DocxAlign.right) {
+      x = startX + maxWidth - shape.width;
+    }
+
+    // Y position (PDF Y is from bottom)
+    final y = startY - shape.height;
+
+    _drawShape(builder, shape, x, y);
+
+    return y - 10; // Return new cursor position with spacing
+  }
+
+  void _drawShape(
+      PdfContentBuilder builder, DocxShape shape, double x, double y) {
+    builder.saveState();
+
+    // Set colors
+    if (shape.fillColor != null) {
+      builder.setFillColorHex(shape.fillColor!.hex);
+    }
+    if (shape.outlineColor != null) {
+      builder.setStrokeColorHex(shape.outlineColor!.hex);
+      builder.setLineWidth(shape.outlineWidth);
+    }
+
+    final w = shape.width;
+    final h = shape.height;
+    final hasFill = shape.fillColor != null;
+    final hasStroke = shape.outlineColor != null;
+
+    switch (shape.preset) {
+      case DocxShapePreset.rect:
+        builder.fillStrokeRect(x, y, w, h, lineWidth: shape.outlineWidth);
+
+      case DocxShapePreset.roundRect:
+        final r = (w < h ? w : h) * 0.15;
+        builder.drawRoundedRect(x, y, w, h, r,
+            stroke: hasStroke, fill: hasFill);
+
+      case DocxShapePreset.ellipse:
+        builder.drawEllipse(x + w / 2, y + h / 2, w / 2, h / 2,
+            stroke: hasStroke, fill: hasFill);
+
+      case DocxShapePreset.triangle:
+        builder.drawPolygon([
+          [x + w / 2, y + h], // Top
+          [x, y], // Bottom left
+          [x + w, y], // Bottom right
+        ], stroke: hasStroke, fill: hasFill);
+
+      case DocxShapePreset.diamond:
+        builder.drawPolygon([
+          [x + w / 2, y + h], // Top
+          [x, y + h / 2], // Left
+          [x + w / 2, y], // Bottom
+          [x + w, y + h / 2], // Right
+        ], stroke: hasStroke, fill: hasFill);
+
+      case DocxShapePreset.rightArrow:
+        _drawArrow(builder, x, y, w, h, 'right', hasFill, hasStroke);
+
+      case DocxShapePreset.leftArrow:
+        _drawArrow(builder, x, y, w, h, 'left', hasFill, hasStroke);
+
+      case DocxShapePreset.upArrow:
+        _drawArrow(builder, x, y, w, h, 'up', hasFill, hasStroke);
+
+      case DocxShapePreset.downArrow:
+        _drawArrow(builder, x, y, w, h, 'down', hasFill, hasStroke);
+
+      case DocxShapePreset.star5:
+        _drawStar(builder, x + w / 2, y + h / 2, w / 2, 5, hasFill, hasStroke);
+
+      case DocxShapePreset.star4:
+        _drawStar(builder, x + w / 2, y + h / 2, w / 2, 4, hasFill, hasStroke);
+
+      case DocxShapePreset.star6:
+        _drawStar(builder, x + w / 2, y + h / 2, w / 2, 6, hasFill, hasStroke);
+
+      case DocxShapePreset.line:
+        builder.drawLine(x, y + h / 2, x + w, y + h / 2,
+            lineWidth: shape.outlineWidth);
+
+      case DocxShapePreset.hexagon:
+        _drawRegularPolygon(
+            builder, x + w / 2, y + h / 2, w / 2, 6, hasFill, hasStroke);
+
+      case DocxShapePreset.octagon:
+        _drawRegularPolygon(
+            builder, x + w / 2, y + h / 2, w / 2, 8, hasFill, hasStroke);
+
+      case DocxShapePreset.pentagon:
+        _drawRegularPolygon(
+            builder, x + w / 2, y + h / 2, w / 2, 5, hasFill, hasStroke);
+
+      default:
+        // Fallback to rectangle for unsupported shapes
+        builder.fillStrokeRect(x, y, w, h, lineWidth: shape.outlineWidth);
+    }
+
+    // Draw text inside shape if present
+    if (shape.text != null && shape.text!.isNotEmpty) {
+      builder.drawText(
+        shape.text!,
+        x + w / 2 - shape.text!.length * 3,
+        y + h / 2 - 4,
+        fontSize: 10,
+        colorHex: '000000',
+      );
+    }
+
+    builder.restoreState();
+  }
+
+  void _drawArrow(PdfContentBuilder builder, double x, double y, double w,
+      double h, String direction, bool fill, bool stroke) {
+    final points = <List<double>>[];
+    final headSize = 0.4;
+    final shaftWidth = 0.3;
+
+    switch (direction) {
+      case 'right':
+        points.addAll([
+          [x, y + h * (0.5 - shaftWidth / 2)],
+          [x + w * (1 - headSize), y + h * (0.5 - shaftWidth / 2)],
+          [x + w * (1 - headSize), y],
+          [x + w, y + h / 2],
+          [x + w * (1 - headSize), y + h],
+          [x + w * (1 - headSize), y + h * (0.5 + shaftWidth / 2)],
+          [x, y + h * (0.5 + shaftWidth / 2)],
+        ]);
+      case 'left':
+        points.addAll([
+          [x + w, y + h * (0.5 - shaftWidth / 2)],
+          [x + w * headSize, y + h * (0.5 - shaftWidth / 2)],
+          [x + w * headSize, y],
+          [x, y + h / 2],
+          [x + w * headSize, y + h],
+          [x + w * headSize, y + h * (0.5 + shaftWidth / 2)],
+          [x + w, y + h * (0.5 + shaftWidth / 2)],
+        ]);
+      case 'up':
+        points.addAll([
+          [x + w * (0.5 - shaftWidth / 2), y],
+          [x + w * (0.5 - shaftWidth / 2), y + h * (1 - headSize)],
+          [x, y + h * (1 - headSize)],
+          [x + w / 2, y + h],
+          [x + w, y + h * (1 - headSize)],
+          [x + w * (0.5 + shaftWidth / 2), y + h * (1 - headSize)],
+          [x + w * (0.5 + shaftWidth / 2), y],
+        ]);
+      case 'down':
+        points.addAll([
+          [x + w * (0.5 - shaftWidth / 2), y + h],
+          [x + w * (0.5 - shaftWidth / 2), y + h * headSize],
+          [x, y + h * headSize],
+          [x + w / 2, y],
+          [x + w, y + h * headSize],
+          [x + w * (0.5 + shaftWidth / 2), y + h * headSize],
+          [x + w * (0.5 + shaftWidth / 2), y + h],
+        ]);
+    }
+
+    builder.drawPolygon(points, stroke: stroke, fill: fill);
+  }
+
+  void _drawStar(PdfContentBuilder builder, double cx, double cy, double r,
+      int points, bool fill, bool stroke) {
+    final innerR = r * 0.4;
+    final vertices = <List<double>>[];
+
+    for (var i = 0; i < points * 2; i++) {
+      final angle = (i * pi / points) - pi / 2;
+      final radius = i.isEven ? r : innerR;
+      vertices.add([cx + radius * cos(angle), cy + radius * sin(angle)]);
+    }
+
+    builder.drawPolygon(vertices, stroke: stroke, fill: fill);
+  }
+
+  void _drawRegularPolygon(PdfContentBuilder builder, double cx, double cy,
+      double r, int sides, bool fill, bool stroke) {
+    final vertices = <List<double>>[];
+
+    for (var i = 0; i < sides; i++) {
+      final angle = (i * 2 * pi / sides) - pi / 2;
+      vertices.add([cx + r * cos(angle), cy + r * sin(angle)]);
+    }
+
+    builder.drawPolygon(vertices, stroke: stroke, fill: fill);
   }
 
   double _renderParagraph(

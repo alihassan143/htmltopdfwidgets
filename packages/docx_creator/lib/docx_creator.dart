@@ -45,6 +45,7 @@ export 'src/reader/docx_reader.dart';
 export 'src/reader/models/docx_style.dart';
 // Reader Models
 export 'src/reader/models/docx_theme.dart';
+export 'src/reader/pdf_reader.dart'; // Add PdfReader export
 // Utilities
 export 'src/utils/content_types_generator.dart';
 export 'src/utils/docx_id_generator.dart';
