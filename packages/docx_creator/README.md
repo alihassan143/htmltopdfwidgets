@@ -14,6 +14,7 @@ A **developer-first DOCX generation library** for Dart. Create, parse, read, and
 | 🌐**HTML Parser**        | Convert HTML to DOCX with 141 CSS named colors      |
 | 📝**Markdown Parser**    | Parse Markdown including tables and nested lists    |
 | 📖**DOCX Reader**        | Load and edit existing .docx files                  |
+| 📕**PDF Reader**         | Parse PDF files to DOCX structure                   |
 | 📄**PDF Export**         | Export documents directly to PDF (pure Dart)        |
 | 🎨**Drawing Shapes**     | 70+ preset shapes (rectangles, arrows, stars, etc.) |
 | 🖼️**Images**           | Embed local, remote, or base64 images (Inline & Floating) |
@@ -114,10 +115,12 @@ await DocxExporter().exportToFile(doc, 'from_markdown.docx');
 7. [HTML Parser](#html-parser)
 8. [Markdown Parser](#markdown-parser)
 9. [DOCX Reader &amp; Editor](#docx-reader--editor)
-10. [PDF Export](#pdf-export)
-11. [Sections &amp; Page Layout](#sections--page-layout)
-12. [Font Embedding](#font-embedding)
-13. [API Reference](#api-reference)
+9. [DOCX Reader &amp; Editor](#docx-reader--editor)
+10. [PDF Reader](#pdf-reader)
+11. [PDF Export](#pdf-export)
+12. [Sections &amp; Page Layout](#sections--page-layout)
+13. [Font Embedding](#font-embedding)
+14. [API Reference](#api-reference)
 
 ---
 
@@ -656,6 +659,57 @@ final output = DocxBuiltDocument(
 
 await DocxExporter().exportToFile(output, 'output.docx');
 ```
+
+---
+
+## PDF Reader
+
+Convert PDF documents into editable `DocxBuiltDocument` objects or extract content programmatically.
+
+### Basic Usage
+
+```dart
+// Load PDF
+final pdf = await PdfReader.load('input.pdf');
+
+// Convert to DOCX
+final doc = pdf.toDocx();
+
+// Save as DOCX
+await DocxExporter().exportToFile(doc, 'converted.docx');
+```
+
+### Content Extraction
+
+You can also access the extracted elements directly:
+
+```dart
+final pdf = await PdfReader.load('input.pdf');
+
+print('Pages: ${pdf.pageCount}');
+print('PDF Version: ${pdf.version}');
+
+// Iterate over extracted elements
+for (final element in pdf.elements) {
+  if (element is DocxParagraph) {
+    print(element.text);
+  } else if (element is DocxImage) {
+    print('Image: ${element.width}x${element.height}');
+  }
+}
+
+// Get all text
+print(pdf.text);
+```
+
+### Supported Features
+
+- **Text Extraction**: Preserves paragraphs, fonts, sizes, and colors.
+- **Formatting**: Bold, italic, underline, strikethrough.
+- **Layout**: Groups text into paragraphs based on position.
+- **Images**: Extracts embedded images/XObjects.
+- **Tables**: Basic table structure detection (beta).
+- **Metadata**: Page count, page size, PDF version.
 
 ---
 

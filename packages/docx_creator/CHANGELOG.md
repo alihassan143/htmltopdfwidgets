@@ -1,3 +1,11 @@
+## 1.1.1
+
+### Fixed
+- **Code Cleanup**: Removed unused optional parameters (`isStrikethrough`, `isUnderline`) in PDF reader classes to fix analyzer warnings.
+- **Internal Optimization**: Improved code quality in `pdf_classes.dart` by removing unused fields.
+
+---
+
 ## 1.1.0
 
 ### Added

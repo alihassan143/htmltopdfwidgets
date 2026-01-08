@@ -11,12 +11,13 @@ This document provides in-depth technical documentation for all features of the 
 3. [HTML Parser - Complete Guide](#html-parser---complete-guide)
 4. [Markdown Parser - Complete Guide](#markdown-parser---complete-guide)
 5. [DOCX Reader & Editor - Complete Guide](#docx-reader--editor---complete-guide)
-6. [PDF Export - Complete Guide](#pdf-export---complete-guide)
-7. [Drawing & Shapes - Complete Guide](#drawing--shapes---complete-guide)
-8. [Advanced Features](#advanced-features)
-9. [OpenXML Internals](#openxml-internals)
-10. [Advanced Examples](#advanced-examples)
-11. [Troubleshooting](#troubleshooting)
+6. [PDF Reader - Complete Guide](#pdf-reader---complete-guide)
+7. [PDF Export - Complete Guide](#pdf-export---complete-guide)
+8. [Drawing & Shapes - Complete Guide](#drawing--shapes---complete-guide)
+9. [Advanced Features](#advanced-features)
+10. [OpenXML Internals](#openxml-internals)
+11. [Advanced Examples](#advanced-examples)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -641,6 +642,89 @@ Future<void> roundTripExample() async {
   print('Saved modified document');
 }
 ```
+
+---
+
+## PDF Reader - Complete Guide
+
+### Overview
+
+The `PdfReader` allows you to unlock content from PDF files, converting them into editable DOCX structures or extracting text and images for analysis. Unlike DOCX, PDF is a fixed-layout format, so the reader uses advanced heuristics to reconstruct structure (paragraphs, tables) from positioned text.
+
+### Usage
+
+```dart
+import 'package:docx_creator/docx_creator.dart';
+
+Future<void> convertPdf() async {
+  try {
+    // 1. Load PDF
+    final pdf = await PdfReader.load('input.pdf');
+    
+    // 2. Check for warnings
+    if (pdf.hasWarnings) {
+      print('Warnings: ${pdf.warnings.join('\n')}');
+    }
+    
+    // 3. Convert to DOCX AST
+    final doc = pdf.toDocx();
+    
+    // 4. Save as DOCX
+    await DocxExporter().exportToFile(doc, 'converted.docx');
+    
+  } catch (e) {
+    print('Error loading PDF: $e');
+  }
+}
+```
+
+### Understanding PDF Extraction
+
+Since PDF instructions only say "draw text 'Hello' at x=100, y=200", the reader performs several reconstruction steps:
+
+1.  **Text Extraction**: Individual character instructions are parsed, preserving font, size, and color.
+2.  **Sorting**: All text on a page is sorted TOP-to-BOTTOM, then LEFT-to-RIGHT.
+3.  **Grouping**: Text items that are vertically aligned and close together are grouped into lines, and lines into paragraphs.
+4.  **Table Detection**: Graphic lines (borders) are analyzed to detect grid structures, grouping contained text into table cells.
+5.  **Image Extraction**: Inline images (XObjects) are extracted, decoded (supporting FlateDecode), and placed in the document flow.
+
+### PdfDocument Class
+
+The `PdfDocument` object holds the analysis result:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `elements` | `List<DocxNode>` | The result AST (paragraphs, tables, images) |
+| `images` | `List<PdfExtractedImage>` | Metadata and bytes of all extracted images |
+| `text` | `String` | Plain text representation of the entire document |
+| `pageCount` | `int` | Total pages parsed |
+| `version` | `String` | PDF Header version (e.g. "1.4") |
+| `pageWidth` | `double` | Page width in points (default 612 for Letter) |
+| `pageHeight` | `double` | Page height in points (default 792 for Letter) |
+
+### Supported Features
+
+**Text & Fonts**
+*   Preserves Font Family names (internally mapped)
+*   **Bold** and *Italic* detection
+*   Font sizes (scaled to points)
+*   Text colors (RGB)
+
+**Layout**
+*   Paragraph reconstruction
+*   Basic table structure detection
+*   Flow layout (converts fixed position to flow)
+
+**Images**
+*   Extracts raster images (JPEG, PNG based on filters)
+*   Preserves dimensions and aspect ratio
+
+### Limitations
+
+*   **Complex Layouts**: Multi-column layouts may be merged into a single column unless distinct enough.
+*   **Vector Graphics**: Complex paths/drawings are not yet converted to DOCX shapes.
+*   **Form Fields**: Interactive form data is ignored.
+*   **Encryption**: Password-protected PDFs are not currently supported.
 
 ---
 
