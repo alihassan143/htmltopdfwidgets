@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['docx', 'pdf'],
+      allowedExtensions: ['docx'],
     );
 
     if (result != null && result.files.single.path != null) {
@@ -221,23 +221,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      );
-    }
-
-    final isPdf = _selectedFile?.path.toLowerCase().endsWith('.pdf') ?? false;
-
-    if (isPdf) {
-      return PdfView(
-        file: _selectedFile,
-        bytes: _demoBytes,
-        config: DocxViewConfig(
-          enableSearch: true,
-          enableZoom: _enableZoom,
-          theme: _darkMode ? DocxViewTheme.dark() : DocxViewTheme.light(),
-          backgroundColor: _darkMode ? const Color(0xFF1E1E1E) : Colors.white,
-          showDebugInfo: true,
-        ),
-        searchController: _searchController,
       );
     }
 
