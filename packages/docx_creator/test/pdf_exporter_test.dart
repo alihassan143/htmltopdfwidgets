@@ -17,7 +17,8 @@ void main() {
 
     test('exports basic paragraph content', () async {
       final doc = docx().p('Hello World').build();
-      final bytes = PdfExporter().exportToBytes(doc);
+      // Disable compression for raw content verification
+      final bytes = PdfExporter(compressContent: false).exportToBytes(doc);
       final pdfContent = String.fromCharCodes(bytes);
 
       // Words are rendered separately in PDF with proper spacing
@@ -34,7 +35,8 @@ void main() {
           ]))
           .build();
 
-      final bytes = PdfExporter().exportToBytes(doc);
+      // Disable compression for raw content verification
+      final bytes = PdfExporter(compressContent: false).exportToBytes(doc);
       final pdfContent = String.fromCharCodes(bytes);
 
       expect(pdfContent, contains('BoldText'));
@@ -50,7 +52,8 @@ void main() {
         ['Cell 1', 'Cell 2']
       ]).build();
 
-      final bytes = PdfExporter().exportToBytes(doc);
+      // Disable compression for raw content verification
+      final bytes = PdfExporter(compressContent: false).exportToBytes(doc);
       final pdfContent = String.fromCharCodes(bytes);
 
       // Words are rendered separately in PDF, check for individual content
@@ -66,7 +69,8 @@ void main() {
       final doc = docx()
           .bullet(['Item 1', 'Item 2']).numbered(['Step 1', 'Step 2']).build();
 
-      final bytes = PdfExporter().exportToBytes(doc);
+      // Disable compression for raw content verification
+      final bytes = PdfExporter(compressContent: false).exportToBytes(doc);
       final pdfContent = String.fromCharCodes(bytes);
 
       // Words are rendered separately in PDF

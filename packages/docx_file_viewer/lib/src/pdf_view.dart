@@ -1,0 +1,519 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:docx_creator/docx_creator.dart';
+import 'package:flutter/material.dart';
+
+import 'docx_view_config.dart';
+import 'search/docx_search_controller.dart';
+import 'theme/docx_view_theme.dart';
+import 'widget_generator/docx_widget_generator.dart';
+
+/// A Flutter widget for viewing PDF files (converted structure).
+///
+/// NOTE: This relies on the experimental PDF Reader support in docx_creator.
+class PdfView extends StatefulWidget {
+  /// The PDF file to display. Provide one of: [file], [bytes], or [path].
+  final File? file;
+
+  /// Raw PDF bytes to display.
+  final Uint8List? bytes;
+
+  /// Path to a PDF file.
+  final String? path;
+
+  /// Configuration for the viewer.
+  final DocxViewConfig config;
+
+  /// Optional search controller for external control.
+  final DocxSearchController? searchController;
+
+  /// Callback when document loading completes.
+  final VoidCallback? onLoaded;
+
+  /// Callback when document loading fails.
+  final void Function(Object error)? onError;
+
+  const PdfView({
+    super.key,
+    this.file,
+    this.bytes,
+    this.path,
+    this.config = const DocxViewConfig(),
+    this.searchController,
+    this.onLoaded,
+    this.onError,
+  }) : assert(
+          file != null || bytes != null || path != null,
+          'Must provide either file, bytes, or path',
+        );
+
+  /// Create from file.
+  factory PdfView.file(
+    File file, {
+    Key? key,
+    DocxViewConfig config = const DocxViewConfig(),
+    DocxSearchController? searchController,
+  }) {
+    return PdfView(
+      key: key,
+      file: file,
+      config: config,
+      searchController: searchController,
+    );
+  }
+
+  /// Create from bytes.
+  factory PdfView.bytes(
+    Uint8List bytes, {
+    Key? key,
+    DocxViewConfig config = const DocxViewConfig(),
+    DocxSearchController? searchController,
+  }) {
+    return PdfView(
+      key: key,
+      bytes: bytes,
+      config: config,
+      searchController: searchController,
+    );
+  }
+
+  /// Create from path.
+  factory PdfView.path(
+    String path, {
+    Key? key,
+    DocxViewConfig config = const DocxViewConfig(),
+    DocxSearchController? searchController,
+  }) {
+    return PdfView(
+      key: key,
+      path: path,
+      config: config,
+      searchController: searchController,
+    );
+  }
+
+  @override
+  State<PdfView> createState() => _PdfViewState();
+}
+
+class _PdfViewState extends State<PdfView> {
+  List<Widget>? _widgets;
+  DocxBuiltDocument? _doc; // Store for re-rendering on search
+  bool _isLoading = true;
+  Object? _error;
+
+  late DocxSearchController _searchController;
+  late DocxWidgetGenerator _generator;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = widget.searchController ?? DocxSearchController();
+    _searchController.addListener(_onSearchChanged);
+    _loadDocument();
+  }
+
+  @override
+  void dispose() {
+    if (widget.searchController == null) {
+      _searchController.dispose();
+    } else {
+      _searchController.removeListener(_onSearchChanged);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(PdfView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.file != widget.file ||
+        oldWidget.bytes != widget.bytes ||
+        oldWidget.path != widget.path) {
+      _loadDocument();
+    }
+  }
+
+  Future<void> _loadDocument() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      Uint8List bytes;
+      if (widget.bytes != null) {
+        bytes = widget.bytes!;
+      } else if (widget.file != null) {
+        bytes = await widget.file!.readAsBytes();
+      } else if (widget.path != null) {
+        bytes = await File(widget.path!).readAsBytes();
+      } else {
+        throw ArgumentError('No document source provided');
+      }
+
+      // Load document using PdfReader from docx_creator
+      final pdfDoc = await PdfReader.loadFromBytes(bytes);
+
+      // Convert mechanisms
+      // PDF documents don't have themes/fonts/styles in the same way DOCX does,
+      // but they produce compatible DocxNode elements.
+      final doc = DocxBuiltDocument(
+        elements: pdfDoc.elements,
+        section: const DocxSectionDef(), // Default section
+        fonts: const [], // PDF fonts are not yet extracted as embedded fonts
+      );
+
+      // Prepare empty maps for notes as PDF doesn't support them yet
+      final footnoteMap = <String, DocxFootnote>{};
+      final endnoteMap = <String, DocxEndnote>{};
+
+      // Initialize widget generator
+      _generator = DocxWidgetGenerator(
+        config: widget.config,
+        theme: widget.config.theme,
+        docxTheme: doc.theme,
+        searchController: widget.config.enableSearch ? _searchController : null,
+        onFootnoteTap: (id) =>
+            _showNoteContent('Footnote', footnoteMap[id]?.content),
+        onEndnoteTap: (id) =>
+            _showNoteContent('Endnote', endnoteMap[id]?.content),
+      );
+
+      // Generate widgets
+      final widgets = _generator.generateWidgets(doc);
+
+      // Build search index
+      final textIndex = _generator.extractTextForSearch(doc);
+
+      // Update search controller with document text
+      _searchController.setDocument(textIndex);
+
+      setState(() {
+        _doc = doc;
+        _widgets = widgets;
+        _isLoading = false;
+      });
+
+      widget.onLoaded?.call();
+    } catch (e) {
+      setState(() {
+        _error = e;
+        _isLoading = false;
+      });
+      widget.onError?.call(e);
+    }
+  }
+
+  void _showNoteContent(String title, List<DocxBlock>? content) {
+    if (content == null || content.isEmpty || !mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        final noteWidgets = _generator.generateWidgets(DocxBuiltDocument(
+          elements: content,
+          section: const DocxSectionDef(),
+        ));
+
+        return AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: noteWidgets,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _onSearchChanged() {
+    if (_doc != null) {
+      final widgets = _generator.generateWidgets(_doc!);
+
+      if (mounted) {
+        setState(() {
+          _widgets = widgets;
+        });
+
+        // Handle navigation
+        final matchIndex = _searchController.currentMatchIndex;
+        if (matchIndex != -1 && matchIndex < _searchController.matches.length) {
+          final match = _searchController.matches[matchIndex];
+          final blockIndex = match.blockIndex;
+
+          final key = _generator.keys[blockIndex];
+          if (key != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (key.currentContext != null) {
+                final context = key.currentContext!;
+                if (!context.mounted) return;
+
+                double alignment = 0.5;
+                try {
+                  final renderObject = context.findRenderObject();
+                  if (renderObject is RenderBox) {
+                    final scrollable = Scrollable.of(context);
+                    if (scrollable.position.hasViewportDimension) {
+                      final viewportHeight =
+                          scrollable.position.viewportDimension;
+                      if (renderObject.size.height > viewportHeight) {
+                        final text = _searchController.getBlockText(blockIndex);
+                        if (text.isNotEmpty) {
+                          final relativePos = match.startOffset / text.length;
+                          alignment = relativePos.clamp(0.0, 1.0);
+                        }
+                      }
+                    }
+                  }
+                } catch (e) {
+                  debugPrint('PdfView: Error calculating alignment: $e');
+                }
+
+                Scrollable.ensureVisible(
+                  context,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  alignment: alignment,
+                );
+              }
+            });
+          }
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = widget.config.theme ?? DocxViewTheme.light();
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load PDF',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error.toString(),
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_widgets == null || _widgets!.isEmpty) {
+      return const Center(child: Text('Empty document'));
+    }
+
+    final backgroundColor =
+        widget.config.backgroundColor ?? theme.backgroundColor ?? Colors.white;
+
+    Widget content;
+    final list = SingleChildScrollView(
+      padding: widget.config.padding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _widgets!.map((child) {
+          if (widget.config.pageMode == DocxPageMode.paged) {
+            return Center(child: child);
+          }
+          return child;
+        }).toList(),
+      ),
+    );
+
+    if (widget.config.pageMode == DocxPageMode.paged) {
+      content = Container(
+        color: widget.config.backgroundColor ?? Colors.grey.shade200,
+        child: list,
+      );
+    } else if (widget.config.pageWidth != null) {
+      content = Container(
+        color: widget.config.backgroundColor ?? const Color(0xFFF0F0F0),
+        alignment: Alignment.topCenter,
+        child: Container(
+          width: widget.config.pageWidth,
+          margin: const EdgeInsets.symmetric(vertical: 24),
+          decoration: BoxDecoration(
+            color: theme.backgroundColor ?? Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: list,
+        ),
+      );
+    } else {
+      content = Container(
+        color: backgroundColor,
+        child: list,
+      );
+    }
+
+    if (widget.config.enableZoom) {
+      content = InteractiveViewer(
+        minScale: widget.config.minScale,
+        maxScale: widget.config.maxScale,
+        child: content,
+      );
+    }
+
+    return content;
+  }
+}
+
+/// Widget extension for adding a search bar to PdfView.
+class PdfViewWithSearch extends StatefulWidget {
+  final File? file;
+  final Uint8List? bytes;
+  final String? path;
+  final DocxViewConfig config;
+
+  const PdfViewWithSearch({
+    super.key,
+    this.file,
+    this.bytes,
+    this.path,
+    this.config = const DocxViewConfig(),
+  });
+
+  @override
+  State<PdfViewWithSearch> createState() => _PdfViewWithSearchState();
+}
+
+class _PdfViewWithSearchState extends State<PdfViewWithSearch> {
+  final DocxSearchController _searchController = DocxSearchController();
+  final TextEditingController _textController = TextEditingController();
+  bool _showSearch = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (_showSearch)
+          Container(
+            padding: const EdgeInsets.all(8),
+            color: Colors.grey.shade100,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textController,
+                    decoration: InputDecoration(
+                      hintText: 'Search...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      isDense: true,
+                    ),
+                    onSubmitted: (value) {
+                      _searchController.search(value);
+                    },
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_upward),
+                  onPressed: _searchController.previousMatch,
+                  tooltip: 'Previous match',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_downward),
+                  onPressed: _searchController.nextMatch,
+                  tooltip: 'Next match',
+                ),
+                ListenableBuilder(
+                  listenable: _searchController,
+                  builder: (context, _) {
+                    if (_searchController.matchCount > 0) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '${_searchController.currentMatchIndex + 1}/${_searchController.matchCount}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    setState(() {
+                      _showSearch = false;
+                      _searchController.clear();
+                      _textController.clear();
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: Stack(
+            children: [
+              PdfView(
+                file: widget.file,
+                bytes: widget.bytes,
+                path: widget.path,
+                config: widget.config,
+                searchController: _searchController,
+              ),
+              if (!_showSearch)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FloatingActionButton(
+                    mini: true,
+                    onPressed: () {
+                      setState(() {
+                        _showSearch = true;
+                      });
+                    },
+                    child: const Icon(Icons.search),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}

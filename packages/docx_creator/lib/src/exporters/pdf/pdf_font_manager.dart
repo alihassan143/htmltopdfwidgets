@@ -159,7 +159,114 @@ class PdfFontManager {
     126: 0.584, // ~
   };
 
-  /// Bold font width scaling factor (Helvetica-Bold is ~5% wider than regular)
+  /// Helvetica-Bold character widths as fraction of font size (1000 units = 1.0)
+  /// These are noticeably wider than regular Helvetica
+  static const Map<int, double> _charWidthsBold = {
+    // Space and punctuation
+    32: 0.278, // space
+    33: 0.333, // !
+    34: 0.474, // "
+    35: 0.556, // #
+    36: 0.556, // $
+    37: 0.889, // %
+    38: 0.722, // &
+    39: 0.238, // '
+    40: 0.333, // (
+    41: 0.333, // )
+    42: 0.389, // *
+    43: 0.584, // +
+    44: 0.278, // ,
+    45: 0.333, // -
+    46: 0.278, // .
+    47: 0.278, // /
+    // Numbers
+    48: 0.556, // 0
+    49: 0.556, // 1
+    50: 0.556, // 2
+    51: 0.556, // 3
+    52: 0.556, // 4
+    53: 0.556, // 5
+    54: 0.556, // 6
+    55: 0.556, // 7
+    56: 0.556, // 8
+    57: 0.556, // 9
+    // Punctuation continued
+    58: 0.333, // :
+    59: 0.333, // ;
+    60: 0.584, // <
+    61: 0.584, // =
+    62: 0.584, // >
+    63: 0.611, // ?
+    64: 0.975, // @
+    // Uppercase letters - significantly wider in bold
+    65: 0.722, // A
+    66: 0.722, // B
+    67: 0.722, // C
+    68: 0.722, // D
+    69: 0.667, // E
+    70: 0.611, // F
+    71: 0.778, // G
+    72: 0.722, // H
+    73: 0.278, // I
+    74: 0.556, // J
+    75: 0.722, // K
+    76: 0.611, // L
+    77: 0.833, // M
+    78: 0.722, // N
+    79: 0.778, // O
+    80: 0.667, // P
+    81: 0.778, // Q
+    82: 0.722, // R
+    83: 0.667, // S
+    84: 0.611, // T
+    85: 0.722, // U
+    86: 0.667, // V
+    87: 0.944, // W
+    88: 0.667, // X
+    89: 0.667, // Y
+    90: 0.611, // Z
+    // Brackets and symbols
+    91: 0.333, // [
+    92: 0.278, // \
+    93: 0.333, // ]
+    94: 0.584, // ^
+    95: 0.556, // _
+    96: 0.333, // `
+    // Lowercase letters - also wider in bold
+    97: 0.556, // a
+    98: 0.611, // b
+    99: 0.556, // c
+    100: 0.611, // d
+    101: 0.556, // e
+    102: 0.333, // f
+    103: 0.611, // g
+    104: 0.611, // h
+    105: 0.278, // i
+    106: 0.278, // j
+    107: 0.556, // k
+    108: 0.278, // l
+    109: 0.889, // m
+    110: 0.611, // n
+    111: 0.611, // o
+    112: 0.611, // p
+    113: 0.611, // q
+    114: 0.389, // r
+    115: 0.556, // s
+    116: 0.333, // t
+    117: 0.611, // u
+    118: 0.556, // v
+    119: 0.778, // w
+    120: 0.556, // x
+    121: 0.556, // y
+    122: 0.500, // z
+    123: 0.389, // {
+    124: 0.280, // |
+    125: 0.389, // }
+    126: 0.584, // ~
+  };
+
+  /// Bold font width scaling factor - no longer needed with separate table
+  @Deprecated('Use _charWidthsBold instead')
   static const double boldWidthFactor = 1.05;
 
   /// Embedded fonts
@@ -216,7 +323,7 @@ class PdfFontManager {
   }
 
   /// Measures the width of text in points using per-character widths.
-  /// [isBold] applies a width scaling factor for bold fonts.
+  /// [isBold] uses Helvetica-Bold width table for accurate measurement.
   /// [fontRef] uses embedded font metrics if available.
   double measureText(String text, double fontSize,
       {bool isBold = false, String? fontRef}) {
@@ -228,16 +335,15 @@ class PdfFontManager {
       }
     }
 
+    // Select appropriate width table
+    final widths = isBold ? _charWidthsBold : _charWidths;
+
     var width = 0.0;
     for (var i = 0; i < text.length; i++) {
       final code = text.codeUnitAt(i);
       // Use character-specific width or fallback to average
-      final charWidth = _charWidths[code] ?? avgCharWidth;
+      final charWidth = widths[code] ?? avgCharWidth;
       width += charWidth * fontSize;
-    }
-    // Apply bold scaling if needed
-    if (isBold) {
-      width *= boldWidthFactor;
     }
     return width;
   }

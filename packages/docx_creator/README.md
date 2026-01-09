@@ -35,7 +35,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  docx_creator: ^1.0.9
+  docx_creator: ^1.1.2
 ```
 
 Then run:
@@ -664,52 +664,108 @@ await DocxExporter().exportToFile(output, 'output.docx');
 
 ## PDF Reader
 
-Convert PDF documents into editable `DocxBuiltDocument` objects or extract content programmatically.
+Parse PDF documents and convert them to editable `DocxBuiltDocument` objects. The reader supports a wide variety of PDF formats including legacy and modern PDFs.
 
 ### Basic Usage
 
 ```dart
-// Load PDF
+// Load PDF from file
 final pdf = await PdfReader.load('input.pdf');
+
+// Load from bytes
+final bytes = await File('input.pdf').readAsBytes();
+final pdf = await PdfReader.loadFromBytes(bytes);
 
 // Convert to DOCX
 final doc = pdf.toDocx();
-
-// Save as DOCX
 await DocxExporter().exportToFile(doc, 'converted.docx');
 ```
 
 ### Content Extraction
 
-You can also access the extracted elements directly:
+Access extracted elements directly:
 
 ```dart
-final pdf = await PdfReader.load('input.pdf');
+final pdf = await PdfReader.loadFromBytes(pdfBytes);
 
 print('Pages: ${pdf.pageCount}');
 print('PDF Version: ${pdf.version}');
+print('Page Size: ${pdf.pageWidth} x ${pdf.pageHeight}');
 
 // Iterate over extracted elements
 for (final element in pdf.elements) {
   if (element is DocxParagraph) {
-    print(element.text);
+    // Text content with formatting
+    for (final child in element.children) {
+      if (child is DocxText) {
+        print('Text: ${child.content}');
+        print('Bold: ${child.fontWeight == DocxFontWeight.bold}');
+      }
+    }
   } else if (element is DocxImage) {
-    print('Image: ${element.width}x${element.height}');
+    // Images are encoded as PNG
+    print('Image: ${element.bytes.length} bytes');
+    // Use directly in Flutter: Image.memory(element.bytes)
+  } else if (element is DocxTable) {
+    print('Table: ${element.rows.length} rows');
   }
 }
 
-// Get all text
+// Get all text as a single string
 print(pdf.text);
+```
+
+### Image Extraction
+
+Images are automatically extracted and encoded as PNG:
+
+```dart
+final pdf = await PdfReader.loadFromBytes(pdfBytes);
+
+// Quick access to all images
+for (final img in pdf.images) {
+  print('${img.width}x${img.height}, ${img.bytes.length} bytes');
+  
+  // Save to file
+  await File('image_${pdf.images.indexOf(img)}.png')
+      .writeAsBytes(img.bytes);
+  
+  // Use in Flutter
+  // Image.memory(img.bytes)
+}
+
+// Images are also available in elements list as DocxImage
+for (final element in pdf.elements) {
+  if (element is DocxImage) {
+    // element.bytes contains PNG data
+  }
+}
 ```
 
 ### Supported Features
 
-- **Text Extraction**: Preserves paragraphs, fonts, sizes, and colors.
-- **Formatting**: Bold, italic, underline, strikethrough.
-- **Layout**: Groups text into paragraphs based on position.
-- **Images**: Extracts embedded images/XObjects.
-- **Tables**: Basic table structure detection (beta).
-- **Metadata**: Page count, page size, PDF version.
+| Feature | Status |
+|---------|--------|
+| Text extraction | ✅ |
+| Text formatting (bold, italic) | ✅ |
+| Font detection | ✅ |
+| Font sizes and colors | ✅ |
+| Paragraph grouping | ✅ |
+| Images (JPEG, PNG, FlateDecode) | ✅ |
+| Table detection | ✅ (beta) |
+| Multi-page documents | ✅ |
+| PDF 1.4 standard format | ✅ |
+| PDF 1.5+ XRef streams | ✅ |
+| Object streams | ✅ |
+| FlateDecode compression | ✅ |
+| LZWDecode compression | ✅ |
+| ASCII85/ASCIIHex encoding | ✅ |
+
+### Limitations
+
+- **Image-only (scanned) PDFs**: If a PDF contains only images with no text operators, no text will be extracted. Consider using OCR separately.
+- **Encrypted PDFs**: Password-protected PDFs are not supported.
+- **Complex layouts**: Multi-column layouts may not preserve exact positioning.
 
 ---
 

@@ -1,3 +1,29 @@
+## 1.1.2
+
+### Added
+- **PDF Reader Improvements**: Major enhancements for broader PDF compatibility:
+  - **XRef Stream Support**: Complete parsing of PDF 1.5+ cross-reference streams with `/W` array, `/Index` array, and proper decompression.
+  - **Object Stream Support**: Parse compressed objects stored within object streams (PDF 1.5+).
+  - **Fallback Object Scanning**: Automatic object recovery when xref table/stream is corrupted or malformed.
+  - **LZW Decoding**: Full implementation of LZWDecode filter for older PDFs.
+  - **PNG Image Encoding**: Raw RGB pixel data (from FlateDecode images) is now properly encoded as PNG format for direct use in Flutter.
+  - **Improved Font Parsing**: Balanced bracket matching for nested dictionary structures.
+
+- **PDF Exporter Improvements**:
+  - **Helvetica-Bold Width Table**: Added complete character width table for Helvetica-Bold with accurate per-character measurements.
+  - **Fixed Binary Stream Handling**: Corrected compression corruption issue where binary compressed data was incorrectly converted through String encoding.
+
+### Fixed
+- **Bold Text Spacing**: Fixed issue where bold text characters appeared too close together due to inaccurate width calculations using only a 1.05x multiplier instead of proper Helvetica-Bold metrics.
+- **Blank PDF Generation**: Fixed blank PDFs caused by binary FlateDecode stream data being corrupted during intermediate String conversions.
+- **Image Extraction**: Fixed image extraction returning raw RGB bytes instead of usable image format. Images are now properly encoded as PNG.
+
+### Improved
+- **PdfDocument Documentation**: Enhanced documentation explaining the purpose of both `elements` and `images` lists.
+- **Error Handling**: Better error recovery during PDF parsing with informative warnings.
+
+---
+
 ## 1.1.1
 
 ### Fixed

@@ -649,7 +649,7 @@ Future<void> roundTripExample() async {
 
 ### Overview
 
-The `PdfReader` allows you to unlock content from PDF files, converting them into editable DOCX structures or extracting text and images for analysis. Unlike DOCX, PDF is a fixed-layout format, so the reader uses advanced heuristics to reconstruct structure (paragraphs, tables) from positioned text.
+The `PdfReader` parses PDF documents and converts them into editable DOCX structures or extracts text and images for analysis. Version 1.2.0 includes major improvements for broader PDF compatibility including PDF 1.5+ features.
 
 ### Usage
 
@@ -657,74 +657,174 @@ The `PdfReader` allows you to unlock content from PDF files, converting them int
 import 'package:docx_creator/docx_creator.dart';
 
 Future<void> convertPdf() async {
-  try {
-    // 1. Load PDF
-    final pdf = await PdfReader.load('input.pdf');
-    
-    // 2. Check for warnings
-    if (pdf.hasWarnings) {
-      print('Warnings: ${pdf.warnings.join('\n')}');
+  // Load from file path
+  final pdf = await PdfReader.load('input.pdf');
+  
+  // Or load from bytes
+  final bytes = await File('input.pdf').readAsBytes();
+  final pdf = await PdfReader.loadFromBytes(bytes);
+  
+  // Check for warnings
+  if (pdf.warnings.isNotEmpty) {
+    print('Warnings: ${pdf.warnings.join('\n')}');
+  }
+  
+  // Convert to DOCX AST
+  final doc = pdf.toDocx();
+  
+  // Save as DOCX or PDF
+  await DocxExporter().exportToFile(doc, 'converted.docx');
+  await PdfExporter().exportToFile(doc, 'converted.pdf');
+}
+```
+
+### PdfDocument Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `elements` | `List<DocxNode>` | Document structure (paragraphs, tables, images) |
+| `images` | `List<PdfExtractedImage>` | Quick access to all extracted images |
+| `text` | `String` | Plain text content of entire document |
+| `pageCount` | `int` | Total pages in the PDF |
+| `pageWidth` | `double` | Page width in points (612 for Letter) |
+| `pageHeight` | `double` | Page height in points (792 for Letter) |
+| `version` | `String` | PDF version (e.g., "1.4", "1.5") |
+| `warnings` | `List<String>` | Any parsing warnings |
+
+### Content Extraction
+
+```dart
+final pdf = await PdfReader.loadFromBytes(pdfBytes);
+
+print('PDF ${pdf.version}, ${pdf.pageCount} pages');
+print('Size: ${pdf.pageWidth} x ${pdf.pageHeight} points');
+
+// Iterate over extracted elements
+for (final element in pdf.elements) {
+  if (element is DocxParagraph) {
+    for (final child in element.children) {
+      if (child is DocxText) {
+        print('Text: ${child.content}');
+        print('  Bold: ${child.fontWeight == DocxFontWeight.bold}');
+        print('  Size: ${child.fontSize}');
+        print('  Color: ${child.color?.hex}');
+      }
     }
-    
-    // 3. Convert to DOCX AST
-    final doc = pdf.toDocx();
-    
-    // 4. Save as DOCX
-    await DocxExporter().exportToFile(doc, 'converted.docx');
-    
-  } catch (e) {
-    print('Error loading PDF: $e');
+  } else if (element is DocxImage) {
+    print('Image: ${element.bytes.length} bytes');
+  } else if (element is DocxTable) {
+    print('Table: ${element.rows.length} rows');
+  }
+}
+
+// Get all text as plain string
+final allText = pdf.text;
+```
+
+### Image Extraction
+
+Images are automatically extracted and encoded as PNG for direct use in Flutter:
+
+```dart
+final pdf = await PdfReader.loadFromBytes(pdfBytes);
+
+// Quick access to all images
+for (final img in pdf.images) {
+  print('${img.width}x${img.height}, ${img.format}');
+  
+  // Images are ready to use
+  // In Flutter: Image.memory(img.bytes)
+  
+  // Save to file
+  await File('image_${pdf.images.indexOf(img)}.png')
+      .writeAsBytes(img.bytes);
+}
+
+// Images are also in elements list as DocxImage
+for (final element in pdf.elements) {
+  if (element is DocxImage) {
+    // element.bytes contains PNG-encoded image data
+    // element.extension is 'png' or 'jpeg'
   }
 }
 ```
 
+### Supported PDF Features
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **PDF Versions** | | |
+| PDF 1.0-1.4 (traditional xref) | ✅ | Full support |
+| PDF 1.5+ (xref streams) | ✅ | Added in v1.2.0 |
+| PDF 1.5+ (object streams) | ✅ | Added in v1.2.0 |
+| **Compression** | | |
+| FlateDecode (zlib) | ✅ | Most common |
+| LZWDecode | ✅ | Added in v1.2.0 |
+| ASCII85Decode | ✅ | |
+| ASCIIHexDecode | ✅ | |
+| **Content** | | |
+| Text extraction | ✅ | With font info |
+| Bold/Italic detection | ✅ | From font name |
+| Font sizes and colors | ✅ | |
+| Paragraph grouping | ✅ | Position-based |
+| Table detection | ✅ | Beta, grid-based |
+| **Images** | | |
+| JPEG (DCTDecode) | ✅ | Native format |
+| Raw RGB (FlateDecode) | ✅ | Encoded as PNG |
+| Inline images | ✅ | |
+| **Error Handling** | | |
+| Fallback object scanning | ✅ | For corrupt xref |
+
 ### Understanding PDF Extraction
 
-Since PDF instructions only say "draw text 'Hello' at x=100, y=200", the reader performs several reconstruction steps:
+Since PDF is a fixed-layout format, the reader performs several reconstruction steps:
 
-1.  **Text Extraction**: Individual character instructions are parsed, preserving font, size, and color.
-2.  **Sorting**: All text on a page is sorted TOP-to-BOTTOM, then LEFT-to-RIGHT.
-3.  **Grouping**: Text items that are vertically aligned and close together are grouped into lines, and lines into paragraphs.
-4.  **Table Detection**: Graphic lines (borders) are analyzed to detect grid structures, grouping contained text into table cells.
-5.  **Image Extraction**: Inline images (XObjects) are extracted, decoded (supporting FlateDecode), and placed in the document flow.
-
-### PdfDocument Class
-
-The `PdfDocument` object holds the analysis result:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `elements` | `List<DocxNode>` | The result AST (paragraphs, tables, images) |
-| `images` | `List<PdfExtractedImage>` | Metadata and bytes of all extracted images |
-| `text` | `String` | Plain text representation of the entire document |
-| `pageCount` | `int` | Total pages parsed |
-| `version` | `String` | PDF Header version (e.g. "1.4") |
-| `pageWidth` | `double` | Page width in points (default 612 for Letter) |
-| `pageHeight` | `double` | Page height in points (default 792 for Letter) |
-
-### Supported Features
-
-**Text & Fonts**
-*   Preserves Font Family names (internally mapped)
-*   **Bold** and *Italic* detection
-*   Font sizes (scaled to points)
-*   Text colors (RGB)
-
-**Layout**
-*   Paragraph reconstruction
-*   Basic table structure detection
-*   Flow layout (converts fixed position to flow)
-
-**Images**
-*   Extracts raster images (JPEG, PNG based on filters)
-*   Preserves dimensions and aspect ratio
+1. **Text Extraction**: Character codes are decoded using font encodings (WinAnsi, ToUnicode CMap).
+2. **Position Sorting**: Text is sorted top-to-bottom, left-to-right.
+3. **Paragraph Grouping**: Vertically aligned text is grouped into paragraphs.
+4. **Table Detection**: Grid lines are analyzed to detect table structures.
+5. **Image Decoding**: XObject images are decompressed and encoded as PNG.
 
 ### Limitations
 
-*   **Complex Layouts**: Multi-column layouts may be merged into a single column unless distinct enough.
-*   **Vector Graphics**: Complex paths/drawings are not yet converted to DOCX shapes.
-*   **Form Fields**: Interactive form data is ignored.
-*   **Encryption**: Password-protected PDFs are not currently supported.
+| Limitation | Description |
+|------------|-------------|
+| **Scanned/Image PDFs** | If pages contain only images with no text operators, no text is extracted. Use OCR separately. |
+| **Encrypted PDFs** | Password-protected PDFs are not supported. |
+| **Complex layouts** | Multi-column layouts may not preserve exact positioning. |
+| **Vector graphics** | Complex paths/drawings are not converted to shapes. |
+| **Form fields** | Interactive form data is ignored. |
+| **Type 3 fonts** | Custom glyph definitions may not render correctly. |
+
+### Example: PDF to DOCX Conversion
+
+```dart
+Future<void> convertPdfToDocx(String inputPath, String outputPath) async {
+  try {
+    // Load PDF
+    final pdf = await PdfReader.load(inputPath);
+    
+    print('Loaded PDF ${pdf.version}');
+    print('${pdf.pageCount} pages, ${pdf.elements.length} elements');
+    print('${pdf.images.length} images extracted');
+    
+    // Check warnings
+    for (final warning in pdf.warnings) {
+      print('Warning: $warning');
+    }
+    
+    // Convert to DOCX
+    final doc = pdf.toDocx();
+    
+    // Export
+    await DocxExporter().exportToFile(doc, outputPath);
+    print('Saved to $outputPath');
+    
+  } on PdfParseException catch (e) {
+    print('Failed to parse PDF: ${e.message}');
+  }
+}
+```
 
 ---
 

@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['docx'],
+      allowedExtensions: ['docx', 'pdf'],
     );
 
     if (result != null && result.files.single.path != null) {
@@ -217,10 +217,27 @@ class _HomeScreenState extends State<HomeScreen> {
             ElevatedButton.icon(
               onPressed: _pickFile,
               icon: const Icon(Icons.folder_open),
-              label: const Text('Open DOCX File'),
+              label: const Text('Open File'),
             ),
           ],
         ),
+      );
+    }
+
+    final isPdf = _selectedFile?.path.toLowerCase().endsWith('.pdf') ?? false;
+
+    if (isPdf) {
+      return PdfView(
+        file: _selectedFile,
+        bytes: _demoBytes,
+        config: DocxViewConfig(
+          enableSearch: true,
+          enableZoom: _enableZoom,
+          theme: _darkMode ? DocxViewTheme.dark() : DocxViewTheme.light(),
+          backgroundColor: _darkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          showDebugInfo: true,
+        ),
+        searchController: _searchController,
       );
     }
 

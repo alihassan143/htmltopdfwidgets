@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
-/// Low-level PDF 1.4 document writer.
+/// Low-level PDF 1.4/A document writer with compression support.
 ///
 /// Handles object creation, cross-reference table, and final PDF assembly.
 class PdfDocumentWriter {
@@ -41,11 +42,30 @@ class PdfDocumentWriter {
     required double width,
     required double height,
     Map<String, int>? xObjectIds,
+    bool compress = true,
   }) {
-    // Create content stream object
-    final contentId = _createObject(
-      '<< /Length ${contentStream.length} >>\nstream\n$contentStream\nendstream',
-    );
+    // Compress content stream with FlateDecode
+    dynamic contentObjData;
+    if (compress && contentStream.length > 100) {
+      try {
+        final compressed = zlib.encode(utf8.encode(contentStream));
+        final dict =
+            '<< /Filter /FlateDecode /Length ${compressed.length} >>\nstream\n';
+        final builder = BytesBuilder();
+        builder.add(utf8.encode(dict));
+        builder.add(compressed);
+        builder.add(utf8.encode('\nendstream'));
+        contentObjData = builder.toBytes();
+      } catch (_) {
+        contentObjData =
+            '<< /Length ${contentStream.length} >>\nstream\n$contentStream\nendstream';
+      }
+    } else {
+      contentObjData =
+          '<< /Length ${contentStream.length} >>\nstream\n$contentStream\nendstream';
+    }
+
+    final contentId = _createObject(contentObjData);
 
     // Build resources dictionary
     final resourcesBuffer = StringBuffer('<<\n');
@@ -84,17 +104,95 @@ class PdfDocumentWriter {
     return pageId;
   }
 
+  /// Adds a link annotation to the current page.
+  ///
+  /// Returns the annotation object ID.
+  int addLinkAnnotation({
+    required double x,
+    required double y,
+    required double width,
+    required double height,
+    required String uri,
+    required int pageId,
+  }) {
+    final annotId = _createObject(
+      '<<\n'
+      '/Type /Annot\n'
+      '/Subtype /Link\n'
+      '/Rect [$x $y ${x + width} ${y + height}]\n'
+      '/Border [0 0 0]\n'
+      '/A << /Type /Action /S /URI /URI ($uri) >>\n'
+      '>>',
+    );
+
+    // Add annotation to page's Annots array
+    _pageAnnotations[pageId] ??= [];
+    _pageAnnotations[pageId]!.add(annotId);
+
+    return annotId;
+  }
+
+  /// Map of page IDs to annotation object IDs
+  final Map<int, List<int>> _pageAnnotations = {};
+
   /// Adds an image XObject.
   ///
   /// Returns the object ID for use in page resources.
+  /// [filter] can be 'DCTDecode' for JPEG, 'FlateDecode' for compressed raw, or 'ASCIIHexDecode'.
   int addImage({
     required Uint8List bytes,
     required int width,
     required int height,
     String colorSpace = 'DeviceRGB',
     int bitsPerComponent = 8,
+    String? filter,
   }) {
-    // Use ASCII85 or Hex encoding for simplicity
+    // Detect JPEG (starts with 0xFFD8)
+    final isJpeg = bytes.length > 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
+
+    if (isJpeg || filter == 'DCTDecode') {
+      // JPEG - embed directly with DCTDecode
+      return _createObject(
+        '<<\n'
+        '/Type /XObject\n'
+        '/Subtype /Image\n'
+        '/Width $width\n'
+        '/Height $height\n'
+        '/ColorSpace /$colorSpace\n'
+        '/BitsPerComponent $bitsPerComponent\n'
+        '/Filter /DCTDecode\n'
+        '/Length ${bytes.length}\n'
+        '>>\n'
+        'stream\n'
+        '${String.fromCharCodes(bytes)}\n'
+        'endstream',
+      );
+    } else if (filter == 'FlateDecode' || bytes.length > 1000) {
+      // Compress raw image data with FlateDecode
+      try {
+        final compressed = zlib.encode(bytes);
+        final dict = '<<\n'
+            '/Type /XObject\n'
+            '/Subtype /Image\n'
+            '/Width $width\n'
+            '/Height $height\n'
+            '/ColorSpace /$colorSpace\n'
+            '/BitsPerComponent $bitsPerComponent\n'
+            '/Filter /FlateDecode\n'
+            '/Length ${compressed.length}\n'
+            '>>\n'
+            'stream\n';
+        final builder = BytesBuilder();
+        builder.add(utf8.encode(dict));
+        builder.add(compressed);
+        builder.add(utf8.encode('\nendstream'));
+        return _createObject(builder.toBytes());
+      } catch (_) {
+        // Fall through to hex encoding
+      }
+    }
+
+    // Fallback: ASCIIHex encoding
     final hexData =
         bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join('');
 
@@ -141,22 +239,38 @@ class PdfDocumentWriter {
     write(
         '$_pagesId 0 obj\n<< /Type /Pages /Kids [$kids] /Count ${_pageObjectIds.length} >>\nendobj\n');
 
-    // Write fonts
+    // Write fonts with width arrays for accurate text measurement
+    // Helvetica width array (characters 32-255)
+    const helveticaWidths =
+        '[278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 '
+        '556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 '
+        '1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 '
+        '667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 '
+        '333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 '
+        '556 556 333 500 278 556 500 722 500 500 500 334 260 334 584 278]';
+
     offsets[_fontHelveticaId] = offset;
     write(
-        '$_fontHelveticaId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n');
+        '$_fontHelveticaId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica '
+        '/Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 '
+        '/Widths $helveticaWidths >>\nendobj\n');
 
     offsets[_fontHelveticaBoldId] = offset;
     write(
-        '$_fontHelveticaBoldId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n');
+        '$_fontHelveticaBoldId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold '
+        '/Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 '
+        '/Widths $helveticaWidths >>\nendobj\n');
 
     offsets[_fontHelveticaObliqueId] = offset;
     write(
-        '$_fontHelveticaObliqueId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>\nendobj\n');
+        '$_fontHelveticaObliqueId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique '
+        '/Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 '
+        '/Widths $helveticaWidths >>\nendobj\n');
 
     offsets[_fontCourierId] = offset;
     write(
-        '$_fontCourierId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>\nendobj\n');
+        '$_fontCourierId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier '
+        '/Encoding /WinAnsiEncoding >>\nendobj\n');
 
     // Write info
     offsets[_infoId] = offset;
@@ -169,7 +283,15 @@ class PdfDocumentWriter {
     // Write dynamic objects
     for (final obj in _objects) {
       offsets[obj.id] = offset;
-      write('${obj.id} 0 obj\n${obj.content}\nendobj\n');
+      write('${obj.id} 0 obj\n');
+      if (obj.content is String) {
+        write('${obj.content as String}\nendobj\n');
+      } else if (obj.content is List<int>) {
+        final data = obj.content as List<int>;
+        buffer.add(data);
+        offset += data.length;
+        write('\nendobj\n');
+      }
     }
 
     // XRef table
@@ -195,7 +317,7 @@ class PdfDocumentWriter {
     return buffer.toBytes();
   }
 
-  int _createObject(String content) {
+  int _createObject(dynamic content) {
     final id = _nextId++;
     _objects.add(_PdfObject(id, content));
     return id;
@@ -204,6 +326,6 @@ class PdfDocumentWriter {
 
 class _PdfObject {
   final int id;
-  final String content;
+  final dynamic content;
   _PdfObject(this.id, this.content);
 }

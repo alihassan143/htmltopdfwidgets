@@ -29,6 +29,9 @@ class PdfExporter {
 
   final int fontSize;
 
+  /// Whether to compress content streams (reduces file size but makes text unreadable in raw bytes)
+  final bool compressContent;
+
   // State for current export
   PdfDocumentWriter? _writer;
   final _pageImages = <String, int>{};
@@ -43,6 +46,7 @@ class PdfExporter {
     this.marginLeft = 72.0,
     this.marginRight = 72.0,
     this.fontSize = 12,
+    this.compressContent = true,
   });
 
   /// Exports the document to a file.
@@ -89,6 +93,7 @@ class PdfExporter {
         width: section.width,
         height: section.height,
         xObjectIds: Map.from(_pageImages),
+        compress: compressContent,
       );
 
       _pageImages.clear();
