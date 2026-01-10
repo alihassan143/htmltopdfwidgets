@@ -23,6 +23,8 @@ dependencies:
   http: ^1.6.0
   uuid: ^4.5.2
   equatable: ^2.0.8
+  pointycastle: ^4.0.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   lints: ^6.0.0

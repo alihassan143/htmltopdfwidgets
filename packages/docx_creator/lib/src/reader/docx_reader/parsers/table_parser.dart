@@ -1,7 +1,7 @@
 import 'package:docx_creator/docx_creator.dart';
 import 'package:xml/xml.dart';
 
-import '../reader_context.dart';
+import '../reader_context/reader_context.dart';
 import 'inline_parser.dart';
 
 /// Parses table elements (w:tbl).

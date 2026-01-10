@@ -2,8 +2,8 @@ import 'dart:typed_data';
 
 import 'package:xml/xml.dart';
 
-import '../../../docx_creator.dart';
-import '../reader_context.dart';
+import '../../../../docx_creator.dart';
+import '../reader_context/reader_context.dart';
 
 /// Parses numbering definitions from numbering.xml.
 class NumberingParser {

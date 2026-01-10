@@ -1,7 +1,7 @@
 import 'package:xml/xml.dart';
 
 import '../core/enums.dart';
-import '../reader/models/docx_font.dart';
+import '../reader/docx_reader/models/docx_font.dart';
 import 'docx_node.dart';
 
 /// A styled text run within a paragraph.

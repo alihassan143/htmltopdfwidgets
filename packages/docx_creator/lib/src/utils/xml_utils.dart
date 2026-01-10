@@ -2,6 +2,7 @@
 ///
 /// Provides text escaping, validation, and other XML-related utilities
 /// to ensure generated DOCX files are well-formed and compliant.
+library;
 
 /// Escapes text content for safe XML embedding.
 ///

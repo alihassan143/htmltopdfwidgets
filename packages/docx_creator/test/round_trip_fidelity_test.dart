@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:docx_creator/docx_creator.dart';
-import 'package:docx_creator/src/utils/docx_validator.dart';
 import 'package:test/test.dart';
 
 /// Round-trip fidelity tests for True-Fidelity DOCX preservation.

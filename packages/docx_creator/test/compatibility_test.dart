@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:docx_creator/src/reader/pdf_parser.dart';
-import 'package:docx_creator/src/reader/pdf_types.dart';
+import 'package:docx_creator/src/reader/pdf_reader/pdf_parser.dart';
+import 'package:docx_creator/src/reader/pdf_reader/pdf_types.dart';
 import 'package:test/test.dart';
 
 void main() {

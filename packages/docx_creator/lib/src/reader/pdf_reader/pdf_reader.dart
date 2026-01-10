@@ -1,13 +1,24 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import '../../docx_creator.dart';
+import '../../../docx_creator.dart';
+import 'pdf_annotations.dart';
+import 'pdf_attachment.dart';
+import 'pdf_form.dart';
 import 'pdf_image_extractor.dart';
+import 'pdf_metadata.dart';
+import 'pdf_outline.dart';
 import 'pdf_parser.dart';
 import 'pdf_table_detector.dart';
 import 'pdf_text_extractor.dart';
 import 'pdf_types.dart';
 
+export 'pdf_annotations.dart' show PdfAnnotation, PdfAnnotationType;
+export 'pdf_encryption.dart' show PdfEncryption;
+export 'pdf_form.dart' show PdfFormField, PdfFieldType;
+export 'pdf_metadata.dart' show PdfMetadata, XmpMetadata;
+export 'pdf_outline.dart' show PdfOutlineItem;
+export 'pdf_page_info.dart' show PdfPageInfo, PdfBox, PdfPageInfoExtractor;
 export 'pdf_parser.dart' show PdfParseException;
 export 'pdf_types.dart' show PdfExtractedImage;
 
@@ -95,6 +106,7 @@ class PdfReader {
       pageWidth: _pageWidth,
       pageHeight: _pageHeight,
       version: _parser.version,
+      parser: _parser,
     );
   }
 
@@ -112,7 +124,7 @@ class PdfReader {
     }
 
     // Get page dimensions from Pages object
-    _extractMediaBox(pagesObj.content);
+    _extractPageBoxes(pagesObj.content);
 
     // Get Kids array (can be nested)
     _parseKidsArray(pagesObj.content);
@@ -143,8 +155,9 @@ class PdfReader {
     }
   }
 
-  /// Extracts media box dimensions.
-  void _extractMediaBox(String content) {
+  /// Extracts page boxes (MediaBox, CropBox, etc.).
+  void _extractPageBoxes(String content) {
+    // MediaBox (Default, Required)
     final mediaBoxMatch = RegExp(
             r'/MediaBox\s*\[\s*([\d\.\-]+)\s+([\d\.\-]+)\s+([\d\.\-]+)\s+([\d\.\-]+)\s*\]')
         .firstMatch(content);
@@ -152,6 +165,21 @@ class PdfReader {
       _pageWidth = double.tryParse(mediaBoxMatch.group(3)!) ?? 612;
       _pageHeight = double.tryParse(mediaBoxMatch.group(4)!) ?? 792;
     }
+
+    // CropBox (Visible region, overrides MediaBox if present)
+    final cropBoxMatch = RegExp(
+            r'/CropBox\s*\[\s*([\d\.\-]+)\s+([\d\.\-]+)\s+([\d\.\-]+)\s+([\d\.\-]+)\s*\]')
+        .firstMatch(content);
+    if (cropBoxMatch != null) {
+      final w = double.tryParse(cropBoxMatch.group(3)!);
+      final h = double.tryParse(cropBoxMatch.group(4)!);
+      if (w != null && h != null) {
+        _pageWidth = w;
+        _pageHeight = h;
+      }
+    }
+
+    // TODO: Extract TrimBox, ArtBox, BleedBox for metadata if needed
   }
 
   /// Parses a single page.
@@ -159,7 +187,7 @@ class PdfReader {
     final pageObj = _parser.getObject(pageRef);
     if (pageObj == null) return;
 
-    _extractMediaBox(pageObj.content);
+    _extractPageBoxes(pageObj.content);
     _textExtractor.pageWidth = _pageWidth;
     _textExtractor.pageHeight = _pageHeight;
 
@@ -513,11 +541,13 @@ class PdfReader {
     // Heuristic: If first line size > 16, treat as Heading
     final firstLine = lines.first;
     String? headingStyle;
-    if (firstLine.size >= 24)
+    if (firstLine.size >= 24) {
       headingStyle = 'Heading1';
-    else if (firstLine.size >= 18)
+    } else if (firstLine.size >= 18) {
       headingStyle = 'Heading2';
-    else if (firstLine.size >= 16) headingStyle = 'Heading3';
+    } else if (firstLine.size >= 16) {
+      headingStyle = 'Heading3';
+    }
 
     // Check for List Item
     // Regex for bullets or numbers: ^[•\-\*] or ^\d+\.
@@ -669,6 +699,21 @@ class PdfDocument {
   /// PDF version (e.g., "1.4").
   final String version;
 
+  /// Internal parser reference for lazy feature access.
+  final PdfParser? _parser;
+
+  // Lazy-loaded feature caches
+  PdfMetadata? _metadata;
+  List<PdfOutlineItem>? _outlines;
+  List<PdfAnnotation>? _annotations;
+  List<PdfFormField>? _formFields;
+  PdfEncryption? _encryption;
+  bool _encryptionChecked = false;
+  List<PdfPageInfo>? _pageInfos;
+  XmpMetadata? _xmpMetadata;
+  bool _xmpChecked = false;
+  List<PdfAttachment>? _attachments;
+
   PdfDocument({
     required this.elements,
     required this.images,
@@ -677,7 +722,132 @@ class PdfDocument {
     this.pageWidth = 612,
     this.pageHeight = 792,
     this.version = '1.4',
-  });
+    PdfParser? parser,
+  }) : _parser = parser;
+
+  // ============ Metadata ============
+
+  /// Document metadata (title, author, dates, etc.).
+  PdfMetadata get metadata {
+    if (_metadata == null && _parser != null) {
+      _metadata = PdfMetadataExtractor(_parser!).extract();
+    }
+    return _metadata ?? PdfMetadata(pdfVersion: version, pageCount: pageCount);
+  }
+
+  /// XMP metadata (Dublin Core, etc.).
+  /// Returns null if no XMP metadata exists.
+  XmpMetadata? get xmpMetadata {
+    if (!_xmpChecked && _parser != null) {
+      _xmpMetadata = XmpMetadata.extract(_parser!);
+      _xmpChecked = true;
+    }
+    return _xmpMetadata;
+  }
+
+  // ============ Attachments ============
+
+  /// Document attachments (embedded files).
+  List<PdfAttachment> get attachments {
+    if (_attachments == null && _parser != null) {
+      _attachments = PdfAttachmentExtractor(_parser!).extract();
+    }
+    return _attachments ?? [];
+  }
+
+  // ============ Outlines/Bookmarks ============
+
+  /// Document outline (bookmarks/table of contents).
+  List<PdfOutlineItem> get outlines {
+    if (_outlines == null && _parser != null) {
+      _outlines = PdfOutlineExtractor(_parser!).extract();
+    }
+    return _outlines ?? [];
+  }
+
+  /// Whether the document has bookmarks.
+  bool get hasOutlines => outlines.isNotEmpty;
+
+  // ============ Annotations ============
+
+  /// All annotations in the document.
+  List<PdfAnnotation> get annotations {
+    if (_annotations == null && _parser != null) {
+      _annotations = PdfAnnotationExtractor(_parser!).extractAll();
+    }
+    return _annotations ?? [];
+  }
+
+  /// Gets annotations for a specific page.
+  List<PdfAnnotation> getAnnotationsForPage(int pageNumber) {
+    return annotations.where((a) => a.pageNumber == pageNumber).toList();
+  }
+
+  /// Whether the document has annotations.
+  bool get hasAnnotations => annotations.isNotEmpty;
+
+  // ============ Forms ============
+
+  /// Form fields in the document.
+  List<PdfFormField> get formFields {
+    if (_formFields == null && _parser != null) {
+      _formFields = PdfFormExtractor(_parser!).extractFields();
+    }
+    return _formFields ?? [];
+  }
+
+  /// Whether the document has a form.
+  bool get hasForm {
+    if (_parser != null) {
+      return PdfFormExtractor(_parser!).hasForm();
+    }
+    return false;
+  }
+
+  /// Gets form data as a map of field names to values.
+  Map<String, dynamic> get formData {
+    if (_parser != null) {
+      return PdfFormExtractor(_parser!).getFormData();
+    }
+    return {};
+  }
+
+  /// Gets a form field by name.
+  PdfFormField? getFormField(String name) {
+    return formFields.where((f) => f.name == name).firstOrNull;
+  }
+
+  // ============ Encryption ============
+
+  /// Encryption information (null if not encrypted).
+  PdfEncryption? get encryption {
+    if (!_encryptionChecked && _parser != null) {
+      _encryption = PdfEncryption.extract(_parser!);
+      _encryptionChecked = true;
+    }
+    return _encryption;
+  }
+
+  /// Whether the document is encrypted.
+  bool get isEncrypted => encryption != null;
+
+  // ============ Page Info ============
+
+  /// Detailed information for all pages.
+  List<PdfPageInfo> get pageInfos {
+    if (_pageInfos == null && _parser != null) {
+      _pageInfos = PdfPageInfoExtractor(_parser!).extractAll();
+    }
+    return _pageInfos ?? [];
+  }
+
+  /// Gets info for a specific page.
+  PdfPageInfo? getPageInfo(int pageNumber) {
+    if (_parser != null) {
+      return PdfPageInfoExtractor(_parser!).extractPage(pageNumber);
+    }
+    return null;
+  }
 
   /// Converts to a DocxBuiltDocument for export.
   DocxBuiltDocument toDocx() {

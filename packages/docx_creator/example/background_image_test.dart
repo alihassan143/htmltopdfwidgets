@@ -28,9 +28,7 @@ void main() async {
     ]).build();
 
     await DocxExporter().exportToFile(doc1, 'bg_from_url.docx');
-  } catch (e) {
-    ;
-  }
+  } catch (e) {}
 
   // ============================================================
   // Example 2: Watermark from URL

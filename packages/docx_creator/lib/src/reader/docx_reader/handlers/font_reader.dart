@@ -3,8 +3,8 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
-import '../../core/font_manager.dart';
-import '../reader_context.dart';
+import '../../../core/font_manager.dart';
+import '../reader_context/reader_context.dart';
 
 /// Reads and parses embedded fonts from fontTable.xml.
 class FontReader {

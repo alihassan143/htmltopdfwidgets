@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'pdf_encryption.dart';
 import 'pdf_types.dart';
 
 /// Low-level PDF parser for reading PDF structure.
@@ -20,13 +21,124 @@ class PdfParser {
   // Parsing warnings
   final List<String> warnings = [];
 
+  PdfEncryption? encryption;
+
   PdfParser(this.data) : content = String.fromCharCodes(data);
+
+  void setEncryption(PdfEncryption encryption) {
+    this.encryption = encryption;
+  }
 
   /// Parses the PDF structure.
   void parse() {
     parseHeader();
     findXRef();
     parseCatalog();
+  }
+
+  // ... existing parseHeader, findXRef ...
+
+  /// Decrypts a string if encryption is active.
+  ///
+  /// [text] should be the raw content bytes of the string object.
+  /// If provided as String, assumes Latin1 (binary) mapping.
+  String decryptString(String text, int objNum, int genNum) {
+    if (encryption == null || !encryption!.isReady) return text;
+
+    // Convert string to bytes (treating char codes as bytes)
+    final bytes = Uint8List.fromList(text.codeUnits);
+
+    final decrypted = encryption!.decryptData(bytes, objNum, genNum);
+
+    // Convert back to string (raw) - callers will handle encoding (e.g. TextExtractor, Metadata)
+    return String.fromCharCodes(decrypted);
+  }
+
+  /// Gets decompressed stream content with support for encryption and filters.
+  String? getStreamContent(int objRef) {
+    final obj = getObject(objRef);
+    if (obj == null) return null;
+
+    final streamStart = obj.content.indexOf('stream');
+    final streamEnd = obj.content.lastIndexOf('endstream');
+    if (streamStart == -1 || streamEnd == -1) return null;
+
+    // Skip 'stream' and newline
+    var dataStart = streamStart + 6;
+    if (obj.content.codeUnitAt(dataStart) == 13) dataStart++; // \r
+    if (obj.content.codeUnitAt(dataStart) == 10) dataStart++; // \n
+
+    // Correctly handle stream end: look for newline before endstream
+    var dataEnd = streamEnd;
+    if (obj.content.codeUnitAt(dataEnd - 1) == 10) dataEnd--; // \n
+    if (obj.content.codeUnitAt(dataEnd - 1) == 13) dataEnd--; // \r
+
+    // Basic extraction
+
+    // We need to parse valid stream length from dict for robustness
+    final lengthMatch = RegExp(r'/Length\s+(\d+)').firstMatch(obj.content);
+    int? length;
+    if (lengthMatch != null) {
+      length = int.parse(lengthMatch.group(1)!);
+    } else {
+      // Handle indirect length reference
+      final lengthRefMatch =
+          RegExp(r'/Length\s+(\d+)\s+\d+\s+R').firstMatch(obj.content);
+      if (lengthRefMatch != null) {
+        final lenObj = getObject(int.parse(lengthRefMatch.group(1)!));
+        if (lenObj != null) {
+          length = int.tryParse(lenObj.content.trim());
+        }
+      }
+    }
+
+    // Extract stream bytes from content string
+    // Assuming content string faithfully represents bytes (Latin1)
+    var streamBytes = obj.content.substring(dataStart, dataEnd).codeUnits;
+
+    // If length is explicit and matches roughly, use it?
+    // Sometimes stream scanning is inaccurate if 'endstream' appears in data.
+    // Ideally we use length if available.
+    if (length != null && length < streamBytes.length) {
+      // Only truncate if we're sure.
+      // streamBytes = streamBytes.sublist(0, length);
+    }
+
+    var bytes = Uint8List.fromList(streamBytes.map((e) => e & 0xFF).toList());
+
+    if (encryption != null && encryption!.isReady) {
+      // Decrypt
+      // We need extraction of objNum and genNum
+      // PdfObject should store it, but currently doesn't expose it easily.
+      // It's usually the key in the objects map.
+      // We passed objRef.
+      int genNum = 0; // Default
+      // Ideally look up genNum from xref if possible or assume 0
+
+      bytes = encryption!.decryptData(bytes, objRef, genNum);
+    }
+
+    // 3. Apply Filters (Flate, etc.)
+    // We need to decode filters to get actual text/binary data
+    final filters = _parseFilters(obj.content);
+    final decodeParms = parseDecodeParms(obj.content);
+
+    if (filters.isNotEmpty) {
+      try {
+        for (var i = filters.length - 1; i >= 0; i--) {
+          final filter = filters[i];
+          final parms = i < decodeParms.length ? decodeParms[i] : null;
+          bytes = applyFilterWithParams(filter, bytes, parms);
+        }
+      } catch (e) {
+        warnings.add('Could not decompress stream $objRef: $e');
+      }
+    }
+
+    // 4. Convert to String (Latin1)
+    final result = String.fromCharCodes(bytes);
+    obj.stream = result;
+    return result;
   }
 
   /// Validates and parses PDF header.
@@ -430,6 +542,11 @@ class PdfParser {
     if (streamContent == null) return null;
 
     // Parse the header (pairs of objNum + offset)
+    if (first > streamContent.length) {
+      warnings.add(
+          'Invalid First offset in object stream: $first > ${streamContent.length}');
+      return null;
+    }
     final header = streamContent.substring(0, first).trim();
     final headerParts = header.split(RegExp(r'\s+'));
 
@@ -567,108 +684,6 @@ class PdfParser {
     }
 
     return tokens;
-  }
-
-  /// Gets decompressed stream content with multiple filter support.
-  String? getStreamContent(int objRef) {
-    final obj = getObject(objRef);
-    if (obj == null) return null;
-
-    if (obj.stream != null) return obj.stream;
-
-    final streamStart = obj.content.indexOf('stream');
-    if (streamStart == -1) return null;
-
-    var dataStart = streamStart + 6;
-    if (dataStart < obj.content.length && obj.content[dataStart] == '\r') {
-      dataStart++;
-    }
-    if (dataStart < obj.content.length && obj.content[dataStart] == '\n') {
-      dataStart++;
-    }
-
-    final streamEnd = obj.content.indexOf('endstream', dataStart);
-    if (streamEnd == -1) return null;
-
-    var streamData = obj.content.substring(dataStart, streamEnd);
-
-    // Parse filter(s) and decode parameters
-    final filters = _parseFilters(obj.content);
-    final decodeParms = parseDecodeParms(obj.content);
-
-    if (filters.isNotEmpty) {
-      try {
-        final objStartIdx = content.indexOf(obj.content);
-        if (objStartIdx != -1) {
-          // Get stream length - try direct or indirect reference
-          final streamLength = _getStreamLength(obj.content, objRef);
-          final absStart = objStartIdx + dataStart;
-          var absEnd = objStartIdx + streamEnd;
-
-          // Use explicit length if available and valid
-          if (streamLength != null && streamLength > 0) {
-            final lengthEnd = absStart + streamLength;
-            if (lengthEnd <= data.length) {
-              absEnd = lengthEnd;
-            }
-          }
-
-          if (absEnd <= data.length && absStart < absEnd) {
-            var streamBytes = data.sublist(absStart, absEnd);
-
-            // Apply filters in reverse order (as per PDF spec)
-            for (var i = filters.length - 1; i >= 0; i--) {
-              final filter = filters[i];
-              final parms = i < decodeParms.length ? decodeParms[i] : null;
-              streamBytes = applyFilterWithParams(filter, streamBytes, parms);
-            }
-
-            streamData = String.fromCharCodes(streamBytes);
-          }
-        }
-      } catch (e) {
-        warnings.add('Could not decompress stream: $e');
-        // Try fallback: return raw data as string
-      }
-    }
-
-    obj.stream = streamData;
-    return streamData;
-  }
-
-  /// Gets stream length, handling indirect references.
-  int? _getStreamLength(String objContent, int objRef) {
-    // Try direct length first
-    final directMatch = RegExp(r'/Length\s+(\d+)').firstMatch(objContent);
-    if (directMatch != null) {
-      return int.tryParse(directMatch.group(1)!);
-    }
-
-    // Try indirect reference: /Length 45 0 R
-    final indirectMatch =
-        RegExp(r'/Length\s+(\d+)\s+\d+\s+R').firstMatch(objContent);
-    if (indirectMatch != null) {
-      final lengthRef = int.tryParse(indirectMatch.group(1)!);
-      if (lengthRef != null) {
-        final lengthObj = getObject(lengthRef);
-        if (lengthObj != null) {
-          // Extract integer from object content
-          final intMatch = RegExp(r'obj\s+(\d+)').firstMatch(lengthObj.content);
-          if (intMatch != null) {
-            return int.tryParse(intMatch.group(1)!);
-          }
-          // Try just the number
-          final numMatch = RegExp(r'^\s*(\d+)').firstMatch(lengthObj.content
-              .replaceAll(RegExp(r'\d+\s+\d+\s+obj'), '')
-              .trim());
-          if (numMatch != null) {
-            return int.tryParse(numMatch.group(1)!);
-          }
-        }
-      }
-    }
-
-    return null;
   }
 
   /// Parses DecodeParms dictionary or array.

@@ -402,14 +402,18 @@ class DocxParagraph extends DocxBlock {
                 builder.element(
                   'w:pBdr',
                   nest: () {
-                    if (borderTop != null)
+                    if (borderTop != null) {
                       _buildBorder(builder, 'w:top', borderTop!);
-                    if (borderLeft != null)
+                    }
+                    if (borderLeft != null) {
                       _buildBorder(builder, 'w:left', borderLeft!);
-                    if (borderRight != null)
+                    }
+                    if (borderRight != null) {
                       _buildBorder(builder, 'w:right', borderRight!);
-                    if (borderBetween != null)
+                    }
+                    if (borderBetween != null) {
                       _buildBorder(builder, 'w:between', borderBetween!);
+                    }
 
                     if (borderBottomSide != null) {
                       _buildBorder(builder, 'w:bottom', borderBottomSide!);

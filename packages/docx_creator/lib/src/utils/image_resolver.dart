@@ -115,8 +115,9 @@ class ImageResolver {
     // Try to get from content-type
     if (contentType != null) {
       if (contentType.contains('png')) return 'png';
-      if (contentType.contains('jpeg') || contentType.contains('jpg'))
+      if (contentType.contains('jpeg') || contentType.contains('jpg')) {
         return 'jpeg';
+      }
       if (contentType.contains('gif')) return 'gif';
       if (contentType.contains('bmp')) return 'bmp';
       if (contentType.contains('webp')) return 'webp';

@@ -4,9 +4,9 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
-import 'models/docx_relationship.dart';
-import 'models/docx_style.dart';
-import 'models/docx_theme.dart';
+import '../models/docx_relationship.dart';
+import '../models/docx_style.dart';
+import '../models/docx_theme.dart';
 
 /// Shared context for all reader components.
 ///

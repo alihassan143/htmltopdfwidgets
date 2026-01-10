@@ -1,7 +1,7 @@
 import 'package:xml/xml.dart';
 
 import '../models/docx_relationship.dart';
-import '../reader_context.dart';
+import '../reader_context/reader_context.dart';
 
 /// Manages document relationships and content types.
 ///

@@ -1,5 +1,20 @@
+import 'dart:math' as math;
+
 import 'pdf_parser.dart';
 import 'pdf_types.dart';
+
+/// Modes for text extraction.
+enum PdfExtractionMode {
+  /// Simple extraction (default).
+  plain,
+
+  /// Preserves physical layout with spaces and newlines.
+  layout,
+}
+
+/// Callback for visiting PDF operators.
+typedef PdfVisitorCallback = void Function(
+    String operator, List<dynamic> operands);
 
 /// Extracts text from PDF content streams with proper font encoding.
 class PdfTextExtractor {
@@ -453,8 +468,10 @@ class PdfTextExtractor {
     return null;
   }
 
-  /// Parses text from a content stream.
-  List<PdfTextLine> extractText(String stream) {
+  /// Extracts text from a content stream.
+  ///
+  /// [visitor] is an optional callback allowing custom processing of all operators.
+  List<PdfTextLine> extractText(String stream, {PdfVisitorCallback? visitor}) {
     if (stream.trim().isEmpty) return [];
 
     final lines = <PdfTextLine>[];
@@ -464,6 +481,7 @@ class PdfTextExtractor {
 
     for (var i = 0; i < tokens.length; i++) {
       final token = tokens[i];
+      List<dynamic> currentOperands = [];
 
       switch (token) {
         case 'q':
@@ -485,6 +503,7 @@ class PdfTextExtractor {
             final e = double.tryParse(tokens[i - 2]) ?? 0;
             final f = double.tryParse(tokens[i - 1]) ?? 0;
             state.ctm = state.ctm.multiply(PdfMatrix(a, b, c, d, e, f));
+            currentOperands = [a, b, c, d, e, f];
           }
           break;
 
@@ -507,6 +526,7 @@ class PdfTextExtractor {
             final f = double.tryParse(tokens[i - 1]) ?? 0;
             state.textMatrix = PdfMatrix(a, b, c, d, e, f);
             state.textLineMatrix = state.textMatrix.clone();
+            currentOperands = [a, b, c, d, e, f];
           }
           break;
 
@@ -517,6 +537,7 @@ class PdfTextExtractor {
             final mat = PdfMatrix(1, 0, 0, 1, tx, ty);
             state.textLineMatrix = mat.multiply(state.textLineMatrix);
             state.textMatrix = state.textLineMatrix.clone();
+            currentOperands = [tx, ty];
           }
           break;
 
@@ -528,12 +549,14 @@ class PdfTextExtractor {
             final mat = PdfMatrix(1, 0, 0, 1, tx, ty);
             state.textLineMatrix = mat.multiply(state.textLineMatrix);
             state.textMatrix = state.textLineMatrix.clone();
+            state.leading = -ty;
+            currentOperands = [tx, ty];
           }
           break;
 
         case 'T*':
           // Move to start of next line (using current leading)
-          state.textLineMatrix = PdfMatrix(1, 0, 0, 1, 0, -state.fontSize * 1.2)
+          state.textLineMatrix = PdfMatrix(1, 0, 0, 1, 0, -state.leading)
               .multiply(state.textLineMatrix);
           state.textMatrix = state.textLineMatrix.clone();
           break;
@@ -542,30 +565,42 @@ class PdfTextExtractor {
           if (i >= 2) {
             state.fontName = tokens[i - 2];
             state.fontSize = double.tryParse(tokens[i - 1]) ?? 12;
+            currentOperands = [state.fontName, state.fontSize];
           }
           break;
 
         case 'Tc':
           if (i >= 1) {
             state.charSpacing = double.tryParse(tokens[i - 1]) ?? 0;
+            currentOperands = [state.charSpacing];
           }
           break;
 
         case 'Tw':
           if (i >= 1) {
             state.wordSpacing = double.tryParse(tokens[i - 1]) ?? 0;
+            currentOperands = [state.wordSpacing];
           }
           break;
 
         case 'Ts':
           if (i >= 1) {
             state.textRise = double.tryParse(tokens[i - 1]) ?? 0;
+            currentOperands = [state.textRise];
           }
           break;
 
         case 'Tz':
           if (i >= 1) {
             state.horizontalScaling = double.tryParse(tokens[i - 1]) ?? 100;
+            currentOperands = [state.horizontalScaling];
+          }
+          break;
+
+        case 'TL': // Set Text Leading
+          if (i >= 1) {
+            state.leading = double.tryParse(tokens[i - 1]) ?? 0;
+            currentOperands = [state.leading];
           }
           break;
 
@@ -573,6 +608,7 @@ class PdfTextExtractor {
           if (i >= 1) {
             final textLine = _processTextString(tokens[i - 1], state);
             if (textLine != null) lines.add(textLine);
+            currentOperands = [tokens[i - 1]];
           }
           break;
 
@@ -580,17 +616,33 @@ class PdfTextExtractor {
           if (i >= 1) {
             final textLines = _processTextArray(tokens[i - 1], state);
             lines.addAll(textLines);
+            currentOperands = [tokens[i - 1]];
           }
           break;
 
         case "'":
           // Move to next line and show text
-          state.textLineMatrix = PdfMatrix(1, 0, 0, 1, 0, -state.fontSize * 1.2)
+          state.textLineMatrix = PdfMatrix(1, 0, 0, 1, 0, -state.leading)
               .multiply(state.textLineMatrix);
           state.textMatrix = state.textLineMatrix.clone();
           if (i >= 1) {
             final textLine = _processTextString(tokens[i - 1], state);
             if (textLine != null) lines.add(textLine);
+            currentOperands = [tokens[i - 1]];
+          }
+          break;
+
+        case '"':
+          // Set word spacing, char spacing, move to next line, show text
+          if (i >= 3) {
+            state.wordSpacing = double.tryParse(tokens[i - 3]) ?? 0;
+            state.charSpacing = double.tryParse(tokens[i - 2]) ?? 0;
+            state.textLineMatrix = PdfMatrix(1, 0, 0, 1, 0, -state.leading)
+                .multiply(state.textLineMatrix);
+            state.textMatrix = state.textLineMatrix.clone();
+            final textLine = _processTextString(tokens[i - 1], state);
+            if (textLine != null) lines.add(textLine);
+            currentOperands = [tokens[i - 3], tokens[i - 2], tokens[i - 1]];
           }
           break;
 
@@ -599,6 +651,11 @@ class PdfTextExtractor {
             state.fillColorR = double.tryParse(tokens[i - 3]) ?? 0;
             state.fillColorG = double.tryParse(tokens[i - 2]) ?? 0;
             state.fillColorB = double.tryParse(tokens[i - 1]) ?? 0;
+            currentOperands = [
+              state.fillColorR,
+              state.fillColorG,
+              state.fillColorB
+            ];
           }
           break;
 
@@ -607,6 +664,11 @@ class PdfTextExtractor {
             state.strokeColorR = double.tryParse(tokens[i - 3]) ?? 0;
             state.strokeColorG = double.tryParse(tokens[i - 2]) ?? 0;
             state.strokeColorB = double.tryParse(tokens[i - 1]) ?? 0;
+            currentOperands = [
+              state.strokeColorR,
+              state.strokeColorG,
+              state.strokeColorB
+            ];
           }
           break;
 
@@ -616,6 +678,7 @@ class PdfTextExtractor {
             state.fillColorR = gray;
             state.fillColorG = gray;
             state.fillColorB = gray;
+            currentOperands = [gray];
           }
           break;
 
@@ -625,12 +688,72 @@ class PdfTextExtractor {
             state.strokeColorR = gray;
             state.strokeColorG = gray;
             state.strokeColorB = gray;
+            currentOperands = [gray];
           }
           break;
+      }
+
+      if (visitor != null) {
+        visitor(token, currentOperands);
       }
     }
 
     return lines;
+  }
+
+  /// Extracts text as a formatted string using the specified [mode].
+  String extractTextString(String stream,
+      {PdfExtractionMode mode = PdfExtractionMode.plain}) {
+    final lines = extractText(stream);
+
+    // Sort lines by position (Top-down, Left-right)
+    lines.sort((a, b) {
+      if ((a.y - b.y).abs() > a.size * 0.5) {
+        return b.y.compareTo(a.y);
+      }
+      return a.x.compareTo(b.x);
+    });
+
+    final buffer = StringBuffer();
+
+    if (mode == PdfExtractionMode.plain) {
+      for (final line in lines) {
+        buffer.write(line.text);
+        buffer.write(' ');
+      }
+      return buffer.toString().trim();
+    }
+
+    // Layout mode
+    double? lastY;
+    double? lastX;
+
+    for (final line in lines) {
+      if (lastY != null) {
+        final distY = (lastY - line.y).abs();
+        if (distY > (line.size * 0.5)) {
+          buffer.writeln();
+          lastX = 0;
+        }
+      }
+
+      if (lastX != null) {
+        final distX = line.x - lastX;
+        final charWidth = line.size * 0.5;
+        if (distX > charWidth) {
+          final spaces = (distX / charWidth).round();
+          if (spaces > 0) {
+            buffer.write(' ' * math.min(spaces, 10));
+          }
+        }
+      }
+
+      buffer.write(line.text);
+      lastY = line.y;
+      lastX = line.x + line.width;
+    }
+
+    return buffer.toString();
   }
 
   PdfTextLine? _processTextString(String textEntry, PdfGraphicsState state) {
@@ -672,18 +795,26 @@ class PdfTextExtractor {
           text.length * state.fontSize * 0.5 * (state.horizontalScaling / 100);
     }
 
+    // Calculate rotation: atan2(c, d)? No, usually b and a
+    // Matrix: [a b c d e f]
+    // Rotation is typically encoded in a, b, c, d
+    // For no skewed rotation: tan(theta) = b/a ... atan2(b, a)
+    final rotation = math.atan2(mat.b, mat.a) * (180 / math.pi);
+
     final line = PdfTextLine(
       text: text,
       x: mat.e,
       y: mat.f,
       font: state.fontName,
-      size: state.fontSize * mat.scale,
+      size: state.fontSize * mat.scale, // Use matrix scale
       colorR: state.fillColorR,
       colorG: state.fillColorG,
       colorB: state.fillColorB,
       width: accumulatedWidth,
       textRise: state.textRise,
       fontInfo: fontInfo,
+      matrix: mat,
+      rotation: rotation,
     );
 
     if (fontInfo != null) {

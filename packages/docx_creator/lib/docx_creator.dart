@@ -41,11 +41,11 @@ export 'src/exporters/pdf/pdf_exporter.dart';
 // Parsers
 export 'src/parsers/html_parser.dart';
 export 'src/parsers/markdown_parser.dart';
-export 'src/reader/docx_reader.dart';
-export 'src/reader/models/docx_style.dart';
+export 'src/reader/docx_reader/docx_reader.dart';
+export 'src/reader/docx_reader/models/docx_style.dart';
 // Reader Models
-export 'src/reader/models/docx_theme.dart';
-export 'src/reader/pdf_reader.dart'; // Add PdfReader export
+export 'src/reader/docx_reader/models/docx_theme.dart';
+export 'src/reader/pdf_reader/pdf_reader.dart'; // Add PdfReader export
 // Utilities
 export 'src/utils/content_types_generator.dart';
 export 'src/utils/docx_id_generator.dart';

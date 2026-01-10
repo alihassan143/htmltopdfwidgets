@@ -31,6 +31,7 @@ class PdfGraphicsState {
   double charSpacing = 0;
   double wordSpacing = 0;
   double horizontalScaling = 100; // Tz, percentage
+  double leading = 0; // TL
 
   PdfGraphicsState clone() {
     return PdfGraphicsState()
@@ -49,7 +50,8 @@ class PdfGraphicsState {
       ..textRise = textRise
       ..charSpacing = charSpacing
       ..wordSpacing = wordSpacing
-      ..horizontalScaling = horizontalScaling;
+      ..horizontalScaling = horizontalScaling
+      ..leading = leading;
   }
 }
 
@@ -143,7 +145,10 @@ class PdfGraphicLine {
 abstract class PdfPageItem {
   double x;
   double y;
-  PdfPageItem(this.x, this.y);
+  PdfMatrix? matrix;
+  double rotation;
+
+  PdfPageItem(this.x, this.y, {this.matrix, this.rotation = 0});
 }
 
 /// Represents a simplified text line with position and style.
@@ -178,7 +183,9 @@ class PdfTextLine extends PdfPageItem {
     required this.width,
     this.textRise = 0,
     this.fontInfo,
-  }) : super(x, y);
+    PdfMatrix? matrix,
+    double rotation = 0,
+  }) : super(x, y, matrix: matrix, rotation: rotation);
 }
 
 /// Represents an image on the page.
@@ -197,7 +204,9 @@ class PdfImageItem extends PdfPageItem {
     required this.height,
     required this.extension,
     this.filter = 'Unknown',
-  }) : super(x, y);
+    PdfMatrix? matrix,
+    double rotation = 0,
+  }) : super(x, y, matrix: matrix, rotation: rotation);
 }
 
 /// Internal font info with encoding support.

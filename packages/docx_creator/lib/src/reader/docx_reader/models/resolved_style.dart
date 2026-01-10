@@ -1,5 +1,4 @@
-import '../../../docx_creator.dart';
-import 'docx_style.dart';
+import '../../../../docx_creator.dart';
 
 /// Represents the fully resolved (effective) style for an element.
 ///

@@ -996,9 +996,9 @@ class DocxParser {
         continue;
       }
 
-      if (part == 'solid')
+      if (part == 'solid') {
         borderStyle = DocxBorder.single;
-      else if (part == 'double')
+      } else if (part == 'double')
         borderStyle = DocxBorder.double;
       else if (part == 'dotted')
         borderStyle = DocxBorder.dotted;

@@ -1,6 +1,6 @@
 import 'package:xml/xml.dart';
 
-import '../../../docx_creator.dart';
+import '../../../../docx_creator.dart';
 import 'docx_font.dart';
 
 /// Represents parsed style properties from styles.xml.

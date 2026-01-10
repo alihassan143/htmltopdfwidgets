@@ -1,8 +1,7 @@
 import 'package:xml/xml.dart';
 
-import '../../../docx_creator.dart';
-import '../models/docx_style.dart';
-import '../reader_context.dart';
+import '../../../../docx_creator.dart';
+import '../reader_context/reader_context.dart';
 
 /// Parses and manages document styles from styles.xml.
 ///

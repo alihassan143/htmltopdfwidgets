@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
-import '../../../docx_creator.dart';
-import 'docx_style.dart';
+import '../../../../docx_creator.dart';
 
 /// Represents the complete theme and style information from a DOCX document.
 ///
