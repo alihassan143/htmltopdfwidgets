@@ -6,9 +6,13 @@ import 'pdf_annotations.dart';
 import 'pdf_attachment.dart';
 import 'pdf_form.dart';
 import 'pdf_image_extractor.dart';
+import 'pdf_layer.dart';
 import 'pdf_metadata.dart';
+import 'pdf_number_tree.dart';
 import 'pdf_outline.dart';
+import 'pdf_page_label.dart';
 import 'pdf_parser.dart';
+import 'pdf_structure_tree.dart';
 import 'pdf_table_detector.dart';
 import 'pdf_text_extractor.dart';
 import 'pdf_types.dart';
@@ -753,6 +757,80 @@ class PdfDocument {
       _attachments = PdfAttachmentExtractor(_parser!).extract();
     }
     return _attachments ?? [];
+  }
+
+  // ============ Page Labels ============
+
+  /// Returns page labels for all pages (e.g., ["i", "ii", "1", "2"]).
+  /// Returns "1", "2", etc. if no labels are defined.
+  List<String> get pageLabels {
+    if (_parser == null) return List.generate(pageCount, (i) => '${i + 1}');
+
+    final rootObj = _parser!.getObject(_parser!.rootRef);
+    if (rootObj == null) return List.generate(pageCount, (i) => '${i + 1}');
+
+    final labelsMatch =
+        RegExp(r'/PageLabels\s+(\d+)\s+\d+\s+R').firstMatch(rootObj.content);
+    if (labelsMatch == null) return List.generate(pageCount, (i) => '${i + 1}');
+
+    final numTreeRef = int.parse(labelsMatch.group(1)!);
+    final tree = PdfNumberTree(_parser!).parse(numTreeRef);
+
+    // Number Tree keys are page INDICES.
+    // We need to fill in gaps. A label applies until the next key.
+    final result = <String>[];
+    final sortedKeys = tree.keys.toList()..sort();
+
+    if (sortedKeys.isEmpty) return List.generate(pageCount, (i) => '${i + 1}');
+
+    PdfPageLabel? currentLabel;
+    int currentRunStart = 0;
+
+    for (var i = 0; i < pageCount; i++) {
+      if (sortedKeys.contains(i)) {
+        // New range starts here
+        final raw = tree[i]!;
+        currentLabel = PdfPageLabel.parse(raw);
+        currentRunStart = i;
+      }
+
+      if (currentLabel != null) {
+        result.add(currentLabel.format(i - currentRunStart));
+      } else {
+        // Implicit default (?)
+        result.add('${i + 1}');
+      }
+    }
+    return result;
+  }
+
+  // ============ Structure/Tagged PDF ============
+
+  /// Whether the PDF is a Tagged PDF (has logical structure).
+  bool get isTagged {
+    if (_parser == null) return false;
+    final rootObj = _parser!.getObject(_parser!.rootRef);
+    if (rootObj == null) return false;
+    return rootObj.content.contains('/StructTreeRoot');
+  }
+
+  /// The logical structure tree (if present).
+  PdfStructureTree? get structureTree {
+    if (!isTagged || _parser == null) return null;
+    final rootObj = _parser!.getObject(_parser!.rootRef);
+    final match = RegExp(r'/StructTreeRoot\s+(\d+)\s+\d+\s+R')
+        .firstMatch(rootObj!.content);
+    if (match == null) return null;
+
+    return PdfStructureTree(_parser!, int.parse(match.group(1)!));
+  }
+
+  // ============ Layers (OCGs) ============
+
+  /// Optional Content Groups (Layers).
+  List<PdfLayer> get layers {
+    if (_parser == null) return [];
+    return PdfLayer.extract(_parser!, _parser!.rootRef);
   }
 
   // ============ Outlines/Bookmarks ============
