@@ -208,9 +208,11 @@ class PdfParser {
 
     // Decompress if needed
     final filters = _parseFilters(obj.content);
-    for (final filter in filters.reversed) {
+    final decodeParms = parseDecodeParms(obj.content);
+    for (var i = filters.length - 1; i >= 0; i--) {
       try {
-        streamBytes = _applyFilter(filter, streamBytes);
+        final parms = i < decodeParms.length ? decodeParms[i] : null;
+        streamBytes = applyFilterWithParams(filters[i], streamBytes, parms);
       } catch (e) {
         warnings.add('Failed to decompress xref stream: $e');
         _fallbackScanObjects();
@@ -590,21 +592,35 @@ class PdfParser {
 
     var streamData = obj.content.substring(dataStart, streamEnd);
 
-    // Parse filter(s) - handle both single and array filters
+    // Parse filter(s) and decode parameters
     final filters = _parseFilters(obj.content);
+    final decodeParms = parseDecodeParms(obj.content);
 
     if (filters.isNotEmpty) {
       try {
         final objStartIdx = content.indexOf(obj.content);
         if (objStartIdx != -1) {
+          // Get stream length - try direct or indirect reference
+          final streamLength = _getStreamLength(obj.content, objRef);
           final absStart = objStartIdx + dataStart;
-          final absEnd = objStartIdx + streamEnd;
-          if (absEnd <= data.length) {
+          var absEnd = objStartIdx + streamEnd;
+
+          // Use explicit length if available and valid
+          if (streamLength != null && streamLength > 0) {
+            final lengthEnd = absStart + streamLength;
+            if (lengthEnd <= data.length) {
+              absEnd = lengthEnd;
+            }
+          }
+
+          if (absEnd <= data.length && absStart < absEnd) {
             var streamBytes = data.sublist(absStart, absEnd);
 
             // Apply filters in reverse order (as per PDF spec)
-            for (final filter in filters.reversed) {
-              streamBytes = _applyFilter(filter, streamBytes);
+            for (var i = filters.length - 1; i >= 0; i--) {
+              final filter = filters[i];
+              final parms = i < decodeParms.length ? decodeParms[i] : null;
+              streamBytes = applyFilterWithParams(filter, streamBytes, parms);
             }
 
             streamData = String.fromCharCodes(streamBytes);
@@ -612,11 +628,118 @@ class PdfParser {
         }
       } catch (e) {
         warnings.add('Could not decompress stream: $e');
+        // Try fallback: return raw data as string
       }
     }
 
     obj.stream = streamData;
     return streamData;
+  }
+
+  /// Gets stream length, handling indirect references.
+  int? _getStreamLength(String objContent, int objRef) {
+    // Try direct length first
+    final directMatch = RegExp(r'/Length\s+(\d+)').firstMatch(objContent);
+    if (directMatch != null) {
+      return int.tryParse(directMatch.group(1)!);
+    }
+
+    // Try indirect reference: /Length 45 0 R
+    final indirectMatch =
+        RegExp(r'/Length\s+(\d+)\s+\d+\s+R').firstMatch(objContent);
+    if (indirectMatch != null) {
+      final lengthRef = int.tryParse(indirectMatch.group(1)!);
+      if (lengthRef != null) {
+        final lengthObj = getObject(lengthRef);
+        if (lengthObj != null) {
+          // Extract integer from object content
+          final intMatch = RegExp(r'obj\s+(\d+)').firstMatch(lengthObj.content);
+          if (intMatch != null) {
+            return int.tryParse(intMatch.group(1)!);
+          }
+          // Try just the number
+          final numMatch = RegExp(r'^\s*(\d+)').firstMatch(lengthObj.content
+              .replaceAll(RegExp(r'\d+\s+\d+\s+obj'), '')
+              .trim());
+          if (numMatch != null) {
+            return int.tryParse(numMatch.group(1)!);
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// Parses DecodeParms dictionary or array.
+  List<Map<String, dynamic>?> parseDecodeParms(String content) {
+    final result = <Map<String, dynamic>?>[];
+
+    // Try array format: /DecodeParms [<<...>> <<...>>]
+    final arrayMatch =
+        RegExp(r'/DecodeParms\s*\[([^\]]+)\]').firstMatch(content);
+    if (arrayMatch != null) {
+      final arrayContent = arrayMatch.group(1)!;
+      // Find all dictionaries
+      final dictPattern = RegExp(r'<<([^>]*)>>');
+      for (final dictMatch in dictPattern.allMatches(arrayContent)) {
+        result.add(_parseParmDict(dictMatch.group(1)!));
+      }
+      // Handle null entries
+      if (result.isEmpty) {
+        result.add(null);
+      }
+      return result;
+    }
+
+    // Try single dictionary: /DecodeParms <<...>>
+    final singleMatch =
+        RegExp(r'/DecodeParms\s*<<([^>]*)>>').firstMatch(content);
+    if (singleMatch != null) {
+      result.add(_parseParmDict(singleMatch.group(1)!));
+      return result;
+    }
+
+    return [null];
+  }
+
+  /// Parses a DecodeParms dictionary content.
+  Map<String, dynamic> _parseParmDict(String dictContent) {
+    final parms = <String, dynamic>{};
+
+    // Parse Predictor
+    final predictorMatch =
+        RegExp(r'/Predictor\s+(\d+)').firstMatch(dictContent);
+    if (predictorMatch != null) {
+      parms['Predictor'] = int.parse(predictorMatch.group(1)!);
+    }
+
+    // Parse Columns
+    final columnsMatch = RegExp(r'/Columns\s+(\d+)').firstMatch(dictContent);
+    if (columnsMatch != null) {
+      parms['Columns'] = int.parse(columnsMatch.group(1)!);
+    }
+
+    // Parse Colors (for images)
+    final colorsMatch = RegExp(r'/Colors\s+(\d+)').firstMatch(dictContent);
+    if (colorsMatch != null) {
+      parms['Colors'] = int.parse(colorsMatch.group(1)!);
+    }
+
+    // Parse BitsPerComponent
+    final bitsMatch =
+        RegExp(r'/BitsPerComponent\s+(\d+)').firstMatch(dictContent);
+    if (bitsMatch != null) {
+      parms['BitsPerComponent'] = int.parse(bitsMatch.group(1)!);
+    }
+
+    // Parse EarlyChange (for LZW)
+    final earlyMatch = RegExp(r'/EarlyChange\s+(\d+)').firstMatch(dictContent);
+    if (earlyMatch != null) {
+      parms['EarlyChange'] = int.parse(earlyMatch.group(1)!);
+    }
+
+    return parms;
   }
 
   /// Parses filter specification (single or array).
@@ -639,11 +762,25 @@ class PdfParser {
     return [];
   }
 
-  /// Applies a single filter to decompress data.
-  Uint8List _applyFilter(String filter, Uint8List data) {
+  /// Applies a single filter to decompress data with parameters.
+  Uint8List applyFilterWithParams(
+      String filter, Uint8List data, Map<String, dynamic>? parms) {
     switch (filter) {
       case 'FlateDecode':
-        return Uint8List.fromList(zlib.decode(data));
+        try {
+          var decoded = Uint8List.fromList(zlib.decode(data));
+          // Apply predictor if specified
+          if (parms != null && parms.containsKey('Predictor')) {
+            final predictor = parms['Predictor'] as int;
+            if (predictor > 1) {
+              decoded = applyPredictor(decoded, parms);
+            }
+          }
+          return decoded;
+        } catch (e) {
+          warnings.add('FlateDecode failed: $e');
+          return data;
+        }
 
       case 'ASCII85Decode':
         return _decodeAscii85(data);
@@ -652,7 +789,19 @@ class PdfParser {
         return _decodeAsciiHex(data);
 
       case 'LZWDecode':
-        return _decodeLZW(data);
+        try {
+          var decoded = _decodeLZW(data);
+          if (parms != null && parms.containsKey('Predictor')) {
+            final predictor = parms['Predictor'] as int;
+            if (predictor > 1) {
+              decoded = applyPredictor(decoded, parms);
+            }
+          }
+          return decoded;
+        } catch (e) {
+          warnings.add('LZWDecode failed: $e');
+          return data;
+        }
 
       case 'DCTDecode':
         // JPEG - pass through
@@ -661,6 +810,9 @@ class PdfParser {
       case 'JPXDecode':
         // JPEG2000 - pass through
         return data;
+
+      case 'RunLengthDecode':
+        return _decodeRunLength(data);
 
       case 'CCITTFaxDecode':
         warnings.add('CCITTFaxDecode not yet supported');
@@ -674,6 +826,158 @@ class PdfParser {
         warnings.add('Unknown filter: $filter');
         return data;
     }
+  }
+
+  /// Applies predictor function to decoded data.
+  /// Supports PNG predictors (10-15) and TIFF predictor (2).
+  Uint8List applyPredictor(Uint8List data, Map<String, dynamic> parms) {
+    final predictor = parms['Predictor'] as int? ?? 1;
+    final columns = parms['Columns'] as int? ?? 1;
+    final colors = parms['Colors'] as int? ?? 1;
+    final bitsPerComponent = parms['BitsPerComponent'] as int? ?? 8;
+
+    final bytesPerPixel = (colors * bitsPerComponent + 7) ~/ 8;
+    final bytesPerRow = (columns * colors * bitsPerComponent + 7) ~/ 8;
+
+    if (predictor == 2) {
+      // TIFF Predictor
+      return _applyTiffPredictor(data, bytesPerRow, bytesPerPixel);
+    } else if (predictor >= 10 && predictor <= 15) {
+      // PNG Predictors
+      return _applyPngPredictor(data, bytesPerRow, bytesPerPixel);
+    }
+
+    return data;
+  }
+
+  /// Applies TIFF horizontal differencing predictor.
+  Uint8List _applyTiffPredictor(
+      Uint8List data, int bytesPerRow, int bytesPerPixel) {
+    if (bytesPerRow <= 0) return data;
+
+    final numRows = data.length ~/ bytesPerRow;
+    final result = Uint8List(data.length);
+
+    for (var row = 0; row < numRows; row++) {
+      final rowStart = row * bytesPerRow;
+
+      for (var i = 0; i < bytesPerRow; i++) {
+        final idx = rowStart + i;
+        if (idx >= data.length) break;
+
+        if (i < bytesPerPixel) {
+          result[idx] = data[idx];
+        } else {
+          result[idx] = (data[idx] + result[idx - bytesPerPixel]) & 0xFF;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /// Applies PNG filter predictor.
+  Uint8List _applyPngPredictor(
+      Uint8List data, int bytesPerRow, int bytesPerPixel) {
+    // PNG format: each row starts with a filter type byte
+    final rowWidth = bytesPerRow + 1; // +1 for filter byte
+    if (rowWidth <= 1) return data;
+
+    final numRows = data.length ~/ rowWidth;
+    final result = Uint8List(numRows * bytesPerRow);
+    var prevRow = Uint8List(bytesPerRow);
+
+    for (var row = 0; row < numRows; row++) {
+      final srcStart = row * rowWidth;
+      if (srcStart >= data.length) break;
+
+      final filterType = data[srcStart];
+      final dstStart = row * bytesPerRow;
+
+      for (var i = 0; i < bytesPerRow && srcStart + 1 + i < data.length; i++) {
+        final raw = data[srcStart + 1 + i];
+        final a = i >= bytesPerPixel
+            ? result[dstStart + i - bytesPerPixel]
+            : 0; // Left
+        final b = prevRow[i]; // Above
+        final c =
+            i >= bytesPerPixel ? prevRow[i - bytesPerPixel] : 0; // Upper-left
+
+        int decoded;
+        switch (filterType) {
+          case 0: // None
+            decoded = raw;
+            break;
+          case 1: // Sub
+            decoded = (raw + a) & 0xFF;
+            break;
+          case 2: // Up
+            decoded = (raw + b) & 0xFF;
+            break;
+          case 3: // Average
+            decoded = (raw + ((a + b) >> 1)) & 0xFF;
+            break;
+          case 4: // Paeth
+            decoded = (raw + _paethPredictor(a, b, c)) & 0xFF;
+            break;
+          default:
+            decoded = raw;
+        }
+
+        result[dstStart + i] = decoded;
+      }
+
+      // Copy current row to prevRow for next iteration
+      for (var i = 0; i < bytesPerRow; i++) {
+        prevRow[i] = result[dstStart + i];
+      }
+    }
+
+    return result;
+  }
+
+  /// PNG Paeth predictor function.
+  int _paethPredictor(int a, int b, int c) {
+    final p = a + b - c;
+    final pa = (p - a).abs();
+    final pb = (p - b).abs();
+    final pc = (p - c).abs();
+
+    if (pa <= pb && pa <= pc) return a;
+    if (pb <= pc) return b;
+    return c;
+  }
+
+  /// Decodes RunLength-encoded data.
+  Uint8List _decodeRunLength(Uint8List data) {
+    final result = <int>[];
+    var i = 0;
+
+    while (i < data.length) {
+      final length = data[i++];
+
+      if (length == 128) {
+        // EOD marker
+        break;
+      } else if (length < 128) {
+        // Copy next length+1 bytes literally
+        final count = length + 1;
+        for (var j = 0; j < count && i < data.length; j++) {
+          result.add(data[i++]);
+        }
+      } else {
+        // Repeat next byte 257-length times
+        final count = 257 - length;
+        if (i < data.length) {
+          final byte = data[i++];
+          for (var j = 0; j < count; j++) {
+            result.add(byte);
+          }
+        }
+      }
+    }
+
+    return Uint8List.fromList(result);
   }
 
   /// Decodes ASCII85-encoded data.

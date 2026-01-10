@@ -30,6 +30,7 @@ class PdfGraphicsState {
   double textRise = 0;
   double charSpacing = 0;
   double wordSpacing = 0;
+  double horizontalScaling = 100; // Tz, percentage
 
   PdfGraphicsState clone() {
     return PdfGraphicsState()
@@ -47,7 +48,8 @@ class PdfGraphicsState {
       ..fontSize = fontSize
       ..textRise = textRise
       ..charSpacing = charSpacing
-      ..wordSpacing = wordSpacing;
+      ..wordSpacing = wordSpacing
+      ..horizontalScaling = horizontalScaling;
   }
 }
 
@@ -162,6 +164,7 @@ class PdfTextLine extends PdfPageItem {
 
   // Font encoding info
   final PdfFontInfo? fontInfo;
+  final double width;
 
   PdfTextLine({
     required this.text,
@@ -172,11 +175,10 @@ class PdfTextLine extends PdfPageItem {
     required this.colorR,
     required this.colorG,
     required this.colorB,
+    required this.width,
     this.textRise = 0,
     this.fontInfo,
   }) : super(x, y);
-
-  double get width => text.length * size * 0.5;
 }
 
 /// Represents an image on the page.
@@ -208,6 +210,14 @@ class PdfFontInfo {
   final Map<int, int>? toUnicode;
   final bool isEmbedded;
   final String subtype; // Type1, TrueType, Type0, CIDFontType2
+  final Map<int, int>? differences; // Custom encoding differences
+  final String? baseEncoding; // Base encoding for differences
+
+  // Font metrics for layout analysis
+  final List<num>? widths;
+  final int firstChar;
+  final int lastChar;
+  final int missingWidth;
 
   PdfFontInfo({
     required this.name,
@@ -218,17 +228,65 @@ class PdfFontInfo {
     this.toUnicode,
     this.isEmbedded = false,
     this.subtype = 'Type1',
+    this.differences,
+    this.baseEncoding,
+    this.widths,
+    this.firstChar = 0,
+    this.lastChar = 255,
+    this.missingWidth = 0,
   });
+
+  /// Gets character width in text space units.
+  double getCharWidth(int code, double fontSize) {
+    if (widths != null && code >= firstChar && code <= lastChar) {
+      final index = code - firstChar;
+      if (index < widths!.length) {
+        return widths![index].toDouble() / 1000.0 * fontSize;
+      }
+    }
+    // Fallback or missing width
+    return missingWidth > 0
+        ? missingWidth.toDouble() / 1000.0 * fontSize
+        : fontSize * 0.5;
+  }
 
   /// Decodes a character code to Unicode.
   int decodeChar(int code) {
+    // First check ToUnicode CMap (highest priority)
     if (toUnicode != null && toUnicode!.containsKey(code)) {
       return toUnicode![code]!;
     }
-    // Apply standard encoding
-    if (encoding == 'WinAnsiEncoding') {
-      return _winAnsiToUnicode(code);
+
+    // Check differences array
+    if (differences != null && differences!.containsKey(code)) {
+      return differences![code]!;
     }
+
+    // Apply standard encoding based on encoding name
+    final enc = encoding ?? baseEncoding;
+    if (enc != null) {
+      switch (enc) {
+        case 'WinAnsiEncoding':
+          return _winAnsiToUnicode(code);
+        case 'MacRomanEncoding':
+          return _macRomanToUnicode(code);
+        case 'StandardEncoding':
+          return _standardEncodingToUnicode(code);
+        case 'MacExpertEncoding':
+          // Expert encoding is mostly the same as Standard for basic chars
+          return _standardEncodingToUnicode(code);
+        case 'Identity-H':
+        case 'Identity-V':
+          // Identity encoding - code is already Unicode
+          return code;
+      }
+    }
+
+    // For ASCII range, return as-is
+    if (code >= 0x20 && code <= 0x7E) {
+      return code;
+    }
+
     return code;
   }
 
@@ -262,6 +320,143 @@ class PdfFontInfo {
       0x9C: 0x0153, // oe ligature
       0x9E: 0x017E, // z caron
       0x9F: 0x0178, // Y diaeresis
+    };
+    return map[code] ?? code;
+  }
+
+  /// MacRoman to Unicode mapping for extended characters.
+  static int _macRomanToUnicode(int code) {
+    const map = <int, int>{
+      0x80: 0x00C4, // Adieresis
+      0x81: 0x00C5, // Aring
+      0x82: 0x00C7, // Ccedilla
+      0x83: 0x00C9, // Eacute
+      0x84: 0x00D1, // Ntilde
+      0x85: 0x00D6, // Odieresis
+      0x86: 0x00DC, // Udieresis
+      0x87: 0x00E1, // aacute
+      0x88: 0x00E0, // agrave
+      0x89: 0x00E2, // acircumflex
+      0x8A: 0x00E4, // adieresis
+      0x8B: 0x00E3, // atilde
+      0x8C: 0x00E5, // aring
+      0x8D: 0x00E7, // ccedilla
+      0x8E: 0x00E9, // eacute
+      0x8F: 0x00E8, // egrave
+      0x90: 0x00EA, // ecircumflex
+      0x91: 0x00EB, // edieresis
+      0x92: 0x00ED, // iacute
+      0x93: 0x00EC, // igrave
+      0x94: 0x00EE, // icircumflex
+      0x95: 0x00EF, // idieresis
+      0x96: 0x00F1, // ntilde
+      0x97: 0x00F3, // oacute
+      0x98: 0x00F2, // ograve
+      0x99: 0x00F4, // ocircumflex
+      0x9A: 0x00F6, // odieresis
+      0x9B: 0x00F5, // otilde
+      0x9C: 0x00FA, // uacute
+      0x9D: 0x00F9, // ugrave
+      0x9E: 0x00FB, // ucircumflex
+      0x9F: 0x00FC, // udieresis
+      0xA0: 0x2020, // dagger
+      0xA1: 0x00B0, // degree
+      0xA2: 0x00A2, // cent
+      0xA3: 0x00A3, // sterling
+      0xA4: 0x00A7, // section
+      0xA5: 0x2022, // bullet
+      0xA6: 0x00B6, // paragraph
+      0xA7: 0x00DF, // germandbls
+      0xA8: 0x00AE, // registered
+      0xA9: 0x00A9, // copyright
+      0xAA: 0x2122, // trademark
+      0xAB: 0x00B4, // acute
+      0xAC: 0x00A8, // dieresis
+      0xAD: 0x2260, // notequal
+      0xAE: 0x00C6, // AE
+      0xAF: 0x00D8, // Oslash
+      0xB0: 0x221E, // infinity
+      0xB1: 0x00B1, // plusminus
+      0xB2: 0x2264, // lessequal
+      0xB3: 0x2265, // greaterequal
+      0xB4: 0x00A5, // yen
+      0xB5: 0x00B5, // mu
+      0xD0: 0x2013, // endash
+      0xD1: 0x2014, // emdash
+      0xD2: 0x201C, // quotedblleft
+      0xD3: 0x201D, // quotedblright
+      0xD4: 0x2018, // quoteleft
+      0xD5: 0x2019, // quoteright
+      0xD6: 0x00F7, // divide
+      0xD8: 0x00FF, // ydieresis
+      0xE0: 0x2021, // daggerdbl
+      0xE1: 0x00B7, // periodcentered
+      0xE2: 0x201A, // quotesinglbase
+      0xE3: 0x201E, // quotedblbase
+      0xE4: 0x2030, // perthousand
+    };
+    return map[code] ?? code;
+  }
+
+  /// Standard Encoding to Unicode mapping.
+  static int _standardEncodingToUnicode(int code) {
+    const map = <int, int>{
+      0x27: 0x2019, // quoteright
+      0x60: 0x2018, // quoteleft
+      0xA1: 0x00A1, // exclamdown
+      0xA2: 0x00A2, // cent
+      0xA3: 0x00A3, // sterling
+      0xA4: 0x2044, // fraction
+      0xA5: 0x00A5, // yen
+      0xA6: 0x0192, // florin
+      0xA7: 0x00A7, // section
+      0xA8: 0x00A4, // currency
+      0xA9: 0x0027, // quotesingle
+      0xAA: 0x201C, // quotedblleft
+      0xAB: 0x00AB, // guillemotleft
+      0xAC: 0x2039, // guilsinglleft
+      0xAD: 0x203A, // guilsinglright
+      0xAE: 0xFB01, // fi
+      0xAF: 0xFB02, // fl
+      0xB1: 0x2013, // endash
+      0xB2: 0x2020, // dagger
+      0xB3: 0x2021, // daggerdbl
+      0xB4: 0x00B7, // periodcentered
+      0xB6: 0x00B6, // paragraph
+      0xB7: 0x2022, // bullet
+      0xB8: 0x201A, // quotesinglbase
+      0xB9: 0x201E, // quotedblbase
+      0xBA: 0x201D, // quotedblright
+      0xBB: 0x00BB, // guillemotright
+      0xBC: 0x2026, // ellipsis
+      0xBD: 0x2030, // perthousand
+      0xBF: 0x00BF, // questiondown
+      0xC1: 0x0060, // grave
+      0xC2: 0x00B4, // acute
+      0xC3: 0x02C6, // circumflex
+      0xC4: 0x02DC, // tilde
+      0xC5: 0x00AF, // macron
+      0xC6: 0x02D8, // breve
+      0xC7: 0x02D9, // dotaccent
+      0xC8: 0x00A8, // dieresis
+      0xCA: 0x02DA, // ring
+      0xCB: 0x00B8, // cedilla
+      0xCD: 0x02DD, // hungarumlaut
+      0xCE: 0x02DB, // ogonek
+      0xCF: 0x02C7, // caron
+      0xD0: 0x2014, // emdash
+      0xE1: 0x00C6, // AE
+      0xE3: 0x00AA, // ordfeminine
+      0xE8: 0x0141, // Lslash
+      0xE9: 0x00D8, // Oslash
+      0xEA: 0x0152, // OE
+      0xEB: 0x00BA, // ordmasculine
+      0xF1: 0x00E6, // ae
+      0xF5: 0x0131, // dotlessi
+      0xF8: 0x0142, // lslash
+      0xF9: 0x00F8, // oslash
+      0xFA: 0x0153, // oe
+      0xFB: 0x00DF, // germandbls
     };
     return map[code] ?? code;
   }

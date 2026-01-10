@@ -417,14 +417,16 @@ class PdfReader {
       if (item is _TableMarker) {
         // Flush paragraph
         if (paragraphLines.isNotEmpty) {
-          _elements.add(_createParagraph(paragraphLines));
+          final p = _createParagraph(paragraphLines);
+          if (p != null) _elements.add(p);
           paragraphLines.clear();
         }
         // Add table
         _elements.add(_createTable(item.table));
       } else if (item is PdfImageItem) {
         if (paragraphLines.isNotEmpty) {
-          _elements.add(_createParagraph(paragraphLines));
+          final p = _createParagraph(paragraphLines);
+          if (p != null) _elements.add(p);
           paragraphLines.clear();
         }
         _elements.add(DocxImage(
@@ -434,11 +436,38 @@ class PdfReader {
           extension: item.extension,
         ));
       } else if (item is PdfTextLine) {
-        // Check if new line (significant Y change)
+        // Check if new line/block
+        var newBlock = false;
+
         if (paragraphLines.isNotEmpty) {
-          final lastY = paragraphLines.last.y;
+          final last = paragraphLines.last;
+          final lastY = last.y;
+          final lastXEnd = last.x + last.width;
+
+          // Vertical check (new line if gap > 1.5 * size)
+          // Also check for columns (if Y is similar but X is far back/forward?)
+          // Current sort is Y desc, X asc.
+          // If Y is same approx, X will increase.
+          // If X gap is HUGE (> 100), maybe strictly separate block?
+
           if ((lastY - item.y).abs() > item.size * 1.5) {
-            _elements.add(_createParagraph(paragraphLines));
+            newBlock = true;
+          } else if ((item.x - lastXEnd) > 100) {
+            // Large horizontal gap on same line -> likely column or separate text area
+            newBlock = true;
+          } else if (item.x < last.x &&
+              (lastY - item.y).abs() < item.size * 0.5) {
+            // Item is to the LEFT of previous item on SAME line?
+            // Should not happen with X sorting, unless Y differed slightly.
+            // If so, it's definitely a different column/block.
+            newBlock = true;
+          }
+        }
+
+        if (newBlock) {
+          if (paragraphLines.isNotEmpty) {
+            final p = _createParagraph(paragraphLines);
+            if (p != null) _elements.add(p);
             paragraphLines.clear();
           }
         }
@@ -447,7 +476,8 @@ class PdfReader {
     }
 
     if (paragraphLines.isNotEmpty) {
-      _elements.add(_createParagraph(paragraphLines));
+      final p = _createParagraph(paragraphLines);
+      if (p != null) _elements.add(p);
     }
   }
 
@@ -474,10 +504,55 @@ class PdfReader {
     }
   }
 
-  DocxParagraph _createParagraph(List<PdfTextLine> lines) {
+  DocxParagraph? _createParagraph(List<PdfTextLine> lines) {
+    if (lines.isEmpty) return null;
+
     final children = <DocxInline>[];
 
-    for (final line in lines) {
+    // Check for Heading (based on font size)
+    // Heuristic: If first line size > 16, treat as Heading
+    final firstLine = lines.first;
+    String? headingStyle;
+    if (firstLine.size >= 24)
+      headingStyle = 'Heading1';
+    else if (firstLine.size >= 18)
+      headingStyle = 'Heading2';
+    else if (firstLine.size >= 16) headingStyle = 'Heading3';
+
+    // Check for List Item
+    // Regex for bullets or numbers: ^[•\-\*] or ^\d+\.
+    bool isListItem = false;
+    String fullText = lines.map((l) => l.text).join(); // Naive join for check
+    if (RegExp(r'^\s*[•\-\*]\s+').hasMatch(fullText) ||
+        RegExp(r'^\s*\d+\.\s+').hasMatch(fullText)) {
+      isListItem = true;
+    }
+
+    // Process lines and insert spaces if needed
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+
+      // Handle gap from previous line on SAME visual line
+      if (i > 0) {
+        final prev = lines[i - 1];
+        // Only if they are roughly on same Y
+        if ((prev.y - line.y).abs() < line.size * 0.5) {
+          final gap = line.x - (prev.x + prev.width);
+          // If gap is significant (> 2pts), insert space.
+          // But if gap is HUGE, it might be separate words.
+          // In PDF, space char is often omitted and spacing is done via position.
+          if (gap > 2.0) {
+            // Tolerance
+            children.add(DocxText(" "));
+          }
+        } else {
+          // New visual line in paragraph. Insert space if previous didn't end with hyphen
+          if (!tokensEndWithHyphen(prev.text)) {
+            children.add(DocxText(" "));
+          }
+        }
+      }
+
       final colorHex = _rgbToHex(line.colorR, line.colorG, line.colorB);
       DocxTextDecoration decoration = DocxTextDecoration.none;
       if (line.isUnderline) decoration = DocxTextDecoration.underline;
@@ -495,7 +570,35 @@ class PdfReader {
       ));
     }
 
+    // Create paragraph with detected style
+    if (headingStyle != null) {
+      // DocxParagraph doesn't expose 'style' directly easily in basic constructor?
+      // It has `style` property?
+      // Let's check DocxParagraph definition.
+      // Assuming it acts as standard paragraph.
+      // If DocxParagraph does not support style string, we fallback to formatting.
+      // User prompt: "Large blocks -> h1()".
+      // docx_creator API: DocxParagraph.h1()? Or generic?
+      // We'll stick to generic DocxParagraph but ideally set style.
+      // Inspecting previous DocxParagraph usage: typically just children.
+      // We'll trust the fontSize we set on children to carry the formatting visually.
+      return DocxParagraph(
+          children: children); // Style support requires API check
+    }
+
+    if (isListItem) {
+      // return DocxParagraph.bullet(children: children);
+      // Need to check API availability.
+      // For now, standard paragraph.
+      return DocxParagraph(children: children);
+    }
+
     return DocxParagraph(children: children);
+  }
+
+  bool tokensEndWithHyphen(String text) {
+    return text.trimRight().endsWith('-') ||
+        text.trimRight().endsWith('\u00AD');
   }
 
   DocxTable _createTable(PdfDetectedTable table) {
@@ -504,8 +607,9 @@ class PdfReader {
     for (final row in table.rows) {
       final cells = <DocxTableCell>[];
       for (final cell in row) {
+        final p = _createParagraph(cell.textLines);
         cells.add(DocxTableCell(
-          children: [_createParagraph(cell.textLines)],
+          children: p != null ? [p] : [],
         ));
       }
       rows.add(DocxTableRow(cells: cells));

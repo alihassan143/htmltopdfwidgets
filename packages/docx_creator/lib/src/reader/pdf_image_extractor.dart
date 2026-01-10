@@ -107,7 +107,18 @@ class PdfImageExtractor {
           heightMatch != null ? int.parse(heightMatch.group(1)!) : 100;
       final bitsPerComponent =
           bitsMatch != null ? int.parse(bitsMatch.group(1)!) : 8;
-      final colorSpace = colorSpaceMatch?.group(1) ?? 'DeviceRGB';
+
+      var colorSpace = 'DeviceRGB';
+      // Check for indexed color space: [/Indexed /DeviceRGB 255 <...>]
+      final indexedMatch =
+          RegExp(r'/ColorSpace\s*\[\s*/Indexed\s+/(\w+)\s+(\d+)\s+')
+              .firstMatch(obj.content);
+      if (indexedMatch != null) {
+        colorSpace = 'Indexed';
+        // Note: Palette extraction would go here
+      } else if (colorSpaceMatch != null) {
+        colorSpace = colorSpaceMatch.group(1)!;
+      }
 
       // Parse filters
       final filters = _parseFilters(obj.content);
@@ -195,22 +206,19 @@ class PdfImageExtractor {
 
       var imageBytes = parser.data.sublist(absStart, absStart + streamLength);
 
+      // Parse decode params
+      final decodeParms = parser.parseDecodeParms(obj.content);
+
       // Apply filters to decode (but keep DCTDecode as is - it's JPEG)
-      for (final filter in filters.reversed) {
+      for (var i = filters.length - 1; i >= 0; i--) {
+        final filter = filters[i];
         if (filter == 'DCTDecode' || filter == 'JPXDecode') {
           // JPEG/JPEG2000 - keep as is
           continue;
-        } else if (filter == 'FlateDecode') {
-          try {
-            imageBytes = Uint8List.fromList(zlib.decode(imageBytes));
-          } catch (e) {
-            warnings.add('Could not decompress image: $e');
-          }
-        } else if (filter == 'ASCIIHexDecode') {
-          imageBytes = _decodeAsciiHex(imageBytes);
-        } else if (filter == 'ASCII85Decode') {
-          imageBytes = _decodeAscii85(imageBytes);
         }
+
+        final parms = i < decodeParms.length ? decodeParms[i] : null;
+        imageBytes = parser.applyFilterWithParams(filter, imageBytes, parms);
       }
 
       return imageBytes;
@@ -589,63 +597,6 @@ class PdfImageExtractor {
       crc = table[(crc ^ byte) & 0xFF] ^ (crc >> 8);
     }
     return crc ^ 0xFFFFFFFF;
-  }
-
-  Uint8List _decodeAsciiHex(Uint8List data) {
-    final hex = String.fromCharCodes(data).replaceAll(RegExp(r'\s|>'), '');
-    final result = <int>[];
-
-    for (var i = 0; i < hex.length; i += 2) {
-      var chunk = hex.substring(i, i + 2 < hex.length ? i + 2 : hex.length);
-      if (chunk.length == 1) chunk += '0';
-      result.add(int.parse(chunk, radix: 16));
-    }
-
-    return Uint8List.fromList(result);
-  }
-
-  Uint8List _decodeAscii85(Uint8List data) {
-    final input = String.fromCharCodes(data)
-        .replaceAll(RegExp(r'\s'), '')
-        .replaceAll('<~', '')
-        .replaceAll('~>', '');
-
-    final result = <int>[];
-    var i = 0;
-
-    while (i < input.length) {
-      if (input[i] == 'z') {
-        result.addAll([0, 0, 0, 0]);
-        i++;
-        continue;
-      }
-
-      var tuple = 0;
-      var count = 0;
-      while (count < 5 && i < input.length) {
-        final c = input.codeUnitAt(i) - 33;
-        if (c >= 0 && c < 85) {
-          tuple = tuple * 85 + c;
-          count++;
-        }
-        i++;
-      }
-
-      for (var j = count; j < 5; j++) {
-        tuple = tuple * 85 + 84;
-      }
-
-      final bytes = [
-        (tuple >> 24) & 0xFF,
-        (tuple >> 16) & 0xFF,
-        (tuple >> 8) & 0xFF,
-        tuple & 0xFF,
-      ];
-
-      result.addAll(bytes.take(count - 1));
-    }
-
-    return Uint8List.fromList(result);
   }
 
   /// Gets image file extension from filter.
