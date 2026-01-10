@@ -107,19 +107,11 @@ class PdfParser {
     var bytes = Uint8List.fromList(streamBytes.map((e) => e & 0xFF).toList());
 
     if (encryption != null && encryption!.isReady) {
-      // Decrypt
-      // We need extraction of objNum and genNum
-      // PdfObject should store it, but currently doesn't expose it easily.
-      // It's usually the key in the objects map.
-      // We passed objRef.
-      int genNum = 0; // Default
-      // Ideally look up genNum from xref if possible or assume 0
-
+      int genNum = 0;
       bytes = encryption!.decryptData(bytes, objRef, genNum);
     }
 
     // 3. Apply Filters (Flate, etc.)
-    // We need to decode filters to get actual text/binary data
     final filters = _parseFilters(obj.content);
     final decodeParms = parseDecodeParms(obj.content);
 

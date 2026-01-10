@@ -614,14 +614,42 @@ class PdfTextExtractor {
 
         case 'TJ':
           if (i >= 1) {
-            final textLines = _processTextArray(tokens[i - 1], state);
-            lines.addAll(textLines);
-            currentOperands = [tokens[i - 1]];
+            String arrayToken = tokens[i - 1];
+
+            // Handle split array (tokenizer might split [ ... ])
+            if (arrayToken == ']') {
+              // Walk backwards to find matching [
+              var j = i - 2;
+              int depth = 1;
+              final buffer = <String>[];
+              buffer.add(']');
+
+              while (j >= 0 && depth > 0) {
+                final t = tokens[j];
+                buffer.insert(0, t); // Prepend
+
+                if (t == ']') depth++;
+                if (t == '[') depth--;
+
+                j--;
+              }
+
+              if (depth == 0) {
+                arrayToken = buffer.join(' '); // Reconstruct with spaces
+                // Remove the used operand from currentOperands (not strictly needed as we just log/use it)
+                // Note: The original i-1 token was just ']'
+              }
+            }
+
+            try {
+              final textLines = _processTextArray(arrayToken, state);
+              lines.addAll(textLines);
+            } catch (e) {}
+            currentOperands = [arrayToken];
           }
           break;
 
         case "'":
-          // Move to next line and show text
           state.textLineMatrix = PdfMatrix(1, 0, 0, 1, 0, -state.leading)
               .multiply(state.textLineMatrix);
           state.textMatrix = state.textLineMatrix.clone();
@@ -761,9 +789,13 @@ class PdfTextExtractor {
 
     // Handle hex strings
     if (text.startsWith('<') && text.endsWith('>')) {
-      text = _decodeHexString(text, state);
+      if (text.length >= 2) {
+        text = _decodeHexString(text, state);
+      }
     } else if (text.startsWith('(') && text.endsWith(')')) {
-      text = _decodeLiteralString(text.substring(1, text.length - 1), state);
+      if (text.length >= 2) {
+        text = _decodeLiteralString(text.substring(1, text.length - 1), state);
+      }
     }
 
     if (text.isEmpty) return null;
@@ -831,6 +863,8 @@ class PdfTextExtractor {
 
   List<PdfTextLine> _processTextArray(
       String arrayEntry, PdfGraphicsState state) {
+    if (arrayEntry.length < 2) return [];
+
     final lines = <PdfTextLine>[];
     final content = arrayEntry.substring(1, arrayEntry.length - 1);
 

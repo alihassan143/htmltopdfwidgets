@@ -47,7 +47,6 @@ class StyleParser {
       _parseNamedStyles(xml);
     } catch (e) {
       // Ignore style parsing errors - graceful degradation
-      print('Error parsing styles: $e');
     }
   }
 

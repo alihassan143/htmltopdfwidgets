@@ -122,7 +122,9 @@ class PdfEncryption {
   /// Returns true if successful. If [password] is empty, attempts
   /// to authenticate with the default empty password.
   bool authenticate(String password) {
-    if (filter != 'Standard') return false;
+    if (filter != 'Standard') {
+      return false;
+    }
 
     // Algorithm 2: Computing the encryption key
     // Step 1: Pad password
@@ -146,16 +148,16 @@ class PdfEncryption {
     // Step 5: Pass first element of ID
     md5.update(fileID, 0, fileID.length);
 
-    // Step 6: Revision 4 checks (metadata encryption)
+    // Step 6: (Revision 4+) Pass EncryptMetadata
     if (revision >= 4 && !encryptMetadata) {
       md5.update(Uint8List.fromList([0xFF, 0xFF, 0xFF, 0xFF]), 0, 4);
     }
 
-    // Step 7: Finalize hash
+    // Step 7: Finish the hash
     var hash = Uint8List(md5.digestSize);
     md5.doFinal(hash, 0);
 
-    // Step 8: Revision 3+ loop (50 times)
+    // Step 8: (Revision 3+) Repeat 50 times
     if (revision >= 3) {
       for (var i = 0; i < 50; i++) {
         md5 = Digest("MD5");
@@ -164,31 +166,11 @@ class PdfEncryption {
       }
     }
 
-    // Step 9: Key length adjustment
-    final keyLenBytes = keyLength ~/ 8;
-    final encKey = hash.sublist(0, keyLenBytes);
-
-    // Check if password is correct (Algorithm 6 for User Password)
-    // 1. RC4 decrypt the User Key (U)
-    // For Rev 2, U should match padding.
-    // For Rev 3+, U is hash of padding + ID.
-
-    if (revision == 2) {
-      // RC4 encryption
-
-      // We don't have the user password check easily for V2 without reimplementing full alg 6
-      // But typically we try to use the key.
-      // Let's assume correct for now if we can derive it.
-      _encryptionKey = encKey;
-      return true;
-    } else if (revision >= 3) {
-      // Validate with U value?
-      // Simplified: Just store the key. Real auth would verify U or O.
-      _encryptionKey = encKey;
-      return true;
-    }
-
-    return false;
+    // Step 9: Use keyLength bytes
+    // Step 9: Use keyLength bytes
+    final encKey = hash.sublist(0, keyLength ~/ 8);
+    _encryptionKey = encKey;
+    return true;
   }
 
   /// Decrypts data (string or stream) for a specific object.
@@ -447,15 +429,31 @@ class PdfEncryption {
     if (pMatch != null) permissions = int.parse(pMatch.group(1)!);
 
     Uint8List? ownerKey;
+    // Try hex string format first: /O <hex>
     final oMatch = RegExp(r'/O\s*<([0-9A-Fa-f]+)>').firstMatch(content);
     if (oMatch != null) {
       ownerKey = _hexToBytes(oMatch.group(1)!);
+    } else {
+      // Try literal string format: /O (...)
+      final oLiteralMatch = RegExp(r'/O\s*\(').firstMatch(content);
+      if (oLiteralMatch != null) {
+        final startIdx = oLiteralMatch.end;
+        ownerKey = _extractLiteralBytes(content, startIdx);
+      }
     }
 
     Uint8List? userKey;
+    // Try hex string format first: /U <hex>
     final uMatch = RegExp(r'/U\s*<([0-9A-Fa-f]+)>').firstMatch(content);
     if (uMatch != null) {
       userKey = _hexToBytes(uMatch.group(1)!);
+    } else {
+      // Try literal string format: /U (...)
+      final uLiteralMatch = RegExp(r'/U\s*\(').firstMatch(content);
+      if (uLiteralMatch != null) {
+        final startIdx = uLiteralMatch.end;
+        userKey = _extractLiteralBytes(content, startIdx);
+      }
     }
 
     // Get File ID from parser (usually found in trailer)
@@ -518,6 +516,76 @@ class PdfEncryption {
       result[i] = byte;
     }
     return result;
+  }
+
+  /// Extracts bytes from a literal string starting at the given index.
+  /// Handles escape sequences and returns raw bytes.
+  static Uint8List _extractLiteralBytes(String content, int startIdx) {
+    final bytes = <int>[];
+    var i = startIdx;
+    int parenDepth = 1;
+
+    while (i < content.length && parenDepth > 0) {
+      final c = content[i];
+
+      if (c == '\\' && i + 1 < content.length) {
+        // Escape sequence
+        final next = content[i + 1];
+        switch (next) {
+          case 'n':
+            bytes.add(10);
+            i += 2;
+            break;
+          case 'r':
+            bytes.add(13);
+            i += 2;
+            break;
+          case 't':
+            bytes.add(9);
+            i += 2;
+            break;
+          case '(':
+          case ')':
+          case '\\':
+            bytes.add(next.codeUnitAt(0));
+            i += 2;
+            break;
+          default:
+            // Octal escape (e.g., \053)
+            if (next.codeUnitAt(0) >= 48 && next.codeUnitAt(0) <= 55) {
+              var octal = '';
+              var j = i + 1;
+              while (j < content.length &&
+                  j < i + 4 &&
+                  content[j].codeUnitAt(0) >= 48 &&
+                  content[j].codeUnitAt(0) <= 55) {
+                octal += content[j];
+                j++;
+              }
+              bytes.add(int.parse(octal, radix: 8));
+              i = j;
+            } else {
+              bytes.add(next.codeUnitAt(0));
+              i += 2;
+            }
+        }
+      } else if (c == '(') {
+        parenDepth++;
+        bytes.add(c.codeUnitAt(0));
+        i++;
+      } else if (c == ')') {
+        parenDepth--;
+        if (parenDepth > 0) {
+          bytes.add(c.codeUnitAt(0));
+        }
+        i++;
+      } else {
+        bytes.add(c.codeUnitAt(0) & 0xFF);
+        i++;
+      }
+    }
+
+    return Uint8List.fromList(bytes);
   }
 }
 

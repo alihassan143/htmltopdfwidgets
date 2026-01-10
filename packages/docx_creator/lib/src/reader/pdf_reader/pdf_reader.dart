@@ -68,14 +68,14 @@ class PdfReader {
   ///
   /// Throws [FileSystemException] if file cannot be read.
   /// Throws [PdfParseException] if PDF is invalid.
-  static Future<PdfDocument> load(String filePath) async {
+  static Future<PdfDocument> load(String filePath, {String? password}) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) {
         throw PdfParseException('File not found: $filePath');
       }
       final bytes = await file.readAsBytes();
-      return loadFromBytes(bytes);
+      return loadFromBytes(bytes, password: password);
     } on FileSystemException catch (e) {
       throw PdfParseException('Cannot read file: ${e.message}');
     }
@@ -84,18 +84,41 @@ class PdfReader {
   /// Loads a PDF from bytes.
   ///
   /// Throws [PdfParseException] if PDF is invalid.
-  static Future<PdfDocument> loadFromBytes(Uint8List bytes) async {
+  static Future<PdfDocument> loadFromBytes(Uint8List bytes,
+      {String? password}) async {
     if (bytes.isEmpty) {
       throw PdfParseException('Empty PDF data');
     }
     final reader = PdfReader._(bytes);
-    return reader._parse();
+
+    return reader._parse(password);
   }
 
   /// Parses the PDF and returns a document.
-  PdfDocument _parse() {
+  PdfDocument _parse(String? password) {
     try {
       _parser.parse();
+
+      // Handle Encryption
+      final encryption = PdfEncryption.extract(_parser);
+      if (encryption != null) {
+        bool authenticated = false;
+        if (password != null) {
+          authenticated = encryption.authenticate(password);
+        } else {
+          // Try default empty password
+          authenticated = encryption.authenticate('');
+        }
+
+        if (!authenticated && password != null) {
+          _warnings.add('Invalid password provided');
+        }
+
+        // We set encryption anyway so parser knows it is encrypted,
+        // even if key is missing (it will fail to decrypt strings/streams).
+        _parser.setEncryption(encryption);
+      }
+
       _warnings.addAll(_parser.warnings);
       _parsePages();
     } catch (e) {
@@ -900,7 +923,9 @@ class PdfDocument {
   /// Encryption information (null if not encrypted).
   PdfEncryption? get encryption {
     if (!_encryptionChecked && _parser != null) {
-      _encryption = PdfEncryption.extract(_parser!);
+      // Use the parser's encryption instance (which has been authenticated)
+      // instead of extracting a new one
+      _encryption = _parser!.encryption;
       _encryptionChecked = true;
     }
     return _encryption;
@@ -971,7 +996,7 @@ class PdfDocument {
                 }
               }
             }
-            sb.write('\t');
+            sb.write('');
           }
           sb.writeln();
         }

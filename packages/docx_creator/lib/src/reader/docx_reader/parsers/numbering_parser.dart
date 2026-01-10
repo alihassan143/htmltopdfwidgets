@@ -64,9 +64,7 @@ class NumberingParser {
           levels: _abstractNums[abstractNumId] ?? [],
         );
       }
-    } catch (e) {
-      print('Error parsing numbering: $e');
-    }
+    } catch (e) {}
   }
 
   /// Parse picture bullet definitions from <w:numPicBullet> elements.
