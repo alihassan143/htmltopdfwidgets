@@ -42,10 +42,22 @@ export 'src/exporters/pdf/pdf_exporter.dart';
 export 'src/parsers/html_parser.dart';
 export 'src/parsers/markdown_parser.dart';
 export 'src/reader/docx_reader/docx_reader.dart';
+export 'src/reader/docx_reader/handlers/font_reader.dart';
+export 'src/reader/docx_reader/handlers/relationship_manager.dart';
+export 'src/reader/docx_reader/models/docx_font.dart';
+export 'src/reader/docx_reader/models/docx_relationship.dart';
 export 'src/reader/docx_reader/models/docx_style.dart';
 // Reader Models
 export 'src/reader/docx_reader/models/docx_theme.dart';
-export 'src/reader/pdf_reader/pdf_reader.dart'; // Add PdfReader export
+export 'src/reader/docx_reader/models/resolved_style.dart';
+export 'src/reader/docx_reader/parsers/block_parser.dart';
+export 'src/reader/docx_reader/parsers/inline_parser.dart';
+export 'src/reader/docx_reader/parsers/numbering_parser.dart';
+export 'src/reader/docx_reader/parsers/section_parser.dart';
+export 'src/reader/docx_reader/parsers/style_parser.dart';
+export 'src/reader/docx_reader/parsers/table_parser.dart';
+export 'src/reader/docx_reader/reader_context/reader_context.dart';
+export 'src/reader/pdf_reader/pdf_reader.dart';
 // Utilities
 export 'src/utils/content_types_generator.dart';
 export 'src/utils/docx_id_generator.dart';
