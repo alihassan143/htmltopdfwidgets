@@ -254,15 +254,6 @@
       ]
     },
     {
-      "name": "xml",
-      "version": "6.6.1",
-      "dependencies": [
-        "collection",
-        "meta",
-        "petitparser"
-      ]
-    },
-    {
       "name": "syncfusion_flutter_core",
       "version": "32.1.22",
       "dependencies": [
@@ -271,12 +262,10 @@
       ]
     },
     {
-      "name": "intl",
-      "version": "0.19.0",
+      "name": "convert",
+      "version": "3.1.2",
       "dependencies": [
-        "clock",
-        "meta",
-        "path"
+        "typed_data"
       ]
     },
     {
@@ -287,10 +276,21 @@
       ]
     },
     {
-      "name": "convert",
-      "version": "3.1.2",
+      "name": "xml",
+      "version": "6.6.1",
       "dependencies": [
-        "typed_data"
+        "collection",
+        "meta",
+        "petitparser"
+      ]
+    },
+    {
+      "name": "intl",
+      "version": "0.19.0",
+      "dependencies": [
+        "clock",
+        "meta",
+        "path"
       ]
     },
     {

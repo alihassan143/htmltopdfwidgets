@@ -1,5 +1,5 @@
 import 'package:docx_creator/docx_creator.dart';
-import 'package:docx_creator/src/reader/models/docx_font.dart';
+
 import 'package:docx_file_viewer/src/docx_view_config.dart';
 import 'package:docx_file_viewer/src/theme/docx_view_theme.dart';
 import 'package:docx_file_viewer/src/widget_generator/list_builder.dart';

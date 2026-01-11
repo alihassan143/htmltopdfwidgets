@@ -2,10 +2,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:docx_creator/docx_creator.dart';
-import 'package:docx_creator/src/reader/models/docx_font.dart';
-import 'package:docx_creator/src/reader/parsers/inline_parser.dart';
-import 'package:docx_creator/src/reader/parsers/table_parser.dart';
-import 'package:docx_creator/src/reader/reader_context.dart';
+
 import 'package:docx_file_viewer/docx_file_viewer.dart';
 import 'package:docx_file_viewer/src/widget_generator/paragraph_builder.dart';
 import 'package:flutter/material.dart';
