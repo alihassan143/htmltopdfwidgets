@@ -271,8 +271,18 @@ class PdfFontInfo {
       return differences![code]!;
     }
 
-    // Apply standard encoding based on encoding name
-    final enc = encoding ?? baseEncoding;
+    // Handle Symbol font
+    if (_isSymbolFont(baseFont)) {
+      return _symbolToUnicode(code);
+    }
+
+    // Handle ZapfDingbats font
+    if (_isZapfDingbatsFont(baseFont)) {
+      return _zapfDingbatsToUnicode(code);
+    }
+
+    // Apply standard encoding based on encoding name or Base14 default
+    final enc = encoding ?? baseEncoding ?? _getBase14DefaultEncoding(baseFont);
     if (enc != null) {
       switch (enc) {
         case 'WinAnsiEncoding':
@@ -297,6 +307,265 @@ class PdfFontInfo {
     }
 
     return code;
+  }
+
+  /// Check if font is Symbol
+  static bool _isSymbolFont(String fontName) {
+    final lowerName = fontName.toLowerCase();
+    return lowerName.contains('symbol');
+  }
+
+  /// Check if font is ZapfDingbats
+  static bool _isZapfDingbatsFont(String fontName) {
+    final lowerName = fontName.toLowerCase();
+    return lowerName.contains('zapfdingbats') || lowerName.contains('dingbats');
+  }
+
+  /// Get default encoding for Base14 fonts
+  static String? _getBase14DefaultEncoding(String fontName) {
+    // Base14 fonts use StandardEncoding by default (except Symbol/ZapfDingbats)
+    final base14 = [
+      'Courier',
+      'Courier-Bold',
+      'Courier-Oblique',
+      'Courier-BoldOblique',
+      'Helvetica',
+      'Helvetica-Bold',
+      'Helvetica-Oblique',
+      'Helvetica-BoldOblique',
+      'Times-Roman',
+      'Times-Bold',
+      'Times-Italic',
+      'Times-BoldItalic',
+    ];
+
+    for (final name in base14) {
+      if (fontName.contains(name)) {
+        return 'StandardEncoding';
+      }
+    }
+    return null;
+  }
+
+  /// Symbol font encoding to Unicode
+  static int _symbolToUnicode(int code) {
+    const map = <int, int>{
+      0x22: 0x2200, // forall
+      0x24: 0x2203, // thereexists
+      0x27: 0x220B, // suchthat
+      0x2A: 0x2217, // asteriskmath
+      0x2D: 0x2212, // minus
+      0x40: 0x2245, // congruent
+      0x41: 0x0391, // Alpha
+      0x42: 0x0392, // Beta
+      0x43: 0x03A7, // Chi
+      0x44: 0x0394, // Delta
+      0x45: 0x0395, // Epsilon
+      0x46: 0x03A6, // Phi
+      0x47: 0x0393, // Gamma
+      0x48: 0x0397, // Eta
+      0x49: 0x0399, // Iota
+      0x4B: 0x039A, // Kappa
+      0x4C: 0x039B, // Lambda
+      0x4D: 0x039C, // Mu
+      0x4E: 0x039D, // Nu
+      0x4F: 0x039F, // Omicron
+      0x50: 0x03A0, // Pi
+      0x51: 0x0398, // Theta
+      0x52: 0x03A1, // Rho
+      0x53: 0x03A3, // Sigma
+      0x54: 0x03A4, // Tau
+      0x55: 0x03A5, // Upsilon
+      0x57: 0x03A9, // Omega
+      0x58: 0x039E, // Xi
+      0x59: 0x03A8, // Psi
+      0x5A: 0x0396, // Zeta
+      0x5C: 0x2234, // therefore
+      0x5E: 0x22A5, // perpendicular
+      0x60: 0xF8E5, // radicalex (Private Use)
+      0x61: 0x03B1, // alpha
+      0x62: 0x03B2, // beta
+      0x63: 0x03C7, // chi
+      0x64: 0x03B4, // delta
+      0x65: 0x03B5, // epsilon
+      0x66: 0x03C6, // phi
+      0x67: 0x03B3, // gamma
+      0x68: 0x03B7, // eta
+      0x69: 0x03B9, // iota
+      0x6B: 0x03BA, // kappa
+      0x6C: 0x03BB, // lambda
+      0x6D: 0x03BC, // mu
+      0x6E: 0x03BD, // nu
+      0x6F: 0x03BF, // omicron
+      0x70: 0x03C0, // pi
+      0x71: 0x03B8, // theta
+      0x72: 0x03C1, // rho
+      0x73: 0x03C3, // sigma
+      0x74: 0x03C4, // tau
+      0x75: 0x03C5, // upsilon
+      0x77: 0x03C9, // omega
+      0x78: 0x03BE, // xi
+      0x79: 0x03C8, // psi
+      0x7A: 0x03B6, // zeta
+      0xA0: 0x20AC, // Euro
+      0xA1: 0x03D2, // Upsilon1
+      0xA2: 0x2032, // minute
+      0xA3: 0x2264, // lessequal
+      0xA4: 0x2044, // fraction
+      0xA5: 0x221E, // infinity
+      0xAA: 0x2194, // arrowboth
+      0xAB: 0x2190, // arrowleft
+      0xAC: 0x2191, // arrowup
+      0xAD: 0x2192, // arrowright
+      0xAE: 0x2193, // arrowdown
+      0xB2: 0x2033, // second
+      0xB3: 0x2265, // greaterequal
+      0xB4: 0x00D7, // multiply
+      0xB7: 0x2022, // bullet
+      0xB8: 0x00F7, // divide
+      0xB9: 0x2260, // notequal
+      0xBA: 0x2261, // equivalence
+      0xBB: 0x2248, // approxequal
+      0xBC: 0x2026, // ellipsis
+      0xC0: 0x2135, // aleph
+      0xC1: 0x2111, // Ifraktur
+      0xC2: 0x211C, // Rfraktur
+      0xC3: 0x2118, // weierstrass
+      0xC4: 0x2297, // circlemultiply
+      0xC5: 0x2295, // circleplus
+      0xC6: 0x2205, // emptyset
+      0xC7: 0x2229, // intersection
+      0xC8: 0x222A, // union
+      0xC9: 0x2283, // propersuperset
+      0xCA: 0x2287, // reflexsuperset
+      0xCB: 0x2284, // notsubset
+      0xCC: 0x2282, // propersubset
+      0xCD: 0x2286, // reflexsubset
+      0xCE: 0x2208, // element
+      0xCF: 0x2209, // notelement
+      0xD0: 0x2220, // angle
+      0xD1: 0x2207, // gradient
+      0xD5: 0x220F, // product
+      0xD6: 0x221A, // radical
+      0xD7: 0x22C5, // dotmath
+      0xD8: 0x00AC, // logicalnot
+      0xD9: 0x2227, // logicaland
+      0xDA: 0x2228, // logicalor
+      0xDB: 0x21D4, // arrowdblboth
+      0xDC: 0x21D0, // arrowdblleft
+      0xDD: 0x21D1, // arrowdblup
+      0xDE: 0x21D2, // arrowdblright
+      0xDF: 0x21D3, // arrowdbldown
+      0xE0: 0x25CA, // lozenge
+      0xE5: 0x2211, // summation
+      0xF1: 0x222B, // integral
+    };
+    return map[code] ?? code;
+  }
+
+  /// ZapfDingbats encoding to Unicode
+  static int _zapfDingbatsToUnicode(int code) {
+    const map = <int, int>{
+      0x21: 0x2701, // upper blade scissors
+      0x22: 0x2702, // black scissors
+      0x23: 0x2703, // lower blade scissors
+      0x24: 0x2704, // white scissors
+      0x25: 0x260E, // black telephone
+      0x26: 0x2706, // telephone location sign
+      0x27: 0x2707, // tape drive
+      0x28: 0x2708, // airplane
+      0x29: 0x2709, // envelope
+      0x2A: 0x261B, // black right pointing index
+      0x2B: 0x261E, // white right pointing index
+      0x2C: 0x270C, // victory hand
+      0x2D: 0x270D, // writing hand
+      0x2E: 0x270E, // lower right pencil
+      0x2F: 0x270F, // pencil
+      0x30: 0x2710, // upper right pencil
+      0x31: 0x2711, // white nib
+      0x32: 0x2712, // black nib
+      0x33: 0x2713, // check mark
+      0x34: 0x2714, // heavy check mark
+      0x35: 0x2715, // multiplication x
+      0x36: 0x2716, // heavy multiplication x
+      0x37: 0x2717, // ballot x
+      0x38: 0x2718, // heavy ballot x
+      0x39: 0x2719, // outlined greek cross
+      0x3A: 0x271A, // heavy greek cross
+      0x3B: 0x271B, // open center cross
+      0x3C: 0x271C, // heavy open center cross
+      0x3D: 0x271D, // latin cross
+      0x3E: 0x271E, // shadowed white latin cross
+      0x3F: 0x271F, // outlined latin cross
+      0x40: 0x2720, // maltese cross
+      0x41: 0x2721, // star of david
+      0x42: 0x2722, // four teardrop-spoked asterisk
+      0x43: 0x2723, // four balloon-spoked asterisk
+      0x44: 0x2724, // heavy four balloon-spoked asterisk
+      0x45: 0x2725, // four club-spoked asterisk
+      0x46: 0x2726, // black four pointed star
+      0x47: 0x2727, // white four pointed star
+      0x48: 0x2605, // black star
+      0x49: 0x2729, // stress outlined white star
+      0x4A: 0x272A, // circled white star
+      0x4B: 0x272B, // open center black star
+      0x4C: 0x272C, // black center white star
+      0x4D: 0x272D, // outlined black star
+      0x4E: 0x272E, // heavy outlined black star
+      0x4F: 0x272F, // pinwheel star
+      0x50: 0x2730, // shadowed white star
+      0x51: 0x2731, // heavy asterisk
+      0x52: 0x2732, // open center asterisk
+      0x53: 0x2733, // eight spoked asterisk
+      0x54: 0x2734, // eight pointed black star
+      0x55: 0x2735, // eight pointed pinwheel star
+      0x56: 0x2736, // six pointed black star
+      0x57: 0x2737, // eight pointed rectilinear black star
+      0x58: 0x2738, // heavy eight pointed rectilinear black star
+      0x59: 0x2739, // twelve pointed black star
+      0x5A: 0x273A, // sixteen pointed asterisk
+      0x5B: 0x273B, // teardrop-spoked asterisk
+      0x5C: 0x273C, // open center teardrop-spoked asterisk
+      0x5D: 0x273D, // heavy teardrop-spoked asterisk
+      0x5E: 0x273E, // six petalled black and white florette
+      0x5F: 0x273F, // black florette
+      0x60: 0x2740, // white florette
+      0x61: 0x2741, // eight petalled outlined black florette
+      0x62: 0x2742, // circled open center eight pointed star
+      0x63: 0x2743, // heavy teardrop-spoked pinwheel asterisk
+      0x64: 0x2744, // snowflake
+      0x65: 0x2745, // tight trifoliate snowflake
+      0x66: 0x2746, // heavy chevron snowflake
+      0x67: 0x2747, // sparkle
+      0x68: 0x2748, // heavy sparkle
+      0x69: 0x2749, // balloon-spoked asterisk
+      0x6A: 0x274A, // eight teardrop-spoked propeller asterisk
+      0x6B: 0x274B, // heavy eight teardrop-spoked propeller asterisk
+      0x6C: 0x25CF, // black circle
+      0x6D: 0x274D, // shadowed white circle
+      0x6E: 0x25A0, // black square
+      0x6F: 0x274F, // lower right drop-shadowed white square
+      0x70: 0x2750, // upper right drop-shadowed white square
+      0x71: 0x2751, // lower right shadowed white square
+      0x72: 0x2752, // upper right shadowed white square
+      0x73: 0x25B2, // black up-pointing triangle
+      0x74: 0x25BC, // black down-pointing triangle
+      0x75: 0x25C6, // black diamond
+      0x76: 0x2756, // black diamond minus white x
+      0x77: 0x25D7, // right half black circle
+      0x78: 0x2758, // light vertical bar
+      0x79: 0x2759, // medium vertical bar
+      0x7A: 0x275A, // heavy vertical bar
+      0x7B: 0x275B, // heavy single turned comma quotation mark ornament
+      0x7C: 0x275C, // heavy single comma quotation mark ornament
+      0x7D: 0x275D, // heavy double turned comma quotation mark ornament
+      0x7E: 0x275E, // heavy double comma quotation mark ornament
+      // Numbers for enclosed numerals (0-9)
+      0xAC: 0x2776, // dingbat negative circled digit one
+      0xAD: 0x2777, 0xAE: 0x2778, 0xAF: 0x2779, 0xB0: 0x277A,
+      0xB1: 0x277B, 0xB2: 0x277C, 0xB3: 0x277D, 0xB4: 0x277E, 0xB5: 0x277F,
+    };
+    return map[code] ?? code;
   }
 
   /// WinAnsi to Unicode mapping for extended characters.

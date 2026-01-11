@@ -254,14 +254,59 @@ class PdfMetadataExtractor {
       return _decodeUtf16BE(clean.substring(4));
     }
 
+    // PDFDocEncoding for non-BOM strings
     final buffer = StringBuffer();
     for (var i = 0; i < clean.length; i += 2) {
       final end = i + 2 <= clean.length ? i + 2 : clean.length;
       var chunk = clean.substring(i, end);
       if (chunk.length == 1) chunk += '0';
-      buffer.writeCharCode(int.parse(chunk, radix: 16));
+      final code = int.parse(chunk, radix: 16);
+      buffer.writeCharCode(_pdfDocEncodingToUnicode(code));
     }
     return buffer.toString();
+  }
+
+  /// Converts PDFDocEncoding to Unicode.
+  /// PDFDocEncoding is identical to Latin-1 for 0-127 and 160-255,
+  /// but has special mappings for 128-159 and 127.
+  static int _pdfDocEncodingToUnicode(int code) {
+    const map = <int, int>{
+      0x80: 0x2022, // bullet
+      0x81: 0x2020, // dagger
+      0x82: 0x2021, // daggerdbl
+      0x83: 0x2026, // ellipsis
+      0x84: 0x2014, // emdash
+      0x85: 0x2013, // endash
+      0x86: 0x0192, // florin
+      0x87: 0x2044, // fraction
+      0x88: 0x2039, // guilsinglleft
+      0x89: 0x203A, // guilsinglright
+      0x8A: 0x2212, // minus
+      0x8B: 0x2030, // perthousand
+      0x8C: 0x201A, // quotesinglebase
+      0x8D: 0x201C, // quotedblleft
+      0x8E: 0x201D, // quotedblright
+      0x8F: 0x2018, // quoteleft
+      0x90: 0x2019, // quoteright
+      0x91: 0x201E, // quotedblbase
+      0x92: 0x2122, // trademark
+      0x93: 0xFB01, // fi
+      0x94: 0xFB02, // fl
+      0x95: 0x0141, // Lslash
+      0x96: 0x0152, // OE
+      0x97: 0x0160, // Scaron
+      0x98: 0x0178, // Ydieresis
+      0x99: 0x017D, // Zcaron
+      0x9A: 0x0131, // dotlessi
+      0x9B: 0x0142, // lslash
+      0x9C: 0x0153, // oe
+      0x9D: 0x0161, // scaron
+      0x9E: 0x017E, // zcaron
+      0x9F: 0xFFFF, // undefined
+      0xA0: 0x20AC, // Euro
+      0xAD: 0x00AD, // soft hyphen
+    };
+    return map[code] ?? code;
   }
 
   /// Decodes UTF-16BE encoded hex string.

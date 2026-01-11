@@ -952,6 +952,262 @@ class PdfDocument {
     return null;
   }
 
+  // ============ Named Destinations ============
+
+  /// Named destinations in the document.
+  /// Maps destination names to page numbers.
+  Map<String, int> get namedDestinations {
+    if (_parser == null) return {};
+
+    final rootObj = _parser!.getObject(_parser!.rootRef);
+    if (rootObj == null) return {};
+
+    final result = <String, int>{};
+
+    // Try /Names -> /Dests name tree
+    final namesMatch =
+        RegExp(r'/Names\s+(\d+)\s+\d+\s+R').firstMatch(rootObj.content);
+    if (namesMatch != null) {
+      final namesObj = _parser!.getObject(int.parse(namesMatch.group(1)!));
+      if (namesObj != null) {
+        final destsMatch =
+            RegExp(r'/Dests\s+(\d+)\s+\d+\s+R').firstMatch(namesObj.content);
+        if (destsMatch != null) {
+          _parseNameTree(int.parse(destsMatch.group(1)!), result);
+        }
+      }
+    }
+
+    // Also try /Dests dictionary in catalog (older PDFs)
+    final destsMatch =
+        RegExp(r'/Dests\s+(\d+)\s+\d+\s+R').firstMatch(rootObj.content);
+    if (destsMatch != null) {
+      _parseDestsDict(int.parse(destsMatch.group(1)!), result);
+    }
+
+    return result;
+  }
+
+  void _parseNameTree(int ref, Map<String, int> result) {
+    final obj = _parser!.getObject(ref);
+    if (obj == null) return;
+
+    // Check for /Names array (leaf node)
+    final namesMatch = RegExp(r'/Names\s*\[([^\]]+)\]').firstMatch(obj.content);
+    if (namesMatch != null) {
+      final content = namesMatch.group(1)!;
+      // Pattern: (name) [destination] or <hex> [destination]
+      final pattern = RegExp(r'(\([^)]+\)|\<[^>]+\>)\s+(\[|\d+\s+\d+\s+R)');
+      for (final match in pattern.allMatches(content)) {
+        final nameRaw = match.group(1)!;
+        String name;
+        if (nameRaw.startsWith('(')) {
+          name = nameRaw.substring(1, nameRaw.length - 1);
+        } else {
+          // Hex string
+          name = String.fromCharCodes(RegExp(r'[0-9A-Fa-f]{2}')
+              .allMatches(nameRaw.substring(1, nameRaw.length - 1))
+              .map((m) => int.parse(m.group(0)!, radix: 16)));
+        }
+        // Extract page number from destination
+        final pageNum = _extractPageFromDest(content.substring(match.end));
+        if (pageNum != null) result[name] = pageNum;
+      }
+    }
+
+    // Check for /Kids array (intermediate node)
+    final kidsMatch = RegExp(r'/Kids\s*\[([^\]]+)\]').firstMatch(obj.content);
+    if (kidsMatch != null) {
+      final refs = RegExp(r'(\d+)\s+\d+\s+R').allMatches(kidsMatch.group(1)!);
+      for (final ref in refs) {
+        _parseNameTree(int.parse(ref.group(1)!), result);
+      }
+    }
+  }
+
+  void _parseDestsDict(int ref, Map<String, int> result) {
+    final obj = _parser!.getObject(ref);
+    if (obj == null) return;
+
+    // Pattern: /DestName [pageRef /XYZ ...] or /DestName pageRef
+    final pattern = RegExp(r'/(\w+)\s*(\[|\d+)');
+    for (final match in pattern.allMatches(obj.content)) {
+      final name = match.group(1)!;
+      final pageNum = _extractPageFromDest(obj.content.substring(match.start));
+      if (pageNum != null) result[name] = pageNum;
+    }
+  }
+
+  int? _extractPageFromDest(String content) {
+    // Try to find page reference in destination array
+    final refMatch = RegExp(r'(\d+)\s+\d+\s+R').firstMatch(content);
+    if (refMatch != null) {
+      final pageRef = int.parse(refMatch.group(1)!);
+      // Find page index for this reference
+      for (var i = 0; i < pageInfos.length; i++) {
+        // Approximate: check if this is a valid page object
+        final obj = _parser!.getObject(pageRef);
+        if (obj != null && obj.content.contains('/Type /Page')) {
+          return i;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// The open destination (where document opens).
+  /// Returns page number, or null if not set.
+  int? get openDestination {
+    if (_parser == null) return null;
+
+    final rootObj = _parser!.getObject(_parser!.rootRef);
+    if (rootObj == null) return null;
+
+    // Check /OpenAction
+    final openMatch = RegExp(r'/OpenAction\s*\[?\s*(\d+)\s+\d+\s+R')
+        .firstMatch(rootObj.content);
+    if (openMatch != null) {
+      final pageRef = int.parse(openMatch.group(1)!);
+      for (var i = 0; i < pageInfos.length; i++) {
+        final obj = _parser!.getObject(pageRef);
+        if (obj != null && obj.content.contains('/Type /Page')) {
+          return i;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ============ Per-Page Text Extraction ============
+
+  /// Extracts text from a specific page.
+  /// [pageNumber] is 0-indexed.
+  String extractTextForPage(int pageNumber) {
+    if (pageNumber < 0 || pageNumber >= pageInfos.length) return '';
+
+    final info = pageInfos[pageNumber];
+    if (_parser == null) return '';
+
+    // Get page object and extract text
+    final pageObj = _getPageObjectByIndex(pageNumber);
+    if (pageObj == null) return '';
+
+    final textExtractor = PdfTextExtractor(_parser!);
+    textExtractor.extractPageFonts(pageObj.content);
+    textExtractor.pageWidth = info.mediaBox.width;
+    textExtractor.pageHeight = info.mediaBox.height;
+
+    // Get content stream
+    final contentStream = _getPageContentStream(pageObj);
+    if (contentStream == null) return '';
+
+    return textExtractor.extractTextString(contentStream);
+  }
+
+  PdfObject? _getPageObjectByIndex(int index) {
+    if (_parser == null) return null;
+
+    // Walk page tree to find page at index
+    final rootObj = _parser!.getObject(_parser!.rootRef);
+    if (rootObj == null) return null;
+
+    final pagesMatch =
+        RegExp(r'/Pages\s+(\d+)\s+\d+\s+R').firstMatch(rootObj.content);
+    if (pagesMatch == null) return null;
+
+    final pagesRef = int.parse(pagesMatch.group(1)!);
+    return _findPageByIndex(pagesRef, index, [0]);
+  }
+
+  PdfObject? _findPageByIndex(
+      int ref, int targetIndex, List<int> currentIndex) {
+    final obj = _parser!.getObject(ref);
+    if (obj == null) return null;
+
+    if (obj.content.contains('/Type /Page') &&
+        !obj.content.contains('/Type /Pages')) {
+      if (currentIndex[0] == targetIndex) return obj;
+      currentIndex[0]++;
+      return null;
+    }
+
+    // Pages node - recurse into Kids
+    final kidsMatch = RegExp(r'/Kids\s*\[([^\]]+)\]').firstMatch(obj.content);
+    if (kidsMatch != null) {
+      final refs = RegExp(r'(\d+)\s+\d+\s+R').allMatches(kidsMatch.group(1)!);
+      for (final m in refs) {
+        final result =
+            _findPageByIndex(int.parse(m.group(1)!), targetIndex, currentIndex);
+        if (result != null) return result;
+      }
+    }
+    return null;
+  }
+
+  String? _getPageContentStream(PdfObject pageObj) {
+    // Array of content streams
+    final arrayMatch =
+        RegExp(r'/Contents\s*\[([^\]]+)\]').firstMatch(pageObj.content);
+    if (arrayMatch != null) {
+      final refs = RegExp(r'(\d+)\s+\d+\s+R').allMatches(arrayMatch.group(1)!);
+      final sb = StringBuffer();
+      for (final m in refs) {
+        final stream = _parser!.getStreamContent(int.parse(m.group(1)!));
+        if (stream != null) sb.writeln(stream);
+      }
+      return sb.toString();
+    }
+
+    // Single content stream
+    final singleMatch =
+        RegExp(r'/Contents\s+(\d+)\s+\d+\s+R').firstMatch(pageObj.content);
+    if (singleMatch != null) {
+      return _parser!.getStreamContent(int.parse(singleMatch.group(1)!));
+    }
+
+    return null;
+  }
+
+  // ============ PDF/A Compliance ============
+
+  /// Whether the document claims PDF/A compliance.
+  bool get isPdfA {
+    final xmp = xmpMetadata;
+    if (xmp?.rawXml != null) {
+      return xmp!.rawXml!.contains('pdfaid:') || xmp.rawXml!.contains('PDF/A');
+    }
+    return false;
+  }
+
+  /// PDF/A conformance level (e.g., "1a", "1b", "2u", "3b").
+  /// Returns null if not PDF/A.
+  String? get pdfaConformance {
+    final xmp = xmpMetadata;
+    if (xmp?.rawXml == null) return null;
+
+    // Look for pdfaid:part and pdfaid:conformance
+    final partMatch = RegExp(r'pdfaid:part>(\d+)<').firstMatch(xmp!.rawXml!);
+    final confMatch =
+        RegExp(r'pdfaid:conformance>([ABU])<', caseSensitive: false)
+            .firstMatch(xmp.rawXml!);
+
+    if (partMatch != null) {
+      final part = partMatch.group(1);
+      final conf = confMatch?.group(1)?.toLowerCase() ?? '';
+      return '$part$conf';
+    }
+    return null;
+  }
+
+  // ============ Permissions (from encryption) ============
+
+  /// Document permissions (from encryption).
+  /// Returns null if document is not encrypted.
+  PdfPermissions? get permissions {
+    if (encryption == null) return null;
+    return PdfPermissions._(encryption!);
+  }
+
   /// Converts to a DocxBuiltDocument for export.
   DocxBuiltDocument toDocx() {
     final widthTwips = (pageWidth * 20).toInt();
@@ -1010,4 +1266,42 @@ class PdfDocument {
 
   /// Whether parsing had warnings.
   bool get hasWarnings => warnings.isNotEmpty;
+}
+
+/// Permissions wrapper for easier access.
+class PdfPermissions {
+  final PdfEncryption _encryption;
+
+  PdfPermissions._(this._encryption);
+
+  /// Whether printing is allowed.
+  bool get canPrint => _encryption.canPrint;
+
+  /// Whether modifying content is allowed.
+  bool get canModify => _encryption.canModify;
+
+  /// Whether copying text is allowed.
+  bool get canCopy => _encryption.canCopy;
+
+  /// Whether adding annotations is allowed.
+  bool get canAnnotate => _encryption.canAnnotate;
+
+  /// Whether filling forms is allowed.
+  bool get canFillForms => _encryption.canFillForms;
+
+  /// Whether extracting for accessibility is allowed.
+  bool get canExtractForAccessibility => _encryption.canExtractForAccessibility;
+
+  /// Whether assembling document is allowed.
+  bool get canAssemble => _encryption.canAssemble;
+
+  /// Whether high quality printing is allowed.
+  bool get canPrintHighQuality => _encryption.canPrintHighQuality;
+
+  /// Raw permission integer value.
+  int get rawValue => _encryption.permissions;
+
+  @override
+  String toString() =>
+      'PdfPermissions(print: $canPrint, copy: $canCopy, modify: $canModify)';
 }

@@ -42,6 +42,7 @@ void main() {
       final bytes =
           await fetchInternal('014-outlines/mistitled_outlines_example.pdf');
       final doc = await PdfReader.loadFromBytes(bytes);
+
       expect(doc.outlines, isNotEmpty);
     });
 

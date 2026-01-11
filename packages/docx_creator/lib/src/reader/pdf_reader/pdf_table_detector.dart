@@ -130,18 +130,32 @@ class PdfTableDetector {
     }
 
     if (tableRows.length >= 2 && tableRows.first.length >= 2) {
-      final minX = vClusters.first;
-      final maxX = vClusters.last;
-      final minY = hClusters.last;
-      final maxY = hClusters.first;
+      // Validation: Reject false positives where cells contain only single characters
+      int singleCharCells = 0;
+      int totalCells = 0;
+      for (final row in tableRows) {
+        for (final cell in row) {
+          totalCells++;
+          final textLen =
+              cell.textLines.fold<int>(0, (sum, l) => sum + l.text.length);
+          if (textLen <= 2) singleCharCells++;
+        }
+      }
 
-      tables.add(PdfDetectedTable(
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY,
-        rows: tableRows,
-      ));
+      if (totalCells == 0 || singleCharCells / totalCells <= 0.4) {
+        final minX = vClusters.first;
+        final maxX = vClusters.last;
+        final minY = hClusters.last;
+        final maxY = hClusters.first;
+
+        tables.add(PdfDetectedTable(
+          x: minX,
+          y: minY,
+          width: maxX - minX,
+          height: maxY - minY,
+          rows: tableRows,
+        ));
+      }
     }
 
     return tables;
@@ -314,6 +328,24 @@ class PdfTableDetector {
     }
 
     if (tableRows.length < 2) return null;
+
+    // Validation: Reject false positives where cells contain only single characters
+    // This happens when PDFs position each character individually
+    int singleCharCells = 0;
+    int totalCells = 0;
+    for (final row in tableRows) {
+      for (final cell in row) {
+        totalCells++;
+        // Calculate total text length in cell
+        final textLen =
+            cell.textLines.fold<int>(0, (sum, l) => sum + l.text.length);
+        if (textLen <= 2) singleCharCells++;
+      }
+    }
+    // If more than 40% of cells have 1-2 chars, this is likely not a real table
+    if (totalCells > 0 && singleCharCells / totalCells > 0.4) {
+      return null;
+    }
 
     final minX = colBoundaries.first;
     final maxX = colBoundaries.last;

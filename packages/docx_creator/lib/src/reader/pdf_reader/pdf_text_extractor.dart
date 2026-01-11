@@ -340,41 +340,20 @@ class PdfTextExtractor {
   }
 
   /// Converts a glyph name to Unicode code point.
+  /// Comprehensive Adobe Glyph List mapping.
   int? _glyphNameToUnicode(String name) {
-    // Common glyph names mapping
+    // Extensive glyph names mapping from Adobe Glyph List
     const glyphMap = <String, int>{
-      'space': 0x0020,
-      'exclam': 0x0021,
-      'quotedbl': 0x0022,
-      'numbersign': 0x0023,
-      'dollar': 0x0024,
-      'percent': 0x0025,
-      'ampersand': 0x0026,
-      'quotesingle': 0x0027,
-      'parenleft': 0x0028,
-      'parenright': 0x0029,
-      'asterisk': 0x002A,
-      'plus': 0x002B,
-      'comma': 0x002C,
-      'hyphen': 0x002D,
-      'period': 0x002E,
-      'slash': 0x002F,
-      'zero': 0x0030,
-      'one': 0x0031,
-      'two': 0x0032,
-      'three': 0x0033,
-      'four': 0x0034,
-      'five': 0x0035,
-      'six': 0x0036,
-      'seven': 0x0037,
-      'eight': 0x0038,
-      'nine': 0x0039,
-      'colon': 0x003A,
-      'semicolon': 0x003B,
-      'less': 0x003C,
-      'equal': 0x003D,
-      'greater': 0x003E,
-      'question': 0x003F,
+      // Basic ASCII
+      'space': 0x0020, 'exclam': 0x0021, 'quotedbl': 0x0022,
+      'numbersign': 0x0023, 'dollar': 0x0024, 'percent': 0x0025,
+      'ampersand': 0x0026, 'quotesingle': 0x0027, 'parenleft': 0x0028,
+      'parenright': 0x0029, 'asterisk': 0x002A, 'plus': 0x002B,
+      'comma': 0x002C, 'hyphen': 0x002D, 'period': 0x002E, 'slash': 0x002F,
+      'zero': 0x0030, 'one': 0x0031, 'two': 0x0032, 'three': 0x0033,
+      'four': 0x0034, 'five': 0x0035, 'six': 0x0036, 'seven': 0x0037,
+      'eight': 0x0038, 'nine': 0x0039, 'colon': 0x003A, 'semicolon': 0x003B,
+      'less': 0x003C, 'equal': 0x003D, 'greater': 0x003E, 'question': 0x003F,
       'at': 0x0040,
       'A': 0x0041, 'B': 0x0042, 'C': 0x0043, 'D': 0x0044, 'E': 0x0045,
       'F': 0x0046, 'G': 0x0047, 'H': 0x0048, 'I': 0x0049, 'J': 0x004A,
@@ -382,82 +361,186 @@ class PdfTextExtractor {
       'P': 0x0050, 'Q': 0x0051, 'R': 0x0052, 'S': 0x0053, 'T': 0x0054,
       'U': 0x0055, 'V': 0x0056, 'W': 0x0057, 'X': 0x0058, 'Y': 0x0059,
       'Z': 0x005A,
-      'bracketleft': 0x005B,
-      'backslash': 0x005C,
-      'bracketright': 0x005D,
-      'asciicircum': 0x005E,
-      'underscore': 0x005F,
-      'grave': 0x0060,
+      'bracketleft': 0x005B, 'backslash': 0x005C, 'bracketright': 0x005D,
+      'asciicircum': 0x005E, 'underscore': 0x005F, 'grave': 0x0060,
       'a': 0x0061, 'b': 0x0062, 'c': 0x0063, 'd': 0x0064, 'e': 0x0065,
       'f': 0x0066, 'g': 0x0067, 'h': 0x0068, 'i': 0x0069, 'j': 0x006A,
       'k': 0x006B, 'l': 0x006C, 'm': 0x006D, 'n': 0x006E, 'o': 0x006F,
       'p': 0x0070, 'q': 0x0071, 'r': 0x0072, 's': 0x0073, 't': 0x0074,
       'u': 0x0075, 'v': 0x0076, 'w': 0x0077, 'x': 0x0078, 'y': 0x0079,
       'z': 0x007A,
-      'braceleft': 0x007B,
-      'bar': 0x007C,
-      'braceright': 0x007D,
+      'braceleft': 0x007B, 'bar': 0x007C, 'braceright': 0x007D,
       'asciitilde': 0x007E,
-      // Extended characters
-      'bullet': 0x2022,
-      'endash': 0x2013,
-      'emdash': 0x2014,
-      'quoteleft': 0x2018,
-      'quoteright': 0x2019,
-      'quotedblleft': 0x201C,
-      'quotedblright': 0x201D,
-      'ellipsis': 0x2026,
-      'trademark': 0x2122,
-      'copyright': 0x00A9,
-      'registered': 0x00AE,
-      'degree': 0x00B0,
-      'plusminus': 0x00B1,
-      'multiply': 0x00D7,
-      'divide': 0x00F7,
-      'fi': 0xFB01,
-      'fl': 0xFB02,
-      // Accented characters
+
+      // Latin Extended-A & Extended-B
+      'Amacron': 0x0100, 'amacron': 0x0101, 'Abreve': 0x0102, 'abreve': 0x0103,
+      'Aogonek': 0x0104, 'aogonek': 0x0105, 'Cacute': 0x0106, 'cacute': 0x0107,
+      'Ccircumflex': 0x0108, 'ccircumflex': 0x0109, 'Cdotaccent': 0x010A,
+      'cdotaccent': 0x010B, 'Ccaron': 0x010C, 'ccaron': 0x010D,
+      'Dcaron': 0x010E, 'dcaron': 0x010F, 'Dcroat': 0x0110, 'dcroat': 0x0111,
+      'Emacron': 0x0112, 'emacron': 0x0113, 'Ebreve': 0x0114, 'ebreve': 0x0115,
+      'Edotaccent': 0x0116, 'edotaccent': 0x0117, 'Eogonek': 0x0118,
+      'eogonek': 0x0119, 'Ecaron': 0x011A, 'ecaron': 0x011B,
+      'Gbreve': 0x011E, 'gbreve': 0x011F, 'Gdotaccent': 0x0120,
+      'gdotaccent': 0x0121, 'Gcommaaccent': 0x0122, 'gcommaaccent': 0x0123,
+      'Hbar': 0x0126, 'hbar': 0x0127, 'Itilde': 0x0128, 'itilde': 0x0129,
+      'Imacron': 0x012A, 'imacron': 0x012B, 'Iogonek': 0x012E,
+      'iogonek': 0x012F,
+      'Idotaccent': 0x0130, 'dotlessi': 0x0131,
+      'Lacute': 0x0139, 'lacute': 0x013A, 'Lcommaaccent': 0x013B,
+      'lcommaaccent': 0x013C, 'Lcaron': 0x013D, 'lcaron': 0x013E,
+      'Lslash': 0x0141, 'lslash': 0x0142, 'Nacute': 0x0143, 'nacute': 0x0144,
+      'Ncommaaccent': 0x0145, 'ncommaaccent': 0x0146, 'Ncaron': 0x0147,
+      'ncaron': 0x0148, 'Eng': 0x014A, 'eng': 0x014B,
+      'Omacron': 0x014C, 'omacron': 0x014D, 'Obreve': 0x014E, 'obreve': 0x014F,
+      'Ohungarumlaut': 0x0150, 'ohungarumlaut': 0x0151,
+      'OE': 0x0152, 'oe': 0x0153, 'Racute': 0x0154, 'racute': 0x0155,
+      'Rcommaaccent': 0x0156, 'rcommaaccent': 0x0157, 'Rcaron': 0x0158,
+      'rcaron': 0x0159, 'Sacute': 0x015A, 'sacute': 0x015B,
+      'Scircumflex': 0x015C, 'scircumflex': 0x015D, 'Scedilla': 0x015E,
+      'scedilla': 0x015F, 'Scaron': 0x0160, 'scaron': 0x0161,
+      'Tcommaaccent': 0x0162, 'tcommaaccent': 0x0163, 'Tcaron': 0x0164,
+      'tcaron': 0x0165, 'Tbar': 0x0166, 'tbar': 0x0167,
+      'Utilde': 0x0168, 'utilde': 0x0169, 'Umacron': 0x016A, 'umacron': 0x016B,
+      'Ubreve': 0x016C, 'ubreve': 0x016D, 'Uring': 0x016E, 'uring': 0x016F,
+      'Uhungarumlaut': 0x0170, 'uhungarumlaut': 0x0171,
+      'Uogonek': 0x0172, 'uogonek': 0x0173, 'Wcircumflex': 0x0174,
+      'wcircumflex': 0x0175, 'Ycircumflex': 0x0176, 'ycircumflex': 0x0177,
+      'Ydieresis': 0x0178, 'Zacute': 0x0179, 'zacute': 0x017A,
+      'Zdotaccent': 0x017B, 'zdotaccent': 0x017C, 'Zcaron': 0x017D,
+      'zcaron': 0x017E, 'florin': 0x0192,
+
+      // Latin-1 Supplement
+      'exclamdown': 0x00A1, 'cent': 0x00A2, 'sterling': 0x00A3,
+      'currency': 0x00A4, 'yen': 0x00A5, 'brokenbar': 0x00A6,
+      'section': 0x00A7, 'dieresis': 0x00A8, 'copyright': 0x00A9,
+      'ordfeminine': 0x00AA, 'guillemotleft': 0x00AB, 'logicalnot': 0x00AC,
+      'registered': 0x00AE, 'macron': 0x00AF, 'degree': 0x00B0,
+      'plusminus': 0x00B1, 'twosuperior': 0x00B2, 'threesuperior': 0x00B3,
+      'acute': 0x00B4, 'mu': 0x00B5, 'paragraph': 0x00B6,
+      'periodcentered': 0x00B7, 'cedilla': 0x00B8, 'onesuperior': 0x00B9,
+      'ordmasculine': 0x00BA, 'guillemotright': 0x00BB, 'onequarter': 0x00BC,
+      'onehalf': 0x00BD, 'threequarters': 0x00BE, 'questiondown': 0x00BF,
       'Agrave': 0x00C0, 'Aacute': 0x00C1, 'Acircumflex': 0x00C2,
       'Atilde': 0x00C3, 'Adieresis': 0x00C4, 'Aring': 0x00C5,
-      'AE': 0x00C6, 'Ccedilla': 0x00C7,
-      'Egrave': 0x00C8, 'Eacute': 0x00C9, 'Ecircumflex': 0x00CA,
-      'Edieresis': 0x00CB,
-      'Igrave': 0x00CC, 'Iacute': 0x00CD, 'Icircumflex': 0x00CE,
-      'Idieresis': 0x00CF,
-      'Ntilde': 0x00D1,
-      'Ograve': 0x00D2, 'Oacute': 0x00D3, 'Ocircumflex': 0x00D4,
-      'Otilde': 0x00D5, 'Odieresis': 0x00D6, 'Oslash': 0x00D8,
-      'Ugrave': 0x00D9, 'Uacute': 0x00DA, 'Ucircumflex': 0x00DB,
-      'Udieresis': 0x00DC,
-      'Yacute': 0x00DD, 'germandbls': 0x00DF,
+      'AE': 0x00C6, 'Ccedilla': 0x00C7, 'Egrave': 0x00C8, 'Eacute': 0x00C9,
+      'Ecircumflex': 0x00CA, 'Edieresis': 0x00CB, 'Igrave': 0x00CC,
+      'Iacute': 0x00CD, 'Icircumflex': 0x00CE, 'Idieresis': 0x00CF,
+      'Eth': 0x00D0, 'Ntilde': 0x00D1, 'Ograve': 0x00D2, 'Oacute': 0x00D3,
+      'Ocircumflex': 0x00D4, 'Otilde': 0x00D5, 'Odieresis': 0x00D6,
+      'multiply': 0x00D7, 'Oslash': 0x00D8, 'Ugrave': 0x00D9, 'Uacute': 0x00DA,
+      'Ucircumflex': 0x00DB, 'Udieresis': 0x00DC, 'Yacute': 0x00DD,
+      'Thorn': 0x00DE, 'germandbls': 0x00DF,
       'agrave': 0x00E0, 'aacute': 0x00E1, 'acircumflex': 0x00E2,
       'atilde': 0x00E3, 'adieresis': 0x00E4, 'aring': 0x00E5,
-      'ae': 0x00E6, 'ccedilla': 0x00E7,
-      'egrave': 0x00E8, 'eacute': 0x00E9, 'ecircumflex': 0x00EA,
-      'edieresis': 0x00EB,
-      'igrave': 0x00EC, 'iacute': 0x00ED, 'icircumflex': 0x00EE,
-      'idieresis': 0x00EF,
-      'ntilde': 0x00F1,
-      'ograve': 0x00F2, 'oacute': 0x00F3, 'ocircumflex': 0x00F4,
-      'otilde': 0x00F5, 'odieresis': 0x00F6, 'oslash': 0x00F8,
-      'ugrave': 0x00F9, 'uacute': 0x00FA, 'ucircumflex': 0x00FB,
-      'udieresis': 0x00FC,
-      'yacute': 0x00FD, 'ydieresis': 0x00FF,
-      // Currency
-      'Euro': 0x20AC,
-      'cent': 0x00A2,
-      'sterling': 0x00A3,
-      'yen': 0x00A5,
+      'ae': 0x00E6, 'ccedilla': 0x00E7, 'egrave': 0x00E8, 'eacute': 0x00E9,
+      'ecircumflex': 0x00EA, 'edieresis': 0x00EB, 'igrave': 0x00EC,
+      'iacute': 0x00ED, 'icircumflex': 0x00EE, 'idieresis': 0x00EF,
+      'eth': 0x00F0, 'ntilde': 0x00F1, 'ograve': 0x00F2, 'oacute': 0x00F3,
+      'ocircumflex': 0x00F4, 'otilde': 0x00F5, 'odieresis': 0x00F6,
+      'divide': 0x00F7, 'oslash': 0x00F8, 'ugrave': 0x00F9, 'uacute': 0x00FA,
+      'ucircumflex': 0x00FB, 'udieresis': 0x00FC, 'yacute': 0x00FD,
+      'thorn': 0x00FE, 'ydieresis': 0x00FF,
+
+      // Spacing Modifier Letters
+      'circumflex': 0x02C6, 'caron': 0x02C7, 'breve': 0x02D8,
+      'dotaccent': 0x02D9, 'ring': 0x02DA, 'ogonek': 0x02DB,
+      'tilde': 0x02DC, 'hungarumlaut': 0x02DD,
+
+      // Greek Letters
+      'Alpha': 0x0391, 'Beta': 0x0392, 'Gamma': 0x0393, 'Delta': 0x0394,
+      'Epsilon': 0x0395, 'Zeta': 0x0396, 'Eta': 0x0397, 'Theta': 0x0398,
+      'Iota': 0x0399, 'Kappa': 0x039A, 'Lambda': 0x039B, 'Mu': 0x039C,
+      'Nu': 0x039D, 'Xi': 0x039E, 'Omicron': 0x039F, 'Pi': 0x03A0,
+      'Rho': 0x03A1, 'Sigma': 0x03A3, 'Tau': 0x03A4, 'Upsilon': 0x03A5,
+      'Phi': 0x03A6, 'Chi': 0x03A7, 'Psi': 0x03A8, 'Omega': 0x03A9,
+      'alpha': 0x03B1, 'beta': 0x03B2, 'gamma': 0x03B3, 'delta': 0x03B4,
+      'epsilon': 0x03B5, 'zeta': 0x03B6, 'eta': 0x03B7, 'theta': 0x03B8,
+      'iota': 0x03B9, 'kappa': 0x03BA, 'lambda': 0x03BB, 'mugreek': 0x03BC,
+      'nu': 0x03BD, 'xi': 0x03BE, 'omicron': 0x03BF, 'pi': 0x03C0,
+      'rho': 0x03C1, 'sigma1': 0x03C2, 'sigma': 0x03C3, 'tau': 0x03C4,
+      'upsilon': 0x03C5, 'phi': 0x03C6, 'chi': 0x03C7, 'psi': 0x03C8,
+      'omega': 0x03C9, 'theta1': 0x03D1, 'phi1': 0x03D5, 'omega1': 0x03D6,
+
+      // General Punctuation
+      'endash': 0x2013, 'emdash': 0x2014, 'afii61664': 0x200D,
+      'quoteleft': 0x2018, 'quoteright': 0x2019, 'quotesinglbase': 0x201A,
+      'quotedblleft': 0x201C, 'quotedblright': 0x201D, 'quotedblbase': 0x201E,
+      'dagger': 0x2020, 'daggerdbl': 0x2021, 'bullet': 0x2022,
+      'ellipsis': 0x2026, 'perthousand': 0x2030, 'minute': 0x2032,
+      'second': 0x2033, 'guilsinglleft': 0x2039, 'guilsinglright': 0x203A,
+      'fraction': 0x2044, 'Euro': 0x20AC,
+
+      // Letterlike Symbols
+      'trademark': 0x2122, 'ohm': 0x2126, 'estimated': 0x212E,
+      'aleph': 0x2135, 'afii61289': 0x2113, 'afii61352': 0x2116,
+
+      // Arrows
+      'arrowleft': 0x2190, 'arrowup': 0x2191, 'arrowright': 0x2192,
+      'arrowdown': 0x2193, 'arrowboth': 0x2194, 'arrowupdn': 0x2195,
+      'arrowdblup': 0x21D1, 'arrowdblright': 0x21D2, 'arrowdbldown': 0x21D3,
+      'arrowdblleft': 0x21D0, 'arrowdblboth': 0x21D4,
+
+      // Mathematical Operators
+      'minus': 0x2212, 'universal': 0x2200,
+      'partialdiff': 0x2202, 'existential': 0x2203, 'emptyset': 0x2205,
+      'increment': 0x2206, 'gradient': 0x2207, 'element': 0x2208,
+      'notelement': 0x2209, 'suchthat': 0x220B, 'product': 0x220F,
+      'summation': 0x2211, 'asteriskmath': 0x2217, 'radical': 0x221A,
+      'proportional': 0x221D, 'infinity': 0x221E, 'angle': 0x2220,
+      'logicaland': 0x2227, 'logicalor': 0x2228, 'intersection': 0x2229,
+      'union': 0x222A, 'integral': 0x222B, 'therefore': 0x2234,
+      'similar': 0x223C, 'congruent': 0x2245, 'approxequal': 0x2248,
+      'notequal': 0x2260, 'equivalence': 0x2261, 'lessequal': 0x2264,
+      'greaterequal': 0x2265, 'propersubset': 0x2282, 'propersuperset': 0x2283,
+      'notsubset': 0x2284, 'reflexsubset': 0x2286, 'reflexsuperset': 0x2287,
+      'circleplus': 0x2295, 'circlemultiply': 0x2297, 'perpendicular': 0x22A5,
+      'dotmath': 0x22C5,
+
+      // Miscellaneous Symbols
+      'lozenge': 0x25CA, 'spade': 0x2660, 'club': 0x2663,
+      'heart': 0x2665, 'diamond': 0x2666,
+
+      // Geometric Shapes
+      'filledbox': 0x25A0, 'H22073': 0x25A1, 'filledrect': 0x25AC,
+      'triagup': 0x25B2, 'triagrt': 0x25BA, 'triagdn': 0x25BC,
+      'triaglf': 0x25C4, 'circle': 0x25CB, 'H18533': 0x25CF,
+
+      // Ligatures
+      'fi': 0xFB01, 'fl': 0xFB02, 'ff': 0xFB00, 'ffi': 0xFB03, 'ffl': 0xFB04,
+
+      // Box Drawing (partial)
+      'SF100000': 0x2500, 'SF110000': 0x2502, 'SF010000': 0x250C,
+      'SF030000': 0x2510, 'SF020000': 0x2514, 'SF040000': 0x2518,
+      'SF080000': 0x253C, 'SF060000': 0x252C, 'SF070000': 0x2534,
+      'SF050000': 0x251C, 'SF090000': 0x2524,
+
+      // Miscellaneous common names
+      'nbspace': 0x00A0, 'softhyphen': 0x00AD,
+      'hyphensoft': 0x00AD, 'hyphenminus': 0x002D,
+      'nonbreakingspace': 0x00A0,
     };
 
     if (glyphMap.containsKey(name)) {
       return glyphMap[name];
     }
 
-    // Handle uniXXXX format
+    // Handle uniXXXX format (e.g., uni0041 = 'A')
     if (name.startsWith('uni') && name.length >= 7) {
       final hex = name.substring(3, 7);
       return int.tryParse(hex, radix: 16);
+    }
+
+    // Handle uXXXX or uXXXXX format
+    if (name.startsWith('u') && name.length >= 5) {
+      final hex = name.substring(1);
+      return int.tryParse(hex, radix: 16);
+    }
+
+    // Handle gXXXX format (glyph ID - return as-is, can't map)
+    if (name.startsWith('g') && name.length > 1) {
+      final id = int.tryParse(name.substring(1));
+      if (id != null) return null; // Can't map glyph IDs to Unicode
     }
 
     // Single character names
@@ -726,7 +809,8 @@ class PdfTextExtractor {
       }
     }
 
-    return lines;
+    // Apply deduplication to remove overlapping text from multi-layer PDFs
+    return _deduplicateLines(lines);
   }
 
   /// Extracts text as a formatted string using the specified [mode].
@@ -734,8 +818,11 @@ class PdfTextExtractor {
       {PdfExtractionMode mode = PdfExtractionMode.plain}) {
     final lines = extractText(stream);
 
+    // Deduplicate overlapping text lines (common in multi-layer PDFs)
+    final deduped = _deduplicateLines(lines);
+
     // Sort lines by position (Top-down, Left-right)
-    lines.sort((a, b) {
+    deduped.sort((a, b) {
       if ((a.y - b.y).abs() > a.size * 0.5) {
         return b.y.compareTo(a.y);
       }
@@ -745,7 +832,7 @@ class PdfTextExtractor {
     final buffer = StringBuffer();
 
     if (mode == PdfExtractionMode.plain) {
-      for (final line in lines) {
+      for (final line in deduped) {
         buffer.write(line.text);
         buffer.write(' ');
       }
@@ -756,7 +843,7 @@ class PdfTextExtractor {
     double? lastY;
     double? lastX;
 
-    for (final line in lines) {
+    for (final line in deduped) {
       if (lastY != null) {
         final distY = (lastY - line.y).abs();
         if (distY > (line.size * 0.5)) {
@@ -782,6 +869,72 @@ class PdfTextExtractor {
     }
 
     return buffer.toString();
+  }
+
+  /// Removes duplicate text lines at overlapping positions.
+  /// Some PDFs (e.g., LibreOffice exports) render text twice at different
+  /// Y positions for visual effects. This detects and removes duplicates.
+  List<PdfTextLine> _deduplicateLines(List<PdfTextLine> lines) {
+    if (lines.isEmpty) return lines;
+
+    // Group lines by their Y coordinate (rounded to paragraph level ~14pt)
+    final yGroups = <int, List<PdfTextLine>>{};
+    for (final line in lines) {
+      final yGroup = (line.y / 14).round();
+      yGroups.putIfAbsent(yGroup, () => []).add(line);
+    }
+
+    // Find Y groups that are duplicates of each other by comparing content
+    final groupKeys = yGroups.keys.toList()..sort((a, b) => b.compareTo(a));
+    final usedGroups = <int>{};
+    final result = <PdfTextLine>[];
+
+    for (final key in groupKeys) {
+      if (usedGroups.contains(key)) continue;
+
+      final group = yGroups[key]!;
+      usedGroups.add(key);
+      result.addAll(group);
+
+      // Check if there's a duplicate group with similar X pattern but different Y
+      // LibreOffice typically offsets duplicate text by ~40pt vertically
+      for (final otherKey in groupKeys) {
+        if (usedGroups.contains(otherKey)) continue;
+        final offset = (key - otherKey).abs();
+        if (offset >= 2 && offset <= 4) {
+          // ~28-56pt apart at 14pt grouping
+          // Check if content is similar (same texts at similar X positions)
+          final otherGroup = yGroups[otherKey]!;
+          if (_areDuplicateGroups(group, otherGroup)) {
+            usedGroups.add(otherKey); // Mark as duplicate, don't include
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /// Checks if two groups have similar text content at similar X positions.
+  bool _areDuplicateGroups(List<PdfTextLine> a, List<PdfTextLine> b) {
+    if (a.isEmpty || b.isEmpty) return false;
+
+    // Build text signatures for each group (text@rounded-x)
+    final sigA = <String>{};
+    final sigB = <String>{};
+
+    for (final line in a) {
+      sigA.add('${line.text}@${(line.x / 5).round()}');
+    }
+    for (final line in b) {
+      sigB.add('${line.text}@${(line.x / 5).round()}');
+    }
+
+    // If >70% overlap, consider them duplicates
+    final overlap = sigA.intersection(sigB).length;
+    final minSize = sigA.length < sigB.length ? sigA.length : sigB.length;
+
+    return minSize > 0 && overlap / minSize > 0.7;
   }
 
   PdfTextLine? _processTextString(String textEntry, PdfGraphicsState state) {
@@ -930,34 +1083,61 @@ class PdfTextExtractor {
         hex.substring(1, hex.length - 1).replaceAll(RegExp(r'\s'), '');
     final fontInfo = fonts[state.fontName];
 
-    // Check if this is a CID font (2 bytes per char)
+    // Determine if this is a CID font (2 bytes per character code)
+    // CID fonts use 2-byte character codes; simple fonts use 1-byte
     final isCID = fontInfo != null &&
-        (fontInfo.subtype == 'Type0' || fontInfo.subtype == 'CIDFontType2');
+        (fontInfo.subtype == 'Type0' ||
+            fontInfo.subtype == 'CIDFontType2' ||
+            fontInfo.subtype == 'CIDFontType0');
 
-    if (isCID || content.length >= 4) {
-      // Try 2-byte decoding
+    // Check encoding type for Identity-H/V (always 2-byte)
+    final isIdentityEncoding = fontInfo?.encoding == 'Identity-H' ||
+        fontInfo?.encoding == 'Identity-V';
+
+    // Only use 2-byte decoding for actual CID fonts with Identity encoding
+    // ToUnicode CMap presence alone doesn't mean 2-byte codes
+    final use2Byte = isCID || isIdentityEncoding;
+
+    if (use2Byte) {
+      // 2-byte (CID) decoding - 4 hex chars = 1 character code
       final sb = StringBuffer();
       for (var i = 0; i < content.length; i += 4) {
         final chunk = content.substring(
             i, i + 4 < content.length ? i + 4 : content.length);
         final code = int.tryParse(chunk.padRight(4, '0'), radix: 16) ?? 0;
 
+        // Priority: ToUnicode CMap -> Identity mapping -> raw code
         if (fontInfo?.toUnicode != null &&
             fontInfo!.toUnicode!.containsKey(code)) {
           sb.writeCharCode(fontInfo.toUnicode![code]!);
-        } else {
+        } else if (isIdentityEncoding && code > 0 && code < 0xFFFF) {
+          // Identity encoding: code is Unicode directly
+          sb.writeCharCode(code);
+        } else if (code > 0 && code < 0xFFFF) {
+          // Fallback: treat as Unicode
           sb.writeCharCode(code);
         }
       }
       return sb.toString();
     } else {
-      // 1-byte decoding
+      // 1-byte decoding for simple fonts - 2 hex chars = 1 character code
       final sb = StringBuffer();
       for (var i = 0; i < content.length; i += 2) {
         final chunk = content.substring(
             i, i + 2 < content.length ? i + 2 : content.length);
         final code = int.tryParse(chunk.padRight(2, '0'), radix: 16) ?? 0;
-        sb.writeCharCode(fontInfo?.decodeChar(code) ?? code);
+
+        // First check ToUnicode CMap (for simple fonts with ToUnicode)
+        if (fontInfo?.toUnicode != null &&
+            fontInfo!.toUnicode!.containsKey(code)) {
+          sb.writeCharCode(fontInfo.toUnicode![code]!);
+        } else {
+          // Apply font encoding
+          final decoded = fontInfo?.decodeChar(code) ?? code;
+          if (decoded > 0) {
+            sb.writeCharCode(decoded);
+          }
+        }
       }
       return sb.toString();
     }

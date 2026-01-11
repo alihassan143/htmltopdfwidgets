@@ -139,10 +139,11 @@ class PdfEncryption {
       md5.update(ownerKey!, 0, ownerKey!.length);
     }
 
-    // Step 4: Pass P value (little-endian 4 bytes)
+    // Step 4: Pass P value (little-endian 4 bytes, signed)
+    // PDF permission values are often negative (e.g., -44)
     final pBytes = Uint8List(4);
     final pData = ByteData.view(pBytes.buffer);
-    pData.setUint32(0, permissions, Endian.little);
+    pData.setInt32(0, permissions, Endian.little);
     md5.update(pBytes, 0, 4);
 
     // Step 5: Pass first element of ID
@@ -166,10 +167,71 @@ class PdfEncryption {
       }
     }
 
-    // Step 9: Use keyLength bytes
-    // Step 9: Use keyLength bytes
-    final encKey = hash.sublist(0, keyLength ~/ 8);
+    // Step 9: Use keyLength bytes (max 16 for MD5 output)
+    final keyBytes = keyLength ~/ 8;
+    final encKey = hash.sublist(0, keyBytes > 16 ? 16 : keyBytes);
+
+    // Validate the password using Algorithm 6 (User Password Validation)
+    if (!_validateUserPassword(encKey)) {
+      // Try owner password validation (Algorithm 7)
+      if (!_validateOwnerPassword(encKey, password)) {
+        return false;
+      }
+    }
+
     _encryptionKey = encKey;
+    return true;
+  }
+
+  /// Algorithm 6: Validating the user password (Revision 3+)
+  bool _validateUserPassword(Uint8List encKey) {
+    if (userKey == null || userKey!.isEmpty) return true;
+
+    if (revision == 2) {
+      // Rev 2: Encrypt padding with key, compare to /U
+      final computed = _rc4(encKey, _padPassword(''));
+      return _compareBytes(computed, userKey!.sublist(0, 32));
+    } else if (revision >= 3) {
+      // Rev 3+: Algorithm 6
+      // 1. Create an MD5 hash of the password padding string + file ID
+      var md5 = Digest("MD5");
+      md5.update(_padPassword(''), 0, 32);
+      md5.update(fileID, 0, fileID.length);
+      var hash = Uint8List(md5.digestSize);
+      md5.doFinal(hash, 0);
+
+      // 2. Encrypt with RC4 using key, then modify key and repeat 19 times
+      var encrypted = _rc4(encKey, hash);
+      for (var i = 1; i <= 19; i++) {
+        final modKey = Uint8List(encKey.length);
+        for (var j = 0; j < encKey.length; j++) {
+          modKey[j] = encKey[j] ^ i;
+        }
+        encrypted = _rc4(modKey, encrypted);
+      }
+
+      // 3. Compare first 16 bytes with /U
+      return _compareBytes(encrypted, userKey!.sublist(0, 16));
+    }
+
+    return true;
+  }
+
+  /// Algorithm 7: Validating the owner password
+  bool _validateOwnerPassword(Uint8List encKey, String password) {
+    if (ownerKey == null || ownerKey!.isEmpty) return false;
+
+    // Try to decrypt /O to get user password, then validate that
+    // This is complex - for now just accept if user validation passed
+    return false;
+  }
+
+  /// Compare byte arrays
+  bool _compareBytes(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
     return true;
   }
 
@@ -219,7 +281,9 @@ class PdfEncryption {
     final hash = Uint8List(md5.digestSize);
     md5.doFinal(hash, 0);
 
-    return hash.sublist(0, min(hash.length, (keyLength ~/ 8) + 5));
+    // Object key is min(n+5, 16) bytes where n is encryption key length
+    final objKeyLength = min(key.length + 5, 16);
+    return hash.sublist(0, objKeyLength);
   }
 
   /// Derives object-specific key for AES-128.
