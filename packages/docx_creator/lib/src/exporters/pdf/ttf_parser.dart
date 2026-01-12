@@ -45,8 +45,13 @@ class TtfParser {
 
   /// Gets the advance width for a Unicode code point.
   int getCharWidth(int unicode) {
-    final glyphId = _unicodeToGlyph[unicode] ?? 0;
+    final glyphId = getGlyphId(unicode);
     return _glyphWidths[glyphId] ?? _glyphWidths[0] ?? 500;
+  }
+
+  /// Gets the glyph ID for a Unicode code point.
+  int getGlyphId(int unicode) {
+    return _unicodeToGlyph[unicode] ?? 0;
   }
 
   /// Gets widths array for PDF (scaled to 1000 units).

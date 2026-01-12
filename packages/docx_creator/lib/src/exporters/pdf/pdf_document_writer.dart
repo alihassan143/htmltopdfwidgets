@@ -11,39 +11,34 @@ class PdfDocumentWriter {
   int _nextId = 1;
 
   // Font object IDs (assigned during initialization)
-  late final int _catalogId;
-  late final int _pagesId;
-  late final int _fontHelveticaId;
-  late final int _fontHelveticaBoldId;
-  late final int _fontHelveticaObliqueId;
-  late final int _fontCourierId;
-  late final int _infoId;
+  // Font object IDs (standard fonts reserved for backward compatibility if needed)
+  int? _pagesId;
+  int? _catalogId;
+  int? _infoId;
 
-  PdfDocumentWriter() {
-    _initializeStandardObjects();
-  }
+  PdfDocumentWriter();
 
-  void _initializeStandardObjects() {
-    // Reserve IDs for standard objects
+  void _ensureInitialized() {
+    if (_catalogId != null) return;
     _catalogId = _nextId++;
     _pagesId = _nextId++;
-    _fontHelveticaId = _nextId++;
-    _fontHelveticaBoldId = _nextId++;
-    _fontHelveticaObliqueId = _nextId++;
-    _fontCourierId = _nextId++;
     _infoId = _nextId++;
   }
 
   /// Adds a page with the given content stream.
   ///
+  /// [fonts] is a map of font names to object IDs (e.g., {'/F1': 5, '/FNew': 12}).
   /// Returns the page object ID.
   int addPage({
     required String contentStream,
     required double width,
     required double height,
     Map<String, int>? xObjectIds,
+    Map<String, int>? fonts,
     bool compress = true,
   }) {
+    _ensureInitialized();
+
     // Compress content stream with FlateDecode
     dynamic contentObjData;
     if (compress && contentStream.length > 100) {
@@ -65,17 +60,18 @@ class PdfDocumentWriter {
           '<< /Length ${contentStream.length} >>\nstream\n$contentStream\nendstream';
     }
 
-    final contentId = _createObject(contentObjData);
+    final contentId = createObject(contentObjData);
 
     // Build resources dictionary
     final resourcesBuffer = StringBuffer('<<\n');
 
     // Fonts
     resourcesBuffer.writeln('/Font <<');
-    resourcesBuffer.writeln('/F1 $_fontHelveticaId 0 R');
-    resourcesBuffer.writeln('/F2 $_fontHelveticaBoldId 0 R');
-    resourcesBuffer.writeln('/F3 $_fontHelveticaObliqueId 0 R');
-    resourcesBuffer.writeln('/F4 $_fontCourierId 0 R');
+    if (fonts != null) {
+      fonts.forEach((name, id) {
+        resourcesBuffer.writeln('$name $id 0 R');
+      });
+    }
     resourcesBuffer.writeln('>>');
 
     // XObjects (images)
@@ -90,7 +86,7 @@ class PdfDocumentWriter {
     resourcesBuffer.write('>>');
 
     // Create page object
-    final pageId = _createObject(
+    final pageId = createObject(
       '<<\n'
       '/Type /Page\n'
       '/Parent $_pagesId 0 R\n'
@@ -115,7 +111,7 @@ class PdfDocumentWriter {
     required String uri,
     required int pageId,
   }) {
-    final annotId = _createObject(
+    final annotId = createObject(
       '<<\n'
       '/Type /Annot\n'
       '/Subtype /Link\n'
@@ -152,7 +148,7 @@ class PdfDocumentWriter {
 
     if (isJpeg || filter == 'DCTDecode') {
       // JPEG - embed directly with DCTDecode
-      return _createObject(
+      return createObject(
         '<<\n'
         '/Type /XObject\n'
         '/Subtype /Image\n'
@@ -186,7 +182,7 @@ class PdfDocumentWriter {
         builder.add(utf8.encode(dict));
         builder.add(compressed);
         builder.add(utf8.encode('\nendstream'));
-        return _createObject(builder.toBytes());
+        return createObject(builder.toBytes());
       } catch (_) {
         // Fall through to hex encoding
       }
@@ -196,7 +192,7 @@ class PdfDocumentWriter {
     final hexData =
         bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join('');
 
-    return _createObject(
+    return createObject(
       '<<\n'
       '/Type /XObject\n'
       '/Subtype /Image\n'
@@ -229,51 +225,19 @@ class PdfDocumentWriter {
     write('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
 
     // Write catalog
-    offsets[_catalogId] = offset;
+    _ensureInitialized();
+    offsets[_catalogId!] = offset;
     write(
         '$_catalogId 0 obj\n<< /Type /Catalog /Pages $_pagesId 0 R >>\nendobj\n');
 
     // Write pages
-    offsets[_pagesId] = offset;
+    offsets[_pagesId!] = offset;
     final kids = _pageObjectIds.map((id) => '$id 0 R').join(' ');
     write(
         '$_pagesId 0 obj\n<< /Type /Pages /Kids [$kids] /Count ${_pageObjectIds.length} >>\nendobj\n');
 
-    // Write fonts with width arrays for accurate text measurement
-    // Helvetica width array (characters 32-255)
-    const helveticaWidths =
-        '[278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 '
-        '556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 '
-        '1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 '
-        '667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 '
-        '333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 '
-        '556 556 333 500 278 556 500 722 500 500 500 334 260 334 584 278]';
-
-    offsets[_fontHelveticaId] = offset;
-    write(
-        '$_fontHelveticaId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica '
-        '/Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 '
-        '/Widths $helveticaWidths >>\nendobj\n');
-
-    offsets[_fontHelveticaBoldId] = offset;
-    write(
-        '$_fontHelveticaBoldId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold '
-        '/Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 '
-        '/Widths $helveticaWidths >>\nendobj\n');
-
-    offsets[_fontHelveticaObliqueId] = offset;
-    write(
-        '$_fontHelveticaObliqueId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique '
-        '/Encoding /WinAnsiEncoding /FirstChar 32 /LastChar 126 '
-        '/Widths $helveticaWidths >>\nendobj\n');
-
-    offsets[_fontCourierId] = offset;
-    write(
-        '$_fontCourierId 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier '
-        '/Encoding /WinAnsiEncoding >>\nendobj\n');
-
-    // Write info
-    offsets[_infoId] = offset;
+    // Info
+    offsets[_infoId!] = offset;
     final now = DateTime.now();
     final dateStr =
         'D:${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
@@ -296,7 +260,9 @@ class PdfDocumentWriter {
 
     // XRef table
     final startXref = offset;
-    final maxId = _objects.isEmpty ? _infoId : _objects.last.id;
+    final maxId = _objects.isEmpty
+        ? _infoId!
+        : (_objects.last.id > _infoId! ? _objects.last.id : _infoId!);
     write('xref\n');
     write('0 ${maxId + 1}\n');
     write('0000000000 65535 f \n');
@@ -317,7 +283,9 @@ class PdfDocumentWriter {
     return buffer.toBytes();
   }
 
-  int _createObject(dynamic content) {
+  /// Creates a raw PDF object and returns its ID.
+  int createObject(dynamic content) {
+    if (_catalogId == null) _ensureInitialized(); // Ensure IDs don't clash
     final id = _nextId++;
     _objects.add(_PdfObject(id, content));
     return id;

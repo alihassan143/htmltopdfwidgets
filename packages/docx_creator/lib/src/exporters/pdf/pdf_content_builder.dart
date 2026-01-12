@@ -5,7 +5,11 @@ import 'pdf_font_manager.dart';
 /// Provides a clean API for text, graphics, and state management.
 class PdfContentBuilder {
   final StringBuffer _buffer = StringBuffer();
-  final PdfFontManager _fontManager = PdfFontManager();
+  late final PdfFontManager _fontManager;
+
+  PdfContentBuilder({PdfFontManager? fontManager}) {
+    _fontManager = fontManager ?? PdfFontManager();
+  }
 
   String _currentFont = PdfFontManager.fontRegular;
   double _currentFontSize = 12;
@@ -257,8 +261,15 @@ class PdfContentBuilder {
 
   /// Shows text.
   void showText(String text) {
-    final escaped = _fontManager.escapeText(text);
-    _buffer.writeln('($escaped) Tj');
+    if (_fontManager.getEmbeddedFont(_currentFont) != null) {
+      // Embedded font: Use Hex string format <FEFF...>
+      final escaped = _fontManager.escapeTextHex(text, _currentFont);
+      _buffer.writeln('<$escaped> Tj');
+    } else {
+      // Standard font: Use string literal format (text)
+      final escaped = _fontManager.escapeText(text);
+      _buffer.writeln('($escaped) Tj');
+    }
   }
 
   /// Shows text with current formatting.

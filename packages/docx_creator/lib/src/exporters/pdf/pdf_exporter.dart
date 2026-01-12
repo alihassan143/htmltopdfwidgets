@@ -89,6 +89,9 @@ class PdfExporter {
 
     final pages = layout.paginate(section.nodes);
 
+    // Write fonts and get their IDs
+    final fontIds = _fontManager.writeFonts(_writer!);
+
     for (final pageNodes in pages) {
       final content = _renderPage(
         pageNodes,
@@ -102,6 +105,7 @@ class PdfExporter {
         width: section.width,
         height: section.height,
         xObjectIds: Map.from(_pageImages),
+        fonts: fontIds, // Pass dynamic fonts
         compress: compressContent,
       );
 
@@ -116,7 +120,7 @@ class PdfExporter {
     DocxNode? header,
     DocxNode? footer,
   }) {
-    final builder = PdfContentBuilder();
+    final builder = PdfContentBuilder(fontManager: _fontManager);
     var cursorY = layout.contentTop;
 
     // Render header

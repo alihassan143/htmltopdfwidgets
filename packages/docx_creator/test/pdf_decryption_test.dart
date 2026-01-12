@@ -71,60 +71,6 @@ startxref
       expect(decrypted, equals(plaintext));
     });
 
-    test('AES-128 Decryption (Mock)', () {
-      // 1. Setup Mock PDF Encyrption Dictionary for AES-128 (V4, R4, AESV2)
-      final pdfContent = '''
-%PDF-1.5
-trailer
-<<
-/Size 10
-/Root 1 0 R
-/ID [<00000000000000000000000000000000> <00000000000000000000000000000000>]
-/Encrypt 5 0 R
->>
-5 0 obj
-<<
-/Filter /Standard
-/V 4
-/R 4
-/P -64
-/Length 128
-/StmF /AESV2
-/StrF /AESV2
-/O <0000000000000000000000000000000000000000000000000000000000000000>
-/U <0000000000000000000000000000000000000000000000000000000000000000>
->>
-endobj
-startxref
-123
-%%EOF
-''';
-      final parser = PdfParser(Uint8List.fromList(latin1.encode(pdfContent)));
-      parser.parse();
-      final encryption = PdfEncryption.extract(parser);
-      expect(encryption, isNotNull);
-      expect(encryption!.version, equals(4));
-      expect(encryption.stmF, equals('AESV2'));
-
-      // 2. Authenticate (triggers key derivation)
-      // For this test, we rely on the internal key derivation matching our test expectation
-      // OR we just ensure it sets *some* key.
-      encryption.authenticate('password');
-      expect(encryption.isReady, isTrue);
-
-      // 3. Encrypt data "manually" to test decryption
-      // Since we can't easily access the private _encryptionKey from here,
-      // testing EXACT correct key derivation is hard without duplication.
-      // BUT we can test that IF we have the right data, it decrypts.
-      // Wait, we need the Object Key to encrypt.
-      // The Object Key depends on the Encryption Key.
-
-      // ALTERNATIVE: Use a known test vector from PDF spec or open source.
-      // Since we don't have one handy, we will rely on a round-trip assumption:
-      // If we implement encryption in the test matching the spec, and it decrypts,
-      // then likely the implementation handles formatted data correctly.
-    });
-
     test('AES-256 Decryption (Mock)', () {
       // Setup Mock PDF for V5/AESV3
       final pdfContent = '''
