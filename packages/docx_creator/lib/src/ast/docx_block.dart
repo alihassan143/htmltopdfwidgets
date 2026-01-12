@@ -68,16 +68,21 @@ class DocxParagraph extends DocxBlock {
   /// First line indentation in twips (can be negative for hanging indent).
   final int? indentFirstLine;
 
-  /// Bottom border style.
-  @Deprecated('Use borderBottomSide instead')
-  final DocxBorder? borderBottom;
-
   /// Detailed border overrides.
   final DocxBorderSide? borderTop;
   final DocxBorderSide? borderBottomSide;
   final DocxBorderSide? borderLeft;
   final DocxBorderSide? borderRight;
   final DocxBorderSide? borderBetween;
+
+  /// Padding in twips (1/20th of a point).
+  final int? paddingTop;
+  final int? paddingBottom;
+  final int? paddingLeft;
+  final int? paddingRight;
+
+  /// Border radius (Note: Not natively supported by standard Word paragraphs).
+  final int? borderRadius;
 
   /// Background shading color hex.
   final String? shadingFill;
@@ -118,12 +123,16 @@ class DocxParagraph extends DocxBlock {
     this.indentLeft,
     this.indentRight,
     this.indentFirstLine,
-    this.borderBottom,
     this.borderTop,
     this.borderBottomSide,
     this.borderLeft,
     this.borderRight,
     this.borderBetween,
+    this.paddingTop,
+    this.paddingBottom,
+    this.paddingLeft,
+    this.paddingRight,
+    this.borderRadius,
     this.shadingFill,
     this.themeFill,
     this.themeFillTint,
@@ -150,12 +159,12 @@ class DocxParagraph extends DocxBlock {
     DocxAlign align = DocxAlign.left,
     double? fontSize,
     String? fontFamily,
-    DocxBorder? borderBottom,
+    DocxBorderSide? borderBottom,
   }) {
     return DocxParagraph(
       align: align,
       children: [DocxText(text, fontSize: fontSize, fontFamily: fontFamily)],
-      borderBottom: borderBottom,
+      borderBottomSide: borderBottom,
     );
   }
 
@@ -274,6 +283,10 @@ class DocxParagraph extends DocxBlock {
     DocxBorderSide? borderLeft,
     DocxBorderSide? borderRight,
     DocxBorderSide? borderBetween,
+    int? paddingTop,
+    int? paddingBottom,
+    int? paddingLeft,
+    int? paddingRight,
     String? shadingFill,
     int? outlineLevel,
     bool? pageBreakBefore,
@@ -292,12 +305,15 @@ class DocxParagraph extends DocxBlock {
       indentLeft: indentLeft ?? this.indentLeft,
       indentRight: indentRight ?? this.indentRight,
       indentFirstLine: indentFirstLine ?? this.indentFirstLine,
-      borderBottom: borderBottom ?? this.borderBottom,
-      borderTop: borderTop ?? borderTop,
-      borderBottomSide: borderBottomSide ?? borderBottomSide,
-      borderLeft: borderLeft ?? borderLeft,
-      borderRight: borderRight ?? borderRight,
-      borderBetween: borderBetween ?? borderBetween,
+      borderTop: borderTop ?? this.borderTop,
+      borderBottomSide: borderBottomSide ?? this.borderBottomSide,
+      borderLeft: borderLeft ?? this.borderLeft,
+      borderRight: borderRight ?? this.borderRight,
+      borderBetween: borderBetween ?? this.borderBetween,
+      paddingTop: paddingTop ?? this.paddingTop,
+      paddingBottom: paddingBottom ?? this.paddingBottom,
+      paddingLeft: paddingLeft ?? this.paddingLeft,
+      paddingRight: paddingRight ?? this.paddingRight,
       shadingFill: shadingFill ?? this.shadingFill,
       themeFill: themeFill ?? themeFill,
       themeFillTint: themeFillTint ?? themeFillTint,
@@ -334,151 +350,142 @@ class DocxParagraph extends DocxBlock {
           builder.element(
             'w:pPr',
             nest: () {
+              // 1. pStyle
               if (styleId != null) {
-                builder.element(
-                  'w:pStyle',
-                  nest: () {
-                    builder.attribute('w:val', styleId!);
-                  },
-                );
+                builder.element('w:pStyle', nest: () {
+                  builder.attribute('w:val', styleId!);
+                });
               }
-              if (align != DocxAlign.left) {
-                builder.element(
-                  'w:jc',
-                  nest: () {
-                    builder.attribute('w:val', align.name);
-                  },
-                );
-              }
-              if (spacingAfter != null ||
-                  spacingBefore != null ||
-                  lineSpacing != null) {
-                builder.element(
-                  'w:spacing',
-                  nest: () {
-                    if (spacingAfter != null) {
-                      builder.attribute('w:after', spacingAfter.toString());
-                    }
-                    if (spacingBefore != null) {
-                      builder.attribute('w:before', spacingBefore.toString());
-                    }
-                    if (lineSpacing != null) {
-                      builder.attribute('w:line', lineSpacing.toString());
-                    }
-                    if (lineRule != null) {
-                      builder.attribute('w:lineRule', lineRule!);
-                    }
-                  },
-                );
-              }
-              if (indentLeft != null ||
-                  indentRight != null ||
-                  indentFirstLine != null) {
-                builder.element(
-                  'w:ind',
-                  nest: () {
-                    if (indentLeft != null) {
-                      builder.attribute('w:left', indentLeft.toString());
-                    }
-                    if (indentRight != null) {
-                      builder.attribute('w:right', indentRight.toString());
-                    }
-                    if (indentFirstLine != null) {
-                      builder.attribute(
-                        'w:firstLine',
-                        indentFirstLine.toString(),
-                      );
-                    }
-                  },
-                );
-              }
-              // Borders
-              if (borderBottom != null ||
-                  borderTop != null ||
-                  borderBottomSide != null ||
-                  borderLeft != null ||
-                  borderRight != null ||
-                  borderBetween != null) {
-                builder.element(
-                  'w:pBdr',
-                  nest: () {
-                    if (borderTop != null) {
-                      _buildBorder(builder, 'w:top', borderTop!);
-                    }
-                    if (borderLeft != null) {
-                      _buildBorder(builder, 'w:left', borderLeft!);
-                    }
-                    if (borderRight != null) {
-                      _buildBorder(builder, 'w:right', borderRight!);
-                    }
-                    if (borderBetween != null) {
-                      _buildBorder(builder, 'w:between', borderBetween!);
-                    }
 
-                    if (borderBottomSide != null) {
-                      _buildBorder(builder, 'w:bottom', borderBottomSide!);
-                    } else if (borderBottom != null &&
-                        borderBottom != DocxBorder.none) {
-                      builder.element(
-                        'w:bottom',
-                        nest: () {
-                          builder.attribute('w:val', borderBottom!.xmlValue);
-                          builder.attribute('w:sz', '4');
-                          builder.attribute('w:space', '1');
-                          builder.attribute('w:color', 'auto');
-                        },
-                      );
-                    }
-                  },
-                );
-              }
-              if (shadingFill != null) {
-                builder.element(
-                  'w:shd',
-                  nest: () {
-                    builder.attribute('w:val', 'clear');
-                    builder.attribute('w:color', 'auto');
-                    builder.attribute('w:fill', shadingFill!);
-                  },
-                );
-              }
-              if (outlineLevel != null) {
-                builder.element(
-                  'w:outlineLvl',
-                  nest: () {
-                    builder.attribute('w:val', outlineLevel.toString());
-                  },
-                );
-              }
+              // 2. pageBreakBefore
               if (pageBreakBefore) {
                 builder.element('w:pageBreakBefore');
               }
+
+              // 3. numPr
               if (numId != null) {
+                builder.element('w:numPr', nest: () {
+                  builder.element('w:ilvl', nest: () {
+                    builder.attribute('w:val', (ilvl ?? 0).toString());
+                  });
+                  builder.element('w:numId', nest: () {
+                    builder.attribute('w:val', numId.toString());
+                  });
+                });
+              }
+
+              // 4. pBdr (Borders & Padding)
+              if (borderTop != null ||
+                  borderBottomSide != null ||
+                  borderLeft != null ||
+                  borderRight != null ||
+                  borderBetween != null ||
+                  paddingTop != null ||
+                  paddingBottom != null ||
+                  paddingLeft != null ||
+                  paddingRight != null) {
                 builder.element(
-                  'w:numPr',
+                  'w:pBdr',
                   nest: () {
-                    builder.element(
-                      'w:ilvl',
-                      nest: () {
-                        builder.attribute('w:val', (ilvl ?? 0).toString());
-                      },
-                    );
-                    builder.element(
-                      'w:numId',
-                      nest: () {
-                        builder.attribute('w:val', numId.toString());
-                      },
-                    );
+                    void buildSide(
+                        String tag, DocxBorderSide? side, int? padding) {
+                      if (side != null) {
+                        // Override space if padding is present (convert twips to points)
+                        final space =
+                            padding != null ? (padding / 20).round() : null;
+                        _buildBorder(builder, tag, side, spaceOverride: space);
+                      } else if (padding != null) {
+                        // Create visible border to force padding spacing
+                        final space = (padding / 20).round();
+                        final color = shadingFill ?? 'auto';
+                        builder.element(tag, nest: () {
+                          builder.attribute('w:val', 'single');
+                          builder.attribute('w:sz', '4');
+                          builder.attribute('w:space', space.toString());
+                          builder.attribute('w:color', color);
+                        });
+                      }
+                    }
+
+                    buildSide('w:top', borderTop, paddingTop);
+                    buildSide('w:left', borderLeft, paddingLeft);
+                    buildSide('w:bottom', borderBottomSide, paddingBottom);
+                    buildSide('w:right', borderRight, paddingRight);
+
+                    if (borderBetween != null) {
+                      _buildBorder(builder, 'w:between', borderBetween!);
+                    }
                   },
                 );
               }
+
+              // 5. shd (Shading)
+              if (shadingFill != null) {
+                builder.element('w:shd', nest: () {
+                  builder.attribute('w:val', 'clear');
+                  builder.attribute('w:color', 'auto');
+                  builder.attribute('w:fill', shadingFill!);
+                });
+              }
+
+              // 6. spacing
+              if (spacingAfter != null ||
+                  spacingBefore != null ||
+                  lineSpacing != null ||
+                  lineRule != null) {
+                builder.element('w:spacing', nest: () {
+                  if (spacingAfter != null) {
+                    builder.attribute('w:after', spacingAfter.toString());
+                  }
+                  if (spacingBefore != null) {
+                    builder.attribute('w:before', spacingBefore.toString());
+                  }
+                  if (lineSpacing != null) {
+                    builder.attribute('w:line', lineSpacing.toString());
+                  }
+                  if (lineRule != null) {
+                    builder.attribute('w:lineRule', lineRule!);
+                  }
+                });
+              }
+
+              // 7. ind (Indentation)
+              if (indentLeft != null ||
+                  indentRight != null ||
+                  indentFirstLine != null) {
+                builder.element('w:ind', nest: () {
+                  if (indentLeft != null) {
+                    builder.attribute('w:left', indentLeft.toString());
+                  }
+                  if (indentRight != null) {
+                    builder.attribute('w:right', indentRight.toString());
+                  }
+                  if (indentFirstLine != null) {
+                    builder.attribute(
+                        'w:firstLine', indentFirstLine.toString());
+                  }
+                });
+              }
+
+              // 8. jc (Alignment)
+              if (align != DocxAlign.left) {
+                builder.element('w:jc', nest: () {
+                  builder.attribute('w:val', align.name);
+                });
+              }
+
+              // 9. outlineLvl
+              if (outlineLevel != null) {
+                builder.element('w:outlineLvl', nest: () {
+                  builder.attribute('w:val', outlineLevel.toString());
+                });
+              }
+
+              // 10. cnfStyle
               if (cnfStyle != null) {
-                builder.element(
-                  'w:cnfStyle',
-                  nest: () {
-                    builder.attribute('w:val', cnfStyle!);
-                  },
-                );
+                builder.element('w:cnfStyle', nest: () {
+                  builder.attribute('w:val', cnfStyle!);
+                });
               }
             },
           );
@@ -502,23 +509,27 @@ class DocxParagraph extends DocxBlock {
       indentLeft != null ||
       indentRight != null ||
       indentFirstLine != null ||
-      borderBottom != null ||
       borderTop != null ||
       borderBottomSide != null ||
       borderLeft != null ||
       borderRight != null ||
       borderBetween != null ||
+      paddingTop != null ||
+      paddingBottom != null ||
+      paddingLeft != null ||
+      paddingRight != null ||
       shadingFill != null ||
       outlineLevel != null ||
       pageBreakBefore ||
       numId != null ||
       cnfStyle != null;
 
-  void _buildBorder(XmlBuilder builder, String tag, DocxBorderSide side) {
+  void _buildBorder(XmlBuilder builder, String tag, DocxBorderSide side,
+      {int? spaceOverride}) {
     builder.element(tag, nest: () {
       builder.attribute('w:val', side.xmlStyle);
       builder.attribute('w:sz', side.size.toString());
-      builder.attribute('w:space', side.space.toString());
+      builder.attribute('w:space', (spaceOverride ?? side.space).toString());
       if (side.color != DocxColor.auto) {
         builder.attribute('w:color', side.color.hex);
       } else {

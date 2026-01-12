@@ -60,7 +60,7 @@ class DocxDocumentBuilder {
   DocxDocumentBuilder p(
     String text, {
     DocxAlign align = DocxAlign.left,
-    DocxBorder? borderBottom,
+    DocxBorderSide? borderBottom,
   }) {
     _elements.add(DocxParagraph.text(
       text,
@@ -100,7 +100,9 @@ class DocxDocumentBuilder {
 
   /// Adds a horizontal rule / divider.
   DocxDocumentBuilder hr() {
-    _elements.add(DocxParagraph(borderBottom: DocxBorder.single, children: []));
+    _elements.add(DocxParagraph(
+        borderBottomSide: const DocxBorderSide(style: DocxBorder.single),
+        children: []));
     return this;
   }
 

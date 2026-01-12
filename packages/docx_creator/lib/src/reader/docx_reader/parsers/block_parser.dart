@@ -1,9 +1,6 @@
 import 'package:xml/xml.dart';
 
 import '../../../../docx_creator.dart';
-import '../reader_context/reader_context.dart';
-import 'inline_parser.dart';
-import 'table_parser.dart';
 
 /// Parses block-level content (paragraphs, lists, tables).
 class BlockParser {
@@ -198,7 +195,6 @@ class BlockParser {
       borderLeft: finalProps.borderLeft,
       borderRight: finalProps.borderRight,
       borderBetween: finalProps.borderBetween,
-      borderBottom: finalProps.borderBottom,
     );
   }
 

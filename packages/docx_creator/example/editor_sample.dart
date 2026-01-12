@@ -148,7 +148,7 @@ class ApiClient {
             indentLeft: element.indentLeft,
             indentRight: element.indentRight,
             indentFirstLine: element.indentFirstLine,
-            borderBottom: element.borderBottom,
+            borderBottomSide: element.borderBottomSide,
             shadingFill: element.shadingFill,
             outlineLevel: element.outlineLevel,
             pageBreakBefore: element.pageBreakBefore,

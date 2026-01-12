@@ -47,7 +47,9 @@ class DocumentBuilder {
         return DocxParagraph.code(textContent ?? '');
 
       case 'hr':
-        return DocxParagraph(borderBottom: DocxBorder.single, children: []);
+        return DocxParagraph(
+            borderBottomSide: const DocxBorderSide(style: DocxBorder.single),
+            children: []);
     }
     return null;
   }

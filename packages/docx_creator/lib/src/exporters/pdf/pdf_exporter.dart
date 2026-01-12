@@ -379,7 +379,13 @@ class PdfExporter {
     final fontSize = layout.getFontSize(paragraph.styleId);
     final lineHeight = fontSize * 1.4;
     final indent = (paragraph.indentLeft ?? 0) / 20.0;
-    final maxWidth = layout.contentWidth - indent;
+
+    final paddingLeft = (paragraph.paddingLeft ?? 0) / 20.0;
+    final paddingRight = (paragraph.paddingRight ?? 0) / 20.0;
+    final paddingTop = (paragraph.paddingTop ?? 0) / 20.0;
+    final paddingBottom = (paragraph.paddingBottom ?? 0) / 20.0;
+
+    final maxWidth = layout.contentWidth - indent - paddingLeft - paddingRight;
 
     // Collect words with their formatting
     final words = <_Word>[];
@@ -494,20 +500,28 @@ class PdfExporter {
 
     // Calculate total height for paragraph background
     final totalParagraphHeight =
-        lineHeights.fold<double>(0, (sum, h) => sum + h);
+        lineHeights.fold<double>(0, (sum, h) => sum + h) +
+            paddingTop +
+            paddingBottom;
 
     // Draw paragraph background (use full width for code blocks etc.)
     if (paragraph.shadingFill != null && paragraph.shadingFill != 'auto') {
       builder.saveState();
       builder.setFillColorHex(paragraph.shadingFill!);
       final bgBottom = startY - totalParagraphHeight;
-      builder.fillRect(
-          startX + indent, bgBottom, maxWidth, totalParagraphHeight);
+      // Background covers indent + padding + text width + padding
+      // But standard Word behavior suggests background covers the entire block width INCLUDING indent?
+      // Actually, shading usually applies to the text box.
+      // If we want FULL shading, we might strictly use (maxWidth + paddingLeft + paddingRight).
+      // Let's stick to the box model we built: indent implies empty space outside.
+      builder.fillRect(startX + indent, bgBottom,
+          maxWidth + paddingLeft + paddingRight, totalParagraphHeight);
       builder.restoreState();
     }
 
-    // Render lines
-    var y = startY - fontSize * 0.3;
+    // Render lines (adjust Y for padding)
+    // Baseline should be approx 1em down from top to fit text inside the line height
+    var y = startY - paddingTop - fontSize;
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -532,7 +546,7 @@ class PdfExporter {
         if (j < line.length - 1) lineWidth += spaceWidth;
       }
 
-      var x = startX + indent;
+      var x = startX + indent + paddingLeft;
       var wordSpacing = 0.0;
 
       if (paragraph.align == DocxAlign.center) {
@@ -647,6 +661,7 @@ class PdfExporter {
         }
       }
 
+      // Move to next line
       y -= currentLineHeight;
     }
 
