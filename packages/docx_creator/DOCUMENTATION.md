@@ -125,6 +125,15 @@ DocxNode (abstract)
 | `lineRule` | `String?` | `auto`, `exact`, `atLeast` |
 | `pageBreakBefore` | `bool` | Page break before paragraph |
 | `shadingFill` | `String?` | Background shading |
+| `paddingTop` | `int?` | Top padding (twips) |
+| `paddingBottom` | `int?` | Bottom padding (twips) |
+| `paddingLeft` | `int?` | Left padding (twips) |
+| `paddingRight` | `int?` | Right padding (twips) |
+| `borderTop` | `DocxBorderSide?` | Top border |
+| `borderBottomSide` | `DocxBorderSide?` | Bottom border |
+| `borderLeft` | `DocxBorderSide?` | Left border |
+| `borderRight` | `DocxBorderSide?` | Right border |
+| `borderBetween` | `DocxBorderSide?` | Border between identical paragraphs |
 
 ---
 

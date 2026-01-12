@@ -764,8 +764,8 @@ for (final element in pdf.elements) {
 ### Limitations
 
 - **Image-only (scanned) PDFs**: If a PDF contains only images with no text operators, no text will be extracted. Consider using OCR separately.
-- **Encrypted PDFs**: Password-protected PDFs are not supported.
 - **Complex layouts**: Multi-column layouts may not preserve exact positioning.
+- **Vertical Text**: Vertical writing modes are not yet supported.
 
 ---
 

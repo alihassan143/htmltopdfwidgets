@@ -1,3 +1,19 @@
+## 1.1.3
+
+### Fixed
+- **DOCX Padding & Backgrounds**: Fixed critical issue where paragraph padding and background colors were ignored by Word.
+  - Implemented strict OOXML schema compliance for `w:pPr` element order (`pStyle` -> `numPr` -> `pBdr` -> `shd` -> ...).
+  - Fixed internal `w:pBdr` child order (`top` -> `left` -> `bottom` -> `right`) which previously caused border blocks to be invalidated.
+  - Corrected `w:space` unit conversion (twips to points) for padding.
+- **PDF Background Alignment**: Fixed issue where text rendered outside its background rectangle.
+  - Corrected text baseline calculation to standard font metrics (approx. 1em offset) ensuring text sits strictly inside the background box.
+- **PDF Rendering Loop**: Fixed bug where multi-line paragraphs were not updating the Y-coordinate correctly during rendering.
+
+### Improved
+- **AST Refactoring**: Cleaned up `DocxParagraph` by removing deprecated fields (`borderBottom`) and unifying styling logic.
+
+---
+
 ## 1.1.2
 
 ### Added
