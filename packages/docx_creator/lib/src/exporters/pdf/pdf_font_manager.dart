@@ -293,6 +293,14 @@ class PdfFontManager {
     return fontRef;
   }
 
+  /// Registers a custom font for use in the PDF.
+  ///
+  /// [fontFamily] is the name used to reference the font (e.g., "Roboto").
+  /// [bytes] is the raw TTF/OTF data.
+  void registerFont(String fontFamily, Uint8List bytes) {
+    embedFont(fontFamily, bytes);
+  }
+
   /// Gets an embedded font by its reference.
   EmbeddedFont? getEmbeddedFont(String fontRef) {
     for (final font in _embeddedFonts) {
@@ -311,7 +319,10 @@ class PdfFontManager {
     // Check for embedded font by family name
     if (fontFamily != null) {
       for (final font in _embeddedFonts) {
-        if (font.name == fontFamily) return font.fontRef;
+        if (font.name == fontFamily ||
+            (font.name.toLowerCase() == fontFamily.toLowerCase())) {
+          return font.fontRef;
+        }
       }
     }
 

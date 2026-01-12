@@ -301,8 +301,12 @@ class PdfContentBuilder {
 
   /// Measures text width.
   /// [isBold] applies a width scaling factor for bold fonts.
-  double measureText(String text, double fontSize, {bool isBold = false}) {
-    return _fontManager.measureText(text, fontSize, isBold: isBold);
+  double measureText(String text, double fontSize,
+      {bool isBold = false, String? fontRef, PdfFontManager? fontManager}) {
+    // Uses provided manager or falls back to local one (though local one won't have reg fonts)
+    final manager = fontManager ?? _fontManager;
+    return manager.measureText(text, fontSize,
+        isBold: isBold, fontRef: fontRef);
   }
 
   /// Escapes text for PDF.

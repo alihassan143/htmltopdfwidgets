@@ -12,6 +12,7 @@ class PdfLayoutEngine {
   final double marginLeft;
   final double marginRight;
   final double baseFontSize;
+  final PdfFontManager fontManager;
 
   PdfLayoutEngine({
     required this.pageWidth,
@@ -21,7 +22,8 @@ class PdfLayoutEngine {
     this.marginLeft = 72,
     this.marginRight = 72,
     this.baseFontSize = 12,
-  });
+    PdfFontManager? fontManager,
+  }) : fontManager = fontManager ?? PdfFontManager();
 
   /// Content area dimensions
   double get contentWidth => pageWidth - marginLeft - marginRight;
@@ -51,14 +53,123 @@ class PdfLayoutEngine {
       final height = measureNode(node);
 
       // Check if node fits on current page
-      if (remainingHeight - height < 0 && currentPage.isNotEmpty) {
-        pages.add(currentPage);
-        currentPage = [];
-        remainingHeight = contentHeight;
-      }
+      if (remainingHeight - height < 0) {
+        // If it fits on a clean page, and we aren't empty, just break page
+        if (height <= contentHeight && currentPage.isNotEmpty) {
+          pages.add(currentPage);
+          currentPage = [];
+          remainingHeight = contentHeight;
+          currentPage.add(node);
+          remainingHeight -= height;
+        } else if (node is DocxParagraph) {
+          // It does not fit or is huge. Split it.
+          if (currentPage.isNotEmpty && remainingHeight < baseFontSize * 2) {
+            // Too little space left, just move to next page to start clean
+            pages.add(currentPage);
+            currentPage = [];
+            remainingHeight = contentHeight;
+          }
 
-      currentPage.add(node);
-      remainingHeight -= height;
+          final splitResult = _splitParagraph(node, remainingHeight);
+          final fittedPart = splitResult.first;
+          final remainderPart = splitResult.last;
+
+          if (fittedPart.children.isEmpty) {
+            // Did not fit at all on current page (or remainingHeight was tiny)
+            if (currentPage.isNotEmpty) {
+              pages.add(currentPage);
+              currentPage = [];
+              remainingHeight = contentHeight;
+
+              // Retry on new page
+              final splitResult2 = _splitParagraph(node, remainingHeight);
+              if (splitResult2.first.children.isNotEmpty) {
+                currentPage.add(splitResult2.first);
+                remainingHeight -= measureParagraph(splitResult2.first);
+
+                var currentRemainder = splitResult2.last;
+                while (currentRemainder.children.isNotEmpty) {
+                  if (remainingHeight < baseFontSize) {
+                    pages.add(currentPage);
+                    currentPage = [];
+                    remainingHeight = contentHeight;
+                  }
+
+                  final remHeight = measureParagraph(currentRemainder);
+                  if (remHeight <= remainingHeight) {
+                    currentPage.add(currentRemainder);
+                    remainingHeight -= remHeight;
+                    break;
+                  }
+
+                  final nextSplit =
+                      _splitParagraph(currentRemainder, remainingHeight);
+                  if (nextSplit.first.children.isNotEmpty) {
+                    currentPage.add(nextSplit.first);
+                    remainingHeight -= measureParagraph(nextSplit.first);
+                    currentRemainder = nextSplit.last;
+                  } else {
+                    // Should not happen if logic is sound, but safe guard
+                    pages.add(currentPage);
+                    currentPage = [];
+                    remainingHeight = contentHeight;
+                  }
+                }
+              } else {
+                // Huge single line?
+                currentPage.add(node);
+                remainingHeight -= height;
+              }
+            } else {
+              currentPage.add(node);
+              remainingHeight -= height;
+            }
+          } else {
+            currentPage.add(fittedPart);
+            remainingHeight -= measureParagraph(fittedPart);
+
+            var currentRemainder = remainderPart;
+            while (currentRemainder.children.isNotEmpty) {
+              if (remainingHeight < baseFontSize) {
+                pages.add(currentPage);
+                currentPage = [];
+                remainingHeight = contentHeight;
+              }
+
+              final remHeight = measureParagraph(currentRemainder);
+              if (remHeight <= remainingHeight) {
+                currentPage.add(currentRemainder);
+                remainingHeight -= remHeight;
+                break;
+              }
+
+              final nextSplit =
+                  _splitParagraph(currentRemainder, remainingHeight);
+              if (nextSplit.first.children.isNotEmpty) {
+                currentPage.add(nextSplit.first);
+                remainingHeight -= measureParagraph(nextSplit.first);
+                currentRemainder = nextSplit.last;
+              } else {
+                pages.add(currentPage);
+                currentPage = [];
+                remainingHeight = contentHeight;
+              }
+            }
+          }
+        } else {
+          // Not a paragraph (e.g. table/image)
+          if (currentPage.isNotEmpty) {
+            pages.add(currentPage);
+            currentPage = [];
+            remainingHeight = contentHeight;
+          }
+          currentPage.add(node);
+          remainingHeight -= height;
+        }
+      } else {
+        currentPage.add(node);
+        remainingHeight -= height;
+      }
     }
 
     if (currentPage.isNotEmpty) {
@@ -234,13 +345,164 @@ class PdfLayoutEngine {
     return baseFontSize.toDouble();
   }
 
+  // ... (previous code)
+
+  /// Splits a paragraph into two parts: one that fits in availableHeight, and the remainder.
+  /// Returns a list of two DocxParagraphs. The second one is null if everything fits.
+  List<DocxParagraph> _splitParagraph(
+      DocxParagraph paragraph, double availableHeight) {
+    final fontSize = getFontSize(paragraph.styleId);
+    final lineHeight = fontSize * 1.4;
+    final indent = (paragraph.indentLeft ?? 0) / 20.0;
+    final availableWidth = contentWidth - indent;
+
+    // 1. Calculate max lines
+    // We remove some padding/margins from available height to be safe
+    final maxLines = ((availableHeight - fontSize * 0.5) / lineHeight).floor();
+
+    if (maxLines <= 0) {
+      // Can't fit anything substantial
+      return [_createParagraph(paragraph, []), paragraph];
+    }
+
+    final fittedChildren = <DocxInline>[];
+    final remainingChildren = <DocxInline>[];
+
+    var currentLine = 1;
+    var currentLineWidth = 0.0;
+    var splitOccurred = false;
+    final spaceWidth = fontManager.measureText(' ', fontSize);
+
+    // Iterate children
+    for (var i = 0; i < paragraph.children.length; i++) {
+      final child = paragraph.children[i];
+
+      if (splitOccurred) {
+        remainingChildren.add(child);
+        continue;
+      }
+
+      if (child is DocxText) {
+        final text = child.content;
+        final lines = text.split('\n');
+
+        // We might need to split this text node
+        final fittedTextBuffer = StringBuffer();
+        final remainingTextBuffer = StringBuffer();
+        var nodeSplit = false;
+
+        for (var l = 0; l < lines.length; l++) {
+          final line = lines[l];
+
+          if (nodeSplit) {
+            if (l > 0) remainingTextBuffer.write('\n');
+            remainingTextBuffer.write(line);
+            continue;
+          }
+
+          if (l > 0) {
+            // Newline in source means new line in output
+            currentLine++;
+            currentLineWidth = 0;
+            if (currentLine > maxLines) {
+              // Split at this newline
+              nodeSplit = true;
+              if (l > 0) remainingTextBuffer.write('\n');
+              remainingTextBuffer.write(line);
+              continue;
+            }
+            fittedTextBuffer.write('\n');
+          }
+
+          if (line.isEmpty) continue; // Empty line (just newline handled above)
+
+          final words = line.split(' ');
+          for (var w = 0; w < words.length; w++) {
+            final word = words[w];
+            final wordWidth = fontManager.measureText(word, fontSize);
+
+            if (currentLineWidth + wordWidth > availableWidth &&
+                currentLineWidth > 0) {
+              currentLine++;
+              currentLineWidth = wordWidth + spaceWidth;
+            } else {
+              currentLineWidth += wordWidth + spaceWidth;
+            }
+
+            if (currentLine > maxLines) {
+              // Split here
+              nodeSplit = true;
+              // Add this word and rest of line to remainder
+              for (var k = w; k < words.length; k++) {
+                if (k > w) remainingTextBuffer.write(' ');
+                remainingTextBuffer.write(words[k]);
+              }
+              break;
+            } else {
+              if (w > 0) fittedTextBuffer.write(' ');
+              fittedTextBuffer.write(word);
+            }
+          }
+        }
+
+        if (fittedTextBuffer.isNotEmpty) {
+          fittedChildren.add(_cloneText(child, fittedTextBuffer.toString()));
+        }
+        if (remainingTextBuffer.isNotEmpty) {
+          remainingChildren
+              .add(_cloneText(child, remainingTextBuffer.toString()));
+          splitOccurred = true;
+        } else if (nodeSplit) {
+          splitOccurred = true;
+        }
+      } else if (child is DocxLineBreak) {
+        currentLine++;
+        currentLineWidth = 0;
+        if (currentLine > maxLines) {
+          splitOccurred = true;
+          remainingChildren.add(child);
+        } else {
+          fittedChildren.add(child);
+        }
+      } else {
+        // Tab or others
+        if (child is DocxTab) {
+          currentLineWidth += fontSize * 3; // Approx tab width
+          if (currentLineWidth > availableWidth) {
+            currentLine++;
+            currentLineWidth = fontSize * 3;
+          }
+        }
+
+        if (currentLine > maxLines) {
+          splitOccurred = true;
+          remainingChildren.add(child);
+        } else {
+          fittedChildren.add(child);
+        }
+      }
+    }
+
+    return [
+      _createParagraph(paragraph, fittedChildren),
+      remainingChildren.isEmpty
+          ? _createParagraph(paragraph, [])
+          : _createParagraph(paragraph, remainingChildren)
+    ];
+  }
+
+  DocxParagraph _createParagraph(
+      DocxParagraph original, List<DocxInline> newChildren) {
+    return original.copyWith(children: newChildren);
+  }
+
+  DocxText _cloneText(DocxText original, String newContent) {
+    return original.copyWith(content: newContent);
+  }
+
   /// Counts lines needed for text in given width.
   int _wrapText(String text, double availableWidth, double fontSize) {
-    final charWidth = fontSize * PdfFontManager.avgCharWidth;
-    final charsPerLine = (availableWidth / charWidth).floor();
-    if (charsPerLine <= 0) return 1;
-
-    // Split by explicit newlines first
+    // 1. Split by explicit newlines
     final paragraphs = text.split('\n');
     int totalLines = 0;
 
@@ -250,17 +512,21 @@ class PdfLayoutEngine {
         continue;
       }
 
+      // 2. Measure words and wrap
       final words = para.split(' ');
-      var currentLineLen = 0;
+      var currentLineWidth = 0.0;
       var lines = 1;
+      final spaceWidth = fontManager.measureText(' ', fontSize);
 
       for (final word in words) {
-        final wordLen = word.length + 1; // +1 for space
-        if (currentLineLen + wordLen > charsPerLine && currentLineLen > 0) {
+        final wordWidth = fontManager.measureText(word, fontSize);
+
+        if (currentLineWidth + wordWidth > availableWidth &&
+            currentLineWidth > 0) {
           lines++;
-          currentLineLen = word.length;
+          currentLineWidth = wordWidth + spaceWidth;
         } else {
-          currentLineLen += wordLen;
+          currentLineWidth += wordWidth + spaceWidth;
         }
       }
       totalLines += lines;

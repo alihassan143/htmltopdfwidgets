@@ -36,6 +36,7 @@ class PdfExporter {
   PdfDocumentWriter? _writer;
   final _pageImages = <String, int>{};
   var _imageCount = 0;
+  late final PdfFontManager _fontManager;
 
   /// Creates a PDF exporter with configurable defaults.
   PdfExporter({
@@ -47,7 +48,14 @@ class PdfExporter {
     this.marginRight = 72.0,
     this.fontSize = 12,
     this.compressContent = true,
-  });
+  }) {
+    _fontManager = PdfFontManager();
+  }
+
+  /// Registers a custom font for use in the export.
+  void registerFont(String fontFamily, Uint8List bytes) {
+    _fontManager.registerFont(fontFamily, bytes);
+  }
 
   /// Exports the document to a file.
   Future<void> exportToFile(DocxBuiltDocument doc, String filePath) async {
@@ -76,6 +84,7 @@ class PdfExporter {
       marginLeft: section.marginLeft,
       marginRight: section.marginRight,
       baseFontSize: fontSize.toDouble(),
+      fontManager: _fontManager,
     );
 
     final pages = layout.paginate(section.nodes);
@@ -374,9 +383,10 @@ class PdfExporter {
       if (child is DocxText) {
         // Apply bold for headings or if text is explicitly bold
         final isHeading = paragraph.styleId?.startsWith('Heading') ?? false;
-        final fontRef = PdfFontManager().selectFont(
+        final fontRef = _fontManager.selectFont(
           isBold: child.isBold || isHeading,
           isItalic: child.isItalic,
+          fontFamily: child.fontFamily,
         );
         final color = child.effectiveColorHex ?? '000000';
 
@@ -422,7 +432,10 @@ class PdfExporter {
               final isBold = child.isBold || isHeading;
               final width = isCheckbox
                   ? effFontSize
-                  : builder.measureText(word, effFontSize, isBold: isBold);
+                  : builder.measureText(word, effFontSize,
+                      isBold: isBold,
+                      fontRef: fontRef,
+                      fontManager: _fontManager);
 
               words.add(_Word(
                 word,
@@ -796,7 +809,7 @@ class PdfExporter {
     final words = <_Word>[];
     for (final child in paragraph.children) {
       if (child is DocxText) {
-        final fontRef = PdfFontManager().selectFont(
+        final fontRef = _fontManager.selectFont(
           isBold: child.isBold,
           isItalic: child.isItalic,
         );
