@@ -8,7 +8,12 @@ class Marker {
 }
 
 class MarkersView extends StatefulWidget {
-  const MarkersView({required this.markers, super.key, this.onTap, this.onDeleteTap});
+  const MarkersView({
+    required this.markers,
+    super.key,
+    this.onTap,
+    this.onDeleteTap,
+  });
 
   final List<Marker> markers;
   final void Function(Marker marker)? onTap;
@@ -35,13 +40,18 @@ class _MarkersViewState extends State<MarkersView> {
                   child: SizedBox(
                     width: double.infinity,
                     height: 40,
-                    child: Text('Page #${marker.range.pageNumber} - ${marker.range.text}'),
+                    child: Text(
+                      'Page #${marker.range.pageNumber} - ${marker.range.text}',
+                    ),
                   ),
                 ),
               ),
               Align(
                 alignment: Alignment.centerRight,
-                child: IconButton(icon: const Icon(Icons.delete), onPressed: () => widget.onDeleteTap?.call(marker)),
+                child: IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () => widget.onDeleteTap?.call(marker),
+                ),
               ),
             ],
           ),

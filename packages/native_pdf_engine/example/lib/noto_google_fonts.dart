@@ -22,7 +22,12 @@ class GoogleFontsFileCJK implements GoogleFontsFile {
 }
 
 class GoogleFontsFileSingle implements GoogleFontsFile {
-  const GoogleFontsFileSingle(this.faceName, this.weight, this.expectedFileHash, this.expectedLength);
+  const GoogleFontsFileSingle(
+    this.faceName,
+    this.weight,
+    this.expectedFileHash,
+    this.expectedLength,
+  );
   @override
   final String faceName;
   final int weight;
@@ -30,10 +35,14 @@ class GoogleFontsFileSingle implements GoogleFontsFile {
   final int expectedLength;
 
   @override
-  Uri get uri => Uri.parse('https://fonts.gstatic.com/s/a/$expectedFileHash.ttf');
+  Uri get uri =>
+      Uri.parse('https://fonts.gstatic.com/s/a/$expectedFileHash.ttf');
 }
 
-GoogleFontsFileSingle? _getNearestWeight(Map<int, GoogleFontsFileSingle> fonts, int weight) {
+GoogleFontsFileSingle? _getNearestWeight(
+  Map<int, GoogleFontsFileSingle> fonts,
+  int weight,
+) {
   final weights = fonts.keys.toList();
   weights.sort((a, b) => (a - weight).abs().compareTo((b - weight).abs()));
   return fonts[weights.first];
@@ -41,14 +50,21 @@ GoogleFontsFileSingle? _getNearestWeight(Map<int, GoogleFontsFileSingle> fonts, 
 
 final notoSerifCJK = GoogleFontsFileCJK(
   'Noto Serif CJK',
-  Uri.parse('https://github.com/googlefonts/noto-cjk/raw/main/Serif/Variable/OTC/NotoSerifCJK-VF.otf.ttc'),
+  Uri.parse(
+    'https://github.com/googlefonts/noto-cjk/raw/main/Serif/Variable/OTC/NotoSerifCJK-VF.otf.ttc',
+  ),
 );
 final notoSansCJK = GoogleFontsFileCJK(
   'Noto Sans CJK',
-  Uri.parse('https://github.com/googlefonts/noto-cjk/raw/main/Sans/Variable/OTC/NotoSansCJK-VF.otf.ttc'),
+  Uri.parse(
+    'https://github.com/googlefonts/noto-cjk/raw/main/Sans/Variable/OTC/NotoSansCJK-VF.otf.ttc',
+  ),
 );
 
-GoogleFontsFile? getGoogleFontsUriFromFontQuery(PdfFontQuery query, {bool preferCJK = true}) {
+GoogleFontsFile? getGoogleFontsUriFromFontQuery(
+  PdfFontQuery query, {
+  bool preferCJK = true,
+}) {
   // For CJK, prefer full CJK fonts (but not for Web because of CORS issues on GitHub)
   if (!kIsWeb &&
       preferCJK &&
@@ -72,8 +88,11 @@ GoogleFontsFile? getGoogleFontsUriFromFontQuery(PdfFontQuery query, {bool prefer
       PdfFontCharset.greek ||
       PdfFontCharset.vietnamese ||
       PdfFontCharset.cyrillic ||
-      PdfFontCharset.easternEuropean => query.isItalic ? _notoSerifItalic : _notoSerif,
-      PdfFontCharset.ansi || PdfFontCharset.default_ || PdfFontCharset.symbol => null,
+      PdfFontCharset.easternEuropean =>
+        query.isItalic ? _notoSerifItalic : _notoSerif,
+      PdfFontCharset.ansi ||
+      PdfFontCharset.default_ ||
+      PdfFontCharset.symbol => null,
     },
     false => switch (query.charset) {
       PdfFontCharset.gb2312 => _notoSansSc,
@@ -86,8 +105,11 @@ GoogleFontsFile? getGoogleFontsUriFromFontQuery(PdfFontQuery query, {bool prefer
       PdfFontCharset.greek ||
       PdfFontCharset.vietnamese ||
       PdfFontCharset.cyrillic ||
-      PdfFontCharset.easternEuropean => query.isItalic ? _notoSansItalic : _notoSans,
-      PdfFontCharset.ansi || PdfFontCharset.default_ || PdfFontCharset.symbol => null,
+      PdfFontCharset.easternEuropean =>
+        query.isItalic ? _notoSansItalic : _notoSans,
+      PdfFontCharset.ansi ||
+      PdfFontCharset.default_ ||
+      PdfFontCharset.symbol => null,
     },
   };
   if (fontTable == null) return null;

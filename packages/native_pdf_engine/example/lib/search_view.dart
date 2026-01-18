@@ -18,7 +18,9 @@ class TextSearchView extends StatefulWidget {
 class _TextSearchViewState extends State<TextSearchView> {
   final focusNode = FocusNode();
   final searchTextController = TextEditingController();
-  late final pageTextStore = PdfPageTextCache(textSearcher: widget.textSearcher);
+  late final pageTextStore = PdfPageTextCache(
+    textSearcher: widget.textSearcher,
+  );
   final scrollController = ScrollController();
 
   @override
@@ -52,8 +54,14 @@ class _TextSearchViewState extends State<TextSearchView> {
       _matchIndexToListIndex.clear();
       _listIndexToMatchIndex.clear();
     }
-    for (int i = _matchIndexToListIndex.length; i < widget.textSearcher.matches.length; i++) {
-      if (i == 0 || widget.textSearcher.matches[i - 1].pageNumber != widget.textSearcher.matches[i].pageNumber) {
+    for (
+      int i = _matchIndexToListIndex.length;
+      i < widget.textSearcher.matches.length;
+      i++
+    ) {
+      if (i == 0 ||
+          widget.textSearcher.matches[i - 1].pageNumber !=
+              widget.textSearcher.matches[i].pageNumber) {
         _listIndexToMatchIndex.add(
           -widget.textSearcher.matches[i].pageNumber,
         ); // negative index to indicate page header
@@ -72,7 +80,10 @@ class _TextSearchViewState extends State<TextSearchView> {
     return Column(
       children: [
         widget.textSearcher.isSearching
-            ? LinearProgressIndicator(value: widget.textSearcher.searchProgress, minHeight: 4)
+            ? LinearProgressIndicator(
+                value: widget.textSearcher.searchProgress,
+                minHeight: 4,
+              )
             : const SizedBox(height: 4),
         Row(
           children: [
@@ -85,7 +96,9 @@ class _TextSearchViewState extends State<TextSearchView> {
                     autofocus: true,
                     focusNode: focusNode,
                     controller: searchTextController,
-                    decoration: const InputDecoration(contentPadding: EdgeInsets.only(right: 50)),
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.only(right: 50),
+                    ),
                     textInputAction: TextInputAction.search,
                     // onSubmitted: (value) {
                     //   // just focus back to the text field
@@ -97,7 +110,10 @@ class _TextSearchViewState extends State<TextSearchView> {
                       alignment: Alignment.centerRight,
                       child: Text(
                         '${widget.textSearcher.currentIndex! + 1} / ${widget.textSearcher.matches.length}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                       ),
                     ),
                 ],
@@ -105,7 +121,9 @@ class _TextSearchViewState extends State<TextSearchView> {
             ),
             const SizedBox(width: 4),
             IconButton(
-              onPressed: (widget.textSearcher.currentIndex ?? 0) < widget.textSearcher.matches.length
+              onPressed:
+                  (widget.textSearcher.currentIndex ?? 0) <
+                      widget.textSearcher.matches.length
                   ? () async {
                       await widget.textSearcher.goToNextMatch();
                       _conditionScrollPosition();
@@ -145,7 +163,8 @@ class _TextSearchViewState extends State<TextSearchView> {
             itemCount: _listIndexToMatchIndex.length,
             itemBuilder: (context, index) {
               final matchIndex = _listIndexToMatchIndex[index];
-              if (matchIndex >= 0 && matchIndex < widget.textSearcher.matches.length) {
+              if (matchIndex >= 0 &&
+                  matchIndex < widget.textSearcher.matches.length) {
                 final match = widget.textSearcher.matches[matchIndex];
                 return SearchResultTile(
                   key: ValueKey(index),
@@ -163,7 +182,13 @@ class _TextSearchViewState extends State<TextSearchView> {
                   height: itemHeight,
                   alignment: Alignment.bottomLeft,
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: Text('Page ${-matchIndex}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Page ${-matchIndex}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 );
               }
             },
@@ -175,7 +200,8 @@ class _TextSearchViewState extends State<TextSearchView> {
 
   void _conditionScrollPosition() {
     final pos = scrollController.position;
-    final newPos = itemHeight * _matchIndexToListIndex[widget.textSearcher.currentIndex!];
+    final newPos =
+        itemHeight * _matchIndexToListIndex[widget.textSearcher.currentIndex!];
     if (newPos + itemHeight > pos.pixels + pos.viewportDimension) {
       scrollController.animateTo(
         newPos + itemHeight - pos.viewportDimension,
@@ -183,7 +209,11 @@ class _TextSearchViewState extends State<TextSearchView> {
         curve: Curves.decelerate,
       );
     } else if (newPos < pos.pixels) {
-      scrollController.animateTo(newPos, duration: const Duration(milliseconds: 300), curve: Curves.decelerate);
+      scrollController.animateTo(
+        newPos,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.decelerate,
+      );
     }
 
     if (mounted) setState(() {});
@@ -246,12 +276,16 @@ class _SearchResultTileState extends State<SearchResultTile> {
     return SizedBox(
       height: widget.height,
       child: Material(
-        color: widget.isCurrent ? DefaultSelectionStyle.of(context).selectionColor! : null,
+        color: widget.isCurrent
+            ? DefaultSelectionStyle.of(context).selectionColor!
+            : null,
         child: InkWell(
           onTap: () => widget.onTap(),
           child: Container(
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Colors.black12, width: 0.5)),
+              border: Border(
+                bottom: BorderSide(color: Colors.black12, width: 0.5),
+              ),
             ),
             padding: const EdgeInsets.all(3),
             child: text,
@@ -261,7 +295,11 @@ class _SearchResultTileState extends State<SearchResultTile> {
     );
   }
 
-  TextSpan createTextSpanForMatch(PdfPageText? pageText, PdfPageTextRange match, {TextStyle? style}) {
+  TextSpan createTextSpanForMatch(
+    PdfPageText? pageText,
+    PdfPageTextRange match, {
+    TextStyle? style,
+  }) {
     style ??= const TextStyle(fontSize: 14);
     if (pageText == null) {
       return TextSpan(text: match.text, style: style);

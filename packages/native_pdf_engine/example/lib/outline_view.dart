@@ -5,7 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 class OutlineView extends StatelessWidget {
-  const OutlineView({required this.outline, required this.controller, super.key});
+  const OutlineView({
+    required this.outline,
+    required this.controller,
+    super.key,
+  });
 
   final List<PdfOutlineNode>? outline;
   final PdfViewerController controller;
@@ -22,7 +26,11 @@ class OutlineView extends StatelessWidget {
           return InkWell(
             onTap: () => controller.goToDest(item.node.dest),
             child: Container(
-              margin: EdgeInsets.only(left: item.level * 16.0 + 8, top: 8, bottom: 8),
+              margin: EdgeInsets.only(
+                left: item.level * 16.0 + 8,
+                top: 8,
+                bottom: 8,
+              ),
               child: Text(item.node.title, softWrap: false),
             ),
           );
@@ -32,7 +40,10 @@ class OutlineView extends StatelessWidget {
   }
 
   /// Recursively create outline indent structure
-  Iterable<({PdfOutlineNode node, int level})> _getOutlineList(List<PdfOutlineNode>? outline, int level) sync* {
+  Iterable<({PdfOutlineNode node, int level})> _getOutlineList(
+    List<PdfOutlineNode>? outline,
+    int level,
+  ) sync* {
     if (outline == null) return;
     for (var node in outline) {
       yield (node: node, level: level);

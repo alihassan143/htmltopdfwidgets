@@ -14,8 +14,12 @@ import 'dart:ffi' as ffi;
 /// @param output_path The file path to save the PDF.
 /// @param callback The callback to invoke when generation is complete.
 @ffi.Native<
-    ffi.Void Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>,
-        ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32 result)>>)>()
+  ffi.Void Function(
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32 result)>>,
+  )
+>()
 external void generate_pdf(
   ffi.Pointer<ffi.Char> html,
   ffi.Pointer<ffi.Char> output_path,
@@ -27,8 +31,12 @@ external void generate_pdf(
 /// @param output_path The file path to save the PDF.
 /// @param callback The callback to invoke when generation is complete.
 @ffi.Native<
-    ffi.Void Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>,
-        ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32 result)>>)>()
+  ffi.Void Function(
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32 result)>>,
+  )
+>()
 external void generate_pdf_from_url(
   ffi.Pointer<ffi.Char> url,
   ffi.Pointer<ffi.Char> output_path,

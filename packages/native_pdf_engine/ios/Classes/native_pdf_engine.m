@@ -1,7 +1,8 @@
 #include <stdint.h>
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
-#import "../../tool/ios_headers.h"
+#import <WebKit/WebKit.h>
+#import <Foundation/NSURLRequest.h>
 
 #if !__has_feature(objc_arc)
 #error "This file must be compiled with ARC enabled"
