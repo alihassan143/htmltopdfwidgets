@@ -159,9 +159,9 @@
     },
     {
       "name": "meta",
-      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/meta-1.16.0",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/meta-1.17.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.5"
     },
     {
       "name": "path",
@@ -231,7 +231,7 @@
     },
     {
       "name": "test_api",
-      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/test_api-0.7.6",
+      "rootUri": "file:///Users/mac/.pub-cache/hosted/pub.dev/test_api-0.7.7",
       "packageUri": "lib/",
       "languageVersion": "3.5"
     },
@@ -273,8 +273,8 @@
     }
   ],
   "generator": "pub",
-  "generatorVersion": "3.9.2",
+  "generatorVersion": "3.10.7",
   "flutterRoot": "file:///opt/homebrew/Caskroom/flutter/3.27.2/flutter",
-  "flutterVersion": "3.35.4",
+  "flutterVersion": "3.38.7",
   "pubCache": "file:///Users/mac/.pub-cache"
 }
