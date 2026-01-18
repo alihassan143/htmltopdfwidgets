@@ -77,11 +77,11 @@ class PdfBuilder {
     final widgets = <pw.Widget>[];
 
     // Check if this block contains only inline content (text, spans, b, i, etc.)
-    // If so, render as RichText
+    // If so, render as RichText widgets (may be split into multiple for page spanning)
     if (_hasOnlyInlineContent(node)) {
-      final richText = _buildRichTextFromNode(node);
-      if (richText != null) {
-        return [richText];
+      final richTextWidgets = _buildRichTextFromNode(node);
+      if (richTextWidgets.isNotEmpty) {
+        return richTextWidgets;
       }
       return [];
     }
@@ -190,21 +190,53 @@ class PdfBuilder {
     return true;
   }
 
-  /// Builds a [pw.RichText] widget from a node that contains only inline content.
-  pw.Widget? _buildRichTextFromNode(RenderNode node) {
+  /// Builds a list of [pw.RichText] widgets from a node that contains only inline content.
+  ///
+  /// Since RichText does NOT automatically span pages, we split large text content
+  /// into smaller chunks. Each chunk becomes a separate RichText widget that fits
+  /// on a page, allowing the overall content to span pages when placed in MultiPage.
+  ///
+  /// The chunking is based on span count to approximate page-friendly sizes.
+  List<pw.Widget> _buildRichTextFromNode(RenderNode node) {
     final spans = <pw.InlineSpan>[];
     _collectInlineSpans(node, spans);
 
-    if (spans.isEmpty) return null;
+    if (spans.isEmpty) return [];
 
-    return pw.Padding(
-      padding: (node.style.margin ?? const pw.EdgeInsets.only(bottom: 6)) +
-          (node.style.padding ?? pw.EdgeInsets.zero),
-      child: pw.RichText(
-        text: pw.TextSpan(children: spans),
-        textAlign: node.style.textAlign ?? pw.TextAlign.left,
-      ),
-    );
+    // If we have a small number of spans, return as single RichText
+    // Estimate: each TextSpan typically takes ~20-40 points in height
+    // A page is ~700 points, so ~15-25 spans per page is safe.
+    // We'll use a conservative chunk size of 8 spans to ensure no overflow.
+    const int maxSpansPerChunk = 8;
+
+    if (spans.length <= maxSpansPerChunk) {
+      return [
+        pw.RichText(
+          overflow: pw.TextOverflow.span,
+          text: pw.TextSpan(children: spans),
+          textAlign: node.style.textAlign ?? pw.TextAlign.left,
+        ),
+      ];
+    }
+
+    // Split spans into smaller chunks to enable page spanning
+    final widgets = <pw.Widget>[];
+    for (int i = 0; i < spans.length; i += maxSpansPerChunk) {
+      final chunkEnd = (i + maxSpansPerChunk < spans.length)
+          ? i + maxSpansPerChunk
+          : spans.length;
+      final chunk = spans.sublist(i, chunkEnd);
+
+      widgets.add(
+        pw.RichText(
+          overflow: pw.TextOverflow.span,
+          text: pw.TextSpan(children: chunk),
+          textAlign: node.style.textAlign ?? pw.TextAlign.left,
+        ),
+      );
+    }
+
+    return widgets;
   }
 
   Future<pw.Widget> _buildImage(RenderNode node) async {
@@ -314,6 +346,7 @@ class PdfBuilder {
     // Apply header styling
     if (isHeader) {
       return pw.RichText(
+        overflow: pw.TextOverflow.span,
         text: pw.TextSpan(
           children: spans,
           style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
@@ -323,6 +356,7 @@ class PdfBuilder {
     }
 
     return pw.RichText(
+      overflow: pw.TextOverflow.span,
       text: pw.TextSpan(children: spans),
     );
   }
@@ -364,6 +398,7 @@ class PdfBuilder {
 
     if (spans.isNotEmpty) {
       contentWidget = pw.RichText(
+        overflow: pw.TextOverflow.span,
         text: pw.TextSpan(children: spans),
         textAlign: node.style.textAlign ?? pw.TextAlign.left,
       );
@@ -539,126 +574,182 @@ class PdfBuilder {
     // Recursive call to get children widgets
     final childrenWidgets = await _buildBlock(node);
 
-    // If it's a list item, we might want to handle it specifically or just as a block
-    // For simplicity, treating as block with container.
+    // Build decoration from node style
+    final decoration = _buildBoxDecoration(node.style);
+    final hasDecoration = decoration != null ||
+        node.style.padding != null ||
+        node.style.margin != null;
 
-    // Apply styling.
-    // Note: pw.Container supports padding, margin, decoration (border, color).
-    // However, pw.Container with non-null decoration might not span pages well if it's too large.
-    // The prompt suggests "Virtual Fragmentation" and "Prefer using pw.Column".
-
-    // If we have background or border, we must use Container/Decoration.
-    // However, pw.Container with non-null decoration does NOT support spanning across pages.
-    // If the content is large (e.g. section, article, div with multiple children),
-    // keeping the decoration will cause "Widget won't fit" error.
-    // For robustness, we discard the decoration if the node seems to be a structural wrapper
-    // (has multiple block children) and relies on flow execution.
-
-    // We only apply decoration if it's likely a small component (like a card or button)
-    // Heuristic: if it has many children or specific semantic tags, avoid decoration.
-
-    pw.Widget widget;
-    if (childrenWidgets.length == 1) {
-      widget = childrenWidgets.first;
-    } else {
-      widget = pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: childrenWidgets,
-      );
+    // Empty blocks with decoration (like colored divs with explicit size)
+    if (childrenWidgets.isEmpty) {
+      if (hasDecoration &&
+          (node.style.width != null || node.style.height != null)) {
+        return [
+          pw.Container(
+            width: node.style.width,
+            height: node.style.height,
+            padding: node.style.padding,
+            margin: node.style.margin,
+            decoration: decoration,
+          )
+        ];
+      }
+      return [];
     }
 
-    var decoration = _buildBoxDecoration(node.style);
-    bool isStructural = false;
-    // Aggressive flattening: Treat all generic block containers as structural
-    // to prevent "Widget too big" errors.
-    // We include 'div' with ANY children (>= 1).
-    // This removes borders/backgrounds from divs, but ensures page spanning.
-    // Universal flattening: Treat ANY block with children as structural.
-    // This is the only way to guarantee "Any widget ... automatically split".
-    // We sacrifice decorations (borders/backgrounds) on wrappers to prevent
-    // "Widget won't fit" crashes.
-    if (childrenWidgets.isNotEmpty) {
-      isStructural = true;
-    }
+    // Determine if this is a "small" block that can safely use Container wrapper
+    // Headers (h1-h6), blockquotes, and single-content blocks can be wrapped
+    final isSmallBlock = _isSmallBlock(node, childrenWidgets);
 
-    // Special handling: Keep decoration for VERY simple elements if needed?
-    // No, robustness first. If it has children, it might be huge. Flatten it.
+    if (isSmallBlock && hasDecoration) {
+      // Small block - wrap everything in a decorated Container
+      // This is safe for headers, titles, short paragraphs, etc.
+      pw.Widget content;
+      if (childrenWidgets.length == 1) {
+        content = childrenWidgets.first;
+      } else {
+        // For small blocks with multiple children, use Column
+        // This is acceptable since small blocks fit on a page
+        content = pw.Column(
+          crossAxisAlignment: node.style.textAlign == pw.TextAlign.center
+              ? pw.CrossAxisAlignment.center
+              : node.style.textAlign == pw.TextAlign.right
+                  ? pw.CrossAxisAlignment.end
+                  : pw.CrossAxisAlignment.start,
+          children: childrenWidgets,
+        );
+      }
 
-    // If the node has NO children (e.g. <hr>, empty div with size),
-    // isStructural is false, and it goes to Container logic below.
-    // That's fine because without children it fits on a page or is just empty.
+      // Determine container alignment based on text-align
+      pw.Alignment? alignment;
+      if (node.style.textAlign == pw.TextAlign.center) {
+        alignment = pw.Alignment.center;
+      } else if (node.style.textAlign == pw.TextAlign.right) {
+        alignment = pw.Alignment.centerRight;
+      }
 
-    if (isStructural) {
-      // Force complete unwrap for structural blocks to guarantee spanning.
-      // We drop decoration (background/border).
-      // We preserve vertical margin/padding via SizedBox.
-      // We SACRIFICE horizontal margin/padding/border to enable robust paging.
-      // (Horizontal constraints usually don't cause page breaks, but wrappers do).
-
-      final topSpace =
-          (node.style.margin?.top ?? 0) + (node.style.padding?.top ?? 0);
-      final bottomSpace =
-          (node.style.margin?.bottom ?? 0) + (node.style.padding?.bottom ?? 0);
-
-      final result = <pw.Widget>[];
-
-      if (topSpace > 0) result.add(pw.SizedBox(height: topSpace));
-
-      // Add all children directly to the result list
-      result.addAll(childrenWidgets);
-
-      if (bottomSpace > 0) result.add(pw.SizedBox(height: bottomSpace));
-
-      return result;
-    }
-
-    // Non-structural / Small blocks (e.g. Buttons, Cards with fixed small content)
-    // We try to keep decoration if possible.
-    if (decoration != null) {
       return [
         pw.Container(
           width: node.style.width,
-          height: node.style.height,
           padding: node.style.padding,
           margin: node.style.margin,
           decoration: decoration,
-          child: widget,
+          alignment: alignment,
+          child: content,
         )
       ];
-    } else {
-      // Even if no decoration, if it's not structural, we might wraps it.
-      // But wait, if it's NOT structural, it probably only has 1 child or is small.
-      // Let's use Padding.
+    }
 
-      if (node.style.padding != null || node.style.margin != null) {
-        final p = node.style.padding ?? const pw.EdgeInsets.all(0);
-        final m = node.style.margin ?? const pw.EdgeInsets.all(0);
+    // Large structural blocks - apply decorations to individual children
+    // This enables page spanning while preserving visual styling
+    if (hasDecoration) {
+      return _applyBlockDecorationToChildren(
+        childrenWidgets,
+        node.style,
+        decoration,
+      );
+    }
 
-        // Optimization: If only vertical spacing, use SizedBox to avoid nesting
-        if (p.left == 0 && p.right == 0 && m.left == 0 && m.right == 0) {
-          final top = p.top + m.top;
-          final bottom = p.bottom + m.bottom;
-          final res = <pw.Widget>[];
-          if (top > 0) res.add(pw.SizedBox(height: top));
-          res.add(widget);
-          if (bottom > 0) res.add(pw.SizedBox(height: bottom));
-          return res;
-        }
+    // No decoration - just return children with spacing
+    final topSpace =
+        (node.style.margin?.top ?? 0) + (node.style.padding?.top ?? 0);
+    final bottomSpace =
+        (node.style.margin?.bottom ?? 0) + (node.style.padding?.bottom ?? 0);
 
-        return [
-          pw.Padding(
-            padding: pw.EdgeInsets.fromLTRB(p.left + m.left, p.top + m.top,
-                p.right + m.right, p.bottom + m.bottom),
-            child: widget,
-          )
-        ];
+    final result = <pw.Widget>[];
+    if (topSpace > 0) result.add(pw.SizedBox(height: topSpace));
+    result.addAll(childrenWidgets);
+    if (bottomSpace > 0) result.add(pw.SizedBox(height: bottomSpace));
+
+    return result;
+  }
+
+  /// Determines if a block is "small" enough to safely wrap in a Container
+  /// VERY conservative - only headers and simple blockquotes
+  /// Paragraphs, divs, and other blocks may contain long content that exceeds page height
+  bool _isSmallBlock(RenderNode node, List<pw.Widget> children) {
+    // Only headers are truly guaranteed to be small
+    if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].contains(node.tagName)) {
+      return true;
+    }
+
+    // Blockquotes with a single short child
+    if (node.tagName == 'blockquote' && children.length == 1) {
+      return true;
+    }
+
+    // Pre blocks with single child
+    if (node.tagName == 'pre' && children.length == 1) {
+      return true;
+    }
+
+    // Everything else (including paragraphs) should be treated as potentially large
+    // to enable page spanning
+    return false;
+  }
+
+  /// For large structural blocks, apply background decoration using top/middle/bottom
+  /// This creates a unified visual block while still allowing page spanning
+  List<pw.Widget> _applyBlockDecorationToChildren(
+    List<pw.Widget> children,
+    CSSStyle style,
+    pw.BoxDecoration? decoration,
+  ) {
+    final result = <pw.Widget>[];
+    final leftPad = (style.padding?.left ?? 0) + (style.margin?.left ?? 0);
+    final rightPad = (style.padding?.right ?? 0) + (style.margin?.right ?? 0);
+    final topSpace = (style.margin?.top ?? 0) + (style.padding?.top ?? 0);
+    final bottomSpace =
+        (style.margin?.bottom ?? 0) + (style.padding?.bottom ?? 0);
+
+    // Add top spacing with background and top border
+    if (topSpace > 0 || decoration != null) {
+      result.add(pw.Container(
+        height: topSpace > 0 ? topSpace : null,
+        padding: topSpace > 0 ? null : const pw.EdgeInsets.only(top: 8),
+        decoration: decoration != null
+            ? pw.BoxDecoration(
+                color: decoration.color,
+                border: decoration.border?.top != null
+                    ? pw.Border(top: decoration.border!.top)
+                    : null,
+              )
+            : null,
+      ));
+    }
+
+    // Apply background and horizontal padding to each child
+    for (final child in children) {
+      if (decoration?.color != null || leftPad > 0 || rightPad > 0) {
+        result.add(pw.Container(
+          padding: pw.EdgeInsets.only(left: leftPad, right: rightPad),
+          decoration: decoration?.color != null
+              ? pw.BoxDecoration(color: decoration!.color)
+              : null,
+          child: child,
+        ));
       } else {
-        return [widget];
+        result.add(child);
       }
     }
 
-    // Pass padding/margin even if decoration is dropped (Container handles it, though padding might not span perfectly)
-    // Ideally we apply padding to the column children or use a specialized widget, but Container is okay for padding.
+    // Add bottom spacing with background and bottom border
+    if (bottomSpace > 0 || decoration != null) {
+      result.add(pw.Container(
+        height: bottomSpace > 0 ? bottomSpace : null,
+        padding: bottomSpace > 0 ? null : const pw.EdgeInsets.only(bottom: 8),
+        decoration: decoration != null
+            ? pw.BoxDecoration(
+                color: decoration.color,
+                border: decoration.border?.bottom != null
+                    ? pw.Border(bottom: decoration.border!.bottom)
+                    : null,
+              )
+            : null,
+      ));
+    }
+
+    return result;
   }
 
   pw.Widget _buildRichText(List<RenderNode> nodes, CSSStyle parentStyle) {
@@ -668,14 +759,15 @@ class PdfBuilder {
       _collectInlineSpans(node, spans);
     }
 
-    // Wrap in a Container with margin for proper spacing
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 6),
-      child: pw.RichText(
-        text: pw.TextSpan(children: spans),
-        textAlign: parentStyle.textAlign ?? pw.TextAlign.left,
-        textDirection: parentStyle.textDirection,
-      ),
+    // Return RichText directly without any wrapper widget.
+    // RichText implements SpanningWidget and can automatically break
+    // content across pages when used in MultiPage layouts.
+    // Wrapping it in Container or Padding prevents this spanning capability.
+    return pw.RichText(
+      overflow: pw.TextOverflow.span,
+      text: pw.TextSpan(children: spans),
+      textAlign: parentStyle.textAlign ?? pw.TextAlign.left,
+      textDirection: parentStyle.textDirection,
     );
   }
 
@@ -806,6 +898,9 @@ class PdfBuilder {
       fontFallback: fontFallback,
       lineSpacing:
           style.lineHeight, // Add line-height support if available in CSSStyle
+      background: style.backgroundColor != null
+          ? pw.BoxDecoration(color: style.backgroundColor)
+          : null,
     );
   }
 }

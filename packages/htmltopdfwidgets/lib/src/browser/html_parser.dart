@@ -96,7 +96,9 @@ class HtmlParser {
     final inlineStyle = CSSStyle.parse(inlineStyleString);
 
     // 3. Compute final style: parent -> tagDefault -> matchedCSS -> attributes -> inline
-    var computedStyle = parentStyle.inheritFrom(parentStyle);
+    // Start with empty style that inherits only inheritable properties from parent
+    // This ensures backgroundColor (non-inherited in CSS) is NOT passed to children
+    var computedStyle = const CSSStyle().inheritFrom(parentStyle);
     computedStyle = computedStyle.merge(tagDefaultStyle);
 
     // 3.1 Apply matched CSS rules from <style> blocks
@@ -635,27 +637,34 @@ class HtmlParser {
         }
         return const CSSStyle(fontWeight: FontWeight.normal);
       case 'font-style':
-        if (textValue == 'italic')
+        if (textValue == 'italic') {
           return const CSSStyle(fontStyle: FontStyle.italic);
+        }
         return const CSSStyle(fontStyle: FontStyle.normal);
       case 'text-decoration':
-        if (textValue.contains('underline'))
+        if (textValue.contains('underline')) {
           return const CSSStyle(textDecoration: TextDecoration.underline);
-        if (textValue.contains('line-through'))
+        }
+        if (textValue.contains('line-through')) {
           return const CSSStyle(textDecoration: TextDecoration.lineThrough);
+        }
         return const CSSStyle(textDecoration: TextDecoration.none);
       case 'text-align':
-        if (textValue == 'center')
+        if (textValue == 'center') {
           return const CSSStyle(textAlign: TextAlign.center);
-        if (textValue == 'right')
+        }
+        if (textValue == 'right') {
           return const CSSStyle(textAlign: TextAlign.right);
-        if (textValue == 'justify')
+        }
+        if (textValue == 'justify') {
           return const CSSStyle(textAlign: TextAlign.justify);
+        }
         return const CSSStyle(textAlign: TextAlign.left);
       case 'display':
         if (textValue == 'none') return const CSSStyle(display: Display.none);
-        if (textValue == 'inline')
+        if (textValue == 'inline') {
           return const CSSStyle(display: Display.inline);
+        }
         if (textValue == 'block') return const CSSStyle(display: Display.block);
         return const CSSStyle();
       case 'margin':
@@ -676,8 +685,9 @@ class HtmlParser {
           for (var part in parts) {
             final c = _parseColorValue(part);
             if (c != null) color = c;
-            if (part.endsWith('px'))
+            if (part.endsWith('px')) {
               width = double.tryParse(part.replaceAll('px', '')) ?? 1.0;
+            }
           }
           return CSSStyle(border: Border.all(color: color, width: width));
         }
