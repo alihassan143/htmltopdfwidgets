@@ -38,9 +38,15 @@ import 'dart:core' show Object, String, bool, double, int;
 import 'package:jni/_internal.dart' as jni$_;
 import 'package:jni/jni.dart' as jni$_;
 
+import '../../java/lang/Runnable.dart' as runnable$_;
+
 import '../content/Context.dart' as context$_;
 
+import '../graphics/Canvas.dart' as canvas$_;
+
 import '../view/View.dart' as view$_;
+
+import '../view/ViewGroup.dart' as viewgroup$_;
 
 /// from: `android.app.Activity$ScreenCaptureCallback`
 class Activity$ScreenCaptureCallback extends jni$_.JObject {
@@ -372,7 +378,10 @@ class Activity extends jni$_.JObject {
           >();
 
   /// from: `public void addContentView(android.view.View view, android.view.ViewGroup$LayoutParams layoutParams)`
-  void addContentView(view$_.View? view, jni$_.JObject? layoutParams) {
+  void addContentView(
+    view$_.View? view,
+    viewgroup$_.ViewGroup$LayoutParams? layoutParams,
+  ) {
     final _$view = view?.reference ?? jni$_.jNullReference;
     final _$layoutParams = layoutParams?.reference ?? jni$_.jNullReference;
     _addContentView(
@@ -3549,7 +3558,7 @@ class Activity extends jni$_.JObject {
           >();
 
   /// from: `public boolean onCreateThumbnail(android.graphics.Bitmap bitmap, android.graphics.Canvas canvas)`
-  bool onCreateThumbnail(jni$_.JObject? bitmap, jni$_.JObject? canvas) {
+  bool onCreateThumbnail(jni$_.JObject? bitmap, canvas$_.Canvas? canvas) {
     final _$bitmap = bitmap?.reference ?? jni$_.jNullReference;
     final _$canvas = canvas?.reference ?? jni$_.jNullReference;
     return _onCreateThumbnail(
@@ -6337,7 +6346,7 @@ class Activity extends jni$_.JObject {
           >();
 
   /// from: `public final void runOnUiThread(java.lang.Runnable runnable)`
-  void runOnUiThread(jni$_.JObject? runnable) {
+  void runOnUiThread(runnable$_.Runnable? runnable) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     _runOnUiThread(
       reference.pointer,
@@ -6503,7 +6512,10 @@ class Activity extends jni$_.JObject {
           >();
 
   /// from: `public void setContentView(android.view.View view, android.view.ViewGroup$LayoutParams layoutParams)`
-  void setContentView$1(view$_.View? view, jni$_.JObject? layoutParams) {
+  void setContentView$1(
+    view$_.View? view,
+    viewgroup$_.ViewGroup$LayoutParams? layoutParams,
+  ) {
     final _$view = view?.reference ?? jni$_.jNullReference;
     final _$layoutParams = layoutParams?.reference ?? jni$_.jNullReference;
     _setContentView$1(

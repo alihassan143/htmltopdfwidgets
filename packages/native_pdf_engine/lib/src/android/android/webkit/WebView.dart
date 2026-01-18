@@ -38,11 +38,19 @@ import 'dart:core' show Object, String, bool, double, int;
 import 'package:jni/_internal.dart' as jni$_;
 import 'package:jni/jni.dart' as jni$_;
 
+import '../../java/lang/Runnable.dart' as runnable$_;
+
 import '../content/Context.dart' as context$_;
+
+import '../graphics/Paint.dart' as paint$_;
+
+import '../graphics/Picture.dart' as picture$_;
 
 import '../print/PrintDocumentAdapter.dart' as printdocumentadapter$_;
 
 import '../view/View.dart' as view$_;
+
+import '../view/ViewGroup.dart' as viewgroup$_;
 
 import 'WebSettings.dart' as websettings$_;
 
@@ -509,7 +517,7 @@ class WebView$PictureListener extends jni$_.JObject {
           >();
 
   /// from: `public abstract void onNewPicture(android.webkit.WebView webView, android.graphics.Picture picture)`
-  void onNewPicture(WebView? webView, jni$_.JObject? picture) {
+  void onNewPicture(WebView? webView, picture$_.Picture? picture) {
     final _$webView = webView?.reference ?? jni$_.jNullReference;
     final _$picture = picture?.reference ?? jni$_.jNullReference;
     _onNewPicture(
@@ -551,7 +559,7 @@ class WebView$PictureListener extends jni$_.JObject {
           r'onNewPicture(Landroid/webkit/WebView;Landroid/graphics/Picture;)V') {
         _$impls[$p]!.onNewPicture(
           $a![0]?.as(const $WebView$Type$(), releaseOriginal: true),
-          $a![1]?.as(const jni$_.$JObject$Type$(), releaseOriginal: true),
+          $a![1]?.as(const picture$_.$Picture$Type$(), releaseOriginal: true),
         );
         return jni$_.nullptr;
       }
@@ -598,26 +606,27 @@ class WebView$PictureListener extends jni$_.JObject {
 
 abstract base mixin class $WebView$PictureListener {
   factory $WebView$PictureListener({
-    required void Function(WebView? webView, jni$_.JObject? picture)
+    required void Function(WebView? webView, picture$_.Picture? picture)
     onNewPicture,
     bool onNewPicture$async,
   }) = _$WebView$PictureListener;
 
-  void onNewPicture(WebView? webView, jni$_.JObject? picture);
+  void onNewPicture(WebView? webView, picture$_.Picture? picture);
   bool get onNewPicture$async => false;
 }
 
 final class _$WebView$PictureListener with $WebView$PictureListener {
   _$WebView$PictureListener({
-    required void Function(WebView? webView, jni$_.JObject? picture)
+    required void Function(WebView? webView, picture$_.Picture? picture)
     onNewPicture,
     this.onNewPicture$async = false,
   }) : _onNewPicture = onNewPicture;
 
-  final void Function(WebView? webView, jni$_.JObject? picture) _onNewPicture;
+  final void Function(WebView? webView, picture$_.Picture? picture)
+  _onNewPicture;
   final bool onNewPicture$async;
 
-  void onNewPicture(WebView? webView, jni$_.JObject? picture) {
+  void onNewPicture(WebView? webView, picture$_.Picture? picture) {
     return _onNewPicture(webView, picture);
   }
 }
@@ -1536,11 +1545,11 @@ class WebView extends jni$_.JObject {
 
   /// from: `public android.graphics.Picture capturePicture()`
   /// The returned object must be released after use, by calling the [release] method.
-  jni$_.JObject? capturePicture() {
+  picture$_.Picture? capturePicture() {
     return _capturePicture(
       reference.pointer,
       _id_capturePicture as jni$_.JMethodIDPtr,
-    ).object<jni$_.JObject?>(const jni$_.$JObject$NullableType$());
+    ).object<picture$_.Picture?>(const picture$_.$Picture$NullableType$());
   }
 
   static final _id_clearCache = _class.instanceMethodId(r'clearCache', r'(Z)V');
@@ -1596,7 +1605,7 @@ class WebView extends jni$_.JObject {
           >();
 
   /// from: `static public void clearClientCertPreferences(java.lang.Runnable runnable)`
-  static void clearClientCertPreferences(jni$_.JObject? runnable) {
+  static void clearClientCertPreferences(runnable$_.Runnable? runnable) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     _clearClientCertPreferences(
       _class.reference.pointer,
@@ -5351,7 +5360,7 @@ class WebView extends jni$_.JObject {
           >();
 
   /// from: `public void setLayerType(int i, android.graphics.Paint paint)`
-  void setLayerType(int i, jni$_.JObject? paint) {
+  void setLayerType(int i, paint$_.Paint? paint) {
     final _$paint = paint?.reference ?? jni$_.jNullReference;
     _setLayerType(
       reference.pointer,
@@ -5385,7 +5394,7 @@ class WebView extends jni$_.JObject {
           >();
 
   /// from: `public void setLayoutParams(android.view.ViewGroup$LayoutParams layoutParams)`
-  void setLayoutParams(jni$_.JObject? layoutParams) {
+  void setLayoutParams(viewgroup$_.ViewGroup$LayoutParams? layoutParams) {
     final _$layoutParams = layoutParams?.reference ?? jni$_.jNullReference;
     _setLayoutParams(
       reference.pointer,

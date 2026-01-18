@@ -38,7 +38,15 @@ import 'dart:core' show Object, String, bool, double, int;
 import 'package:jni/_internal.dart' as jni$_;
 import 'package:jni/jni.dart' as jni$_;
 
+import '../../java/lang/Runnable.dart' as runnable$_;
+
 import '../content/Context.dart' as context$_;
+
+import '../graphics/Canvas.dart' as canvas$_;
+
+import '../graphics/Paint.dart' as paint$_;
+
+import 'ViewGroup.dart' as viewgroup$_;
 
 /// from: `android.view.View$AccessibilityDelegate`
 class View$AccessibilityDelegate extends jni$_.JObject {
@@ -378,7 +386,7 @@ class View$AccessibilityDelegate extends jni$_.JObject {
 
   /// from: `public boolean onRequestSendAccessibilityEvent(android.view.ViewGroup viewGroup, android.view.View view, android.view.accessibility.AccessibilityEvent accessibilityEvent)`
   bool onRequestSendAccessibilityEvent(
-    jni$_.JObject? viewGroup,
+    viewgroup$_.ViewGroup? viewGroup,
     View? view,
     jni$_.JObject? accessibilityEvent,
   ) {
@@ -973,7 +981,7 @@ class View$DragShadowBuilder extends jni$_.JObject {
           >();
 
   /// from: `public void onDrawShadow(android.graphics.Canvas canvas)`
-  void onDrawShadow(jni$_.JObject? canvas) {
+  void onDrawShadow(canvas$_.Canvas? canvas) {
     final _$canvas = canvas?.reference ?? jni$_.jNullReference;
     _onDrawShadow(
       reference.pointer,
@@ -8826,7 +8834,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void draw(android.graphics.Canvas canvas)`
-  void draw(jni$_.JObject? canvas) {
+  void draw(canvas$_.Canvas? canvas) {
     final _$canvas = canvas?.reference ?? jni$_.jNullReference;
     _draw(
       reference.pointer,
@@ -11219,11 +11227,11 @@ class View extends jni$_.JObject {
 
   /// from: `public java.lang.Runnable getHandwritingDelegatorCallback()`
   /// The returned object must be released after use, by calling the [release] method.
-  jni$_.JObject? getHandwritingDelegatorCallback() {
+  runnable$_.Runnable? getHandwritingDelegatorCallback() {
     return _getHandwritingDelegatorCallback(
       reference.pointer,
       _id_getHandwritingDelegatorCallback as jni$_.JMethodIDPtr,
-    ).object<jni$_.JObject?>(const jni$_.$JObject$NullableType$());
+    ).object<runnable$_.Runnable?>(const runnable$_.$Runnable$NullableType$());
   }
 
   static final _id_getHasOverlappingRendering = _class.instanceMethodId(
@@ -11684,11 +11692,13 @@ class View extends jni$_.JObject {
 
   /// from: `public android.view.ViewGroup$LayoutParams getLayoutParams()`
   /// The returned object must be released after use, by calling the [release] method.
-  jni$_.JObject? getLayoutParams() {
+  viewgroup$_.ViewGroup$LayoutParams? getLayoutParams() {
     return _getLayoutParams(
       reference.pointer,
       _id_getLayoutParams as jni$_.JMethodIDPtr,
-    ).object<jni$_.JObject?>(const jni$_.$JObject$NullableType$());
+    ).object<viewgroup$_.ViewGroup$LayoutParams?>(
+      const viewgroup$_.$ViewGroup$LayoutParams$NullableType$(),
+    );
   }
 
   static final _id_getLeft = _class.instanceMethodId(r'getLeft', r'()I');
@@ -14903,7 +14913,7 @@ class View extends jni$_.JObject {
   static View? inflate(
     context$_.Context? context,
     int i,
-    jni$_.JObject? viewGroup,
+    viewgroup$_.ViewGroup? viewGroup,
   ) {
     final _$context = context?.reference ?? jni$_.jNullReference;
     final _$viewGroup = viewGroup?.reference ?? jni$_.jNullReference;
@@ -17204,7 +17214,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void onDrawForeground(android.graphics.Canvas canvas)`
-  void onDrawForeground(jni$_.JObject? canvas) {
+  void onDrawForeground(canvas$_.Canvas? canvas) {
     final _$canvas = canvas?.reference ?? jni$_.jNullReference;
     _onDrawForeground(
       reference.pointer,
@@ -18680,7 +18690,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public boolean post(java.lang.Runnable runnable)`
-  bool post(jni$_.JObject? runnable) {
+  bool post(runnable$_.Runnable? runnable) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     return _post(
       reference.pointer,
@@ -18714,7 +18724,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public boolean postDelayed(java.lang.Runnable runnable, long j)`
-  bool postDelayed(jni$_.JObject? runnable, int j) {
+  bool postDelayed(runnable$_.Runnable? runnable, int j) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     return _postDelayed(
       reference.pointer,
@@ -18966,7 +18976,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void postOnAnimation(java.lang.Runnable runnable)`
-  void postOnAnimation(jni$_.JObject? runnable) {
+  void postOnAnimation(runnable$_.Runnable? runnable) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     _postOnAnimation(
       reference.pointer,
@@ -19000,7 +19010,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void postOnAnimationDelayed(java.lang.Runnable runnable, long j)`
-  void postOnAnimationDelayed(jni$_.JObject? runnable, int j) {
+  void postOnAnimationDelayed(runnable$_.Runnable? runnable, int j) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     _postOnAnimationDelayed(
       reference.pointer,
@@ -19092,7 +19102,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public boolean removeCallbacks(java.lang.Runnable runnable)`
-  bool removeCallbacks(jni$_.JObject? runnable) {
+  bool removeCallbacks(runnable$_.Runnable? runnable) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     return _removeCallbacks(
       reference.pointer,
@@ -19939,7 +19949,7 @@ class View extends jni$_.JObject {
   /// from: `public void scheduleDrawable(android.graphics.drawable.Drawable drawable, java.lang.Runnable runnable, long j)`
   void scheduleDrawable(
     jni$_.JObject? drawable,
-    jni$_.JObject? runnable,
+    runnable$_.Runnable? runnable,
     int j,
   ) {
     final _$drawable = drawable?.reference ?? jni$_.jNullReference;
@@ -21918,7 +21928,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void setHandwritingDelegatorCallback(java.lang.Runnable runnable)`
-  void setHandwritingDelegatorCallback(jni$_.JObject? runnable) {
+  void setHandwritingDelegatorCallback(runnable$_.Runnable? runnable) {
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     _setHandwritingDelegatorCallback(
       reference.pointer,
@@ -22457,7 +22467,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void setLayerPaint(android.graphics.Paint paint)`
-  void setLayerPaint(jni$_.JObject? paint) {
+  void setLayerPaint(paint$_.Paint? paint) {
     final _$paint = paint?.reference ?? jni$_.jNullReference;
     _setLayerPaint(
       reference.pointer,
@@ -22491,7 +22501,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void setLayerType(int i, android.graphics.Paint paint)`
-  void setLayerType(int i, jni$_.JObject? paint) {
+  void setLayerType(int i, paint$_.Paint? paint) {
     final _$paint = paint?.reference ?? jni$_.jNullReference;
     _setLayerType(
       reference.pointer,
@@ -22557,7 +22567,7 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void setLayoutParams(android.view.ViewGroup$LayoutParams layoutParams)`
-  void setLayoutParams(jni$_.JObject? layoutParams) {
+  void setLayoutParams(viewgroup$_.ViewGroup$LayoutParams? layoutParams) {
     final _$layoutParams = layoutParams?.reference ?? jni$_.jNullReference;
     _setLayoutParams(
       reference.pointer,
@@ -26212,7 +26222,10 @@ class View extends jni$_.JObject {
           >();
 
   /// from: `public void unscheduleDrawable(android.graphics.drawable.Drawable drawable, java.lang.Runnable runnable)`
-  void unscheduleDrawable$1(jni$_.JObject? drawable, jni$_.JObject? runnable) {
+  void unscheduleDrawable$1(
+    jni$_.JObject? drawable,
+    runnable$_.Runnable? runnable,
+  ) {
     final _$drawable = drawable?.reference ?? jni$_.jNullReference;
     final _$runnable = runnable?.reference ?? jni$_.jNullReference;
     _unscheduleDrawable$1(

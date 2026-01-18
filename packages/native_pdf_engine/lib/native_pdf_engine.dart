@@ -8,13 +8,12 @@ import 'dart:ffi' as ffi;
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'package:jni/jni.dart' as jni;
 import 'package:objective_c/objective_c.dart' as objc;
 
-import 'src/android/com/example/native_pdf_engine/NativePdfEnginePlugin.dart'
-    as android_plugin;
-import 'src/android/com/example/native_pdf_engine/PdfGenerator.dart'
-    as android_pdf;
+import 'src/android/java/lang/Runnable.dart' as javalang;
+import 'src/android_bindings.dart' as android;
 import 'src/native_pdf_engine_ios_bindings.dart' as ios;
 import 'src/native_pdf_engine_macos_bindings.dart' as macos;
 
@@ -320,8 +319,14 @@ void _handleMacOSNavigationFinished(
 }
 
 // Android Implementation
-void _convertAndroid(String content, String outputPath, {required bool isUrl}) {
-  final activity = android_plugin.NativePdfEnginePlugin.Companion.getActivity();
+void _convertAndroid(
+  String content,
+  String outputPath, {
+  required bool isUrl,
+}) async {
+  final activity = jni.Jni.androidActivity(
+    PlatformDispatcher.instance.engineId!,
+  );
   if (activity == null) {
     NativePdf._completeWithError(
       Exception('Android Activity is null. Engine not attached?'),
@@ -329,26 +334,124 @@ void _convertAndroid(String content, String outputPath, {required bool isUrl}) {
     return;
   }
 
-  final generator = android_pdf.PdfGenerator(activity);
+  // Cast to strongly typed Activity
+  final androidActivity = android.Activity.fromReference(activity.reference);
 
-  // Keep strong reference
-  NativePdf._activeWebView = generator;
+  // Use a Completer to bridge the async gap from the UI thread callback
+  final completer = Completer<void>();
 
-  final callback = android_pdf.PdfGenerator$Callback.implement(
-    android_pdf.$PdfGenerator$Callback(
-      onSuccess: () {
-        NativePdf._completeWithSuccess();
-      },
-      onFailure: (jni.JString message) {
-        NativePdf._completeWithError(Exception(message.toDartString()));
+  // Implement Runnable
+  final runnable = javalang.Runnable.implement(
+    javalang.$Runnable(
+      run: () async {
+        try {
+          // 1. Create WebView
+          // WebView constructor expects a Context. Activity is a Context, but JNI bindings don't automatically inherit.
+          // We explicitly create a Context reference from the Activity reference.
+          final androidContext = android.Context.fromReference(
+            androidActivity.reference,
+          );
+          final webView = android.WebView(androidContext);
+
+          NativePdf._activeWebView = webView; // Keep reference
+
+          // 2. Configure Settings
+          final settings = webView.getSettings();
+          settings?.setJavaScriptEnabled(true);
+          settings?.setDomStorageEnabled(true);
+
+          // 3. Set layout manually to fixed size (e.g. A4 or 1024x768)
+          final width = 1024;
+          final height = 768;
+
+          // Cast WebView to View to access layout() and draw()
+          final webViewAsView = android.View.fromReference(webView.reference);
+
+          // Force layout
+          webViewAsView.layout(0, 0, width, height);
+
+          // 4. Load Content
+          if (isUrl) {
+            webView.loadUrl(content.toJString());
+          } else {
+            webView.loadDataWithBaseURL(
+              jni.JString.fromString(""),
+              content.toJString(),
+              "text/html".toJString(),
+              "utf-8".toJString(),
+              jni.JString.fromString(""),
+            );
+          }
+
+          // 5. Poll for completion
+          // onPageFinished is robust, but requires subclassing WebViewClient which is hard in JNI.
+          // We use getProgress loop as a workaround.
+          int attempts = 0;
+          while ((webView.getProgress() < 100) && attempts < 100) {
+            // 10s timeout
+            await Future.delayed(Duration(milliseconds: 100));
+            attempts++;
+          }
+
+          if (attempts >= 100) {
+            debugPrint(
+              "Timeout waiting for page load, proceeding with partial render...",
+            );
+          }
+
+          // Allow a bit more time for rendering after 100%
+          await Future.delayed(Duration(milliseconds: 500));
+
+          // 6. Generate PDF
+          final pdfDoc = android.PdfDocument();
+
+          // Page Info
+          final pageBuilder = android.PdfDocument$PageInfo$Builder(
+            width,
+            height,
+            1,
+          );
+          final pageInfo = pageBuilder.create();
+
+          // Start Page
+          final page = pdfDoc.startPage(pageInfo);
+          final canvas = page?.getCanvas();
+
+          if (canvas != null) {
+            // Draw WebView to Canvas
+            webViewAsView.draw(canvas);
+          }
+
+          pdfDoc.finishPage(page);
+
+          // 7. Write to file
+          // File.new$1(String) corresponds to File(String pathname)
+          final file = android.File.new$1(outputPath.toJString());
+          // FileOutputStream(File) corresponds to FileOutputStream(File file)
+          final fos = android.FileOutputStream(file);
+
+          pdfDoc.writeTo(fos);
+
+          // 8. Close and Success
+          pdfDoc.close();
+          fos.close();
+
+          completer.complete();
+        } catch (e) {
+          completer.completeError(e);
+        }
       },
     ),
   );
 
-  generator.convert(
-    content.toJString(),
-    isUrl,
-    outputPath.toJString(),
-    callback,
-  );
+  // Execute on UI Thread
+  androidActivity.runOnUiThread(runnable);
+
+  // Wait for completion
+  try {
+    await completer.future;
+    NativePdf._completeWithSuccess();
+  } catch (e) {
+    NativePdf._completeWithError(Exception('PDF generation failed: $e'));
+  }
 }

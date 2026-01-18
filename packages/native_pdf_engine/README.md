@@ -1,95 +1,88 @@
 # native_pdf_engine
 
-A new Flutter FFI plugin project.
+A minimal, high-performance Flutter package for generating PDFs from HTML or URLs using native OS webview capabilities.
 
-## Getting Started
+This package uses `dart:ffi` and `package:jni` to invoke native APIs directly, ensuring:
+- **Zero bloat**: No bundled browser engines (uses pre-installed OS webviews).
+- **High performance**: Direct native calls, low overhead.
+- **Native fidelity**: PDFs look exactly as they would when printing from Safari (iOS/macOS) or Chrome (Android).
 
-This project is a starting point for a Flutter
-[FFI plugin](https://flutter.dev/to/ffi-package),
-a specialized package that includes native code directly invoked with Dart FFI.
+## Platforms Supported
 
-## Project structure
+| Platform | Tech Stack | Status |
+|---|---|---|
+| **iOS** | `WKWebView` + `UIPrintPageRenderer` (via FFI/ObjC) | ✅ |
+| **macOS** | `WKWebView` + `Cocoa` (via FFI/ObjC) | ✅ |
+| **Android** | `android.webkit.WebView` + `PdfDocument` (via JNI/jnigen) | ✅ |
+| **Windows** | *Planned* | 🚧 |
+| **Linux** | *Planned* | 🚧 |
 
-This template uses the following structure:
+## Features
 
-* `src`: Contains the native source code, and a CmakeFile.txt file for building
-  that source code into a dynamic library.
+- **Convert HTML String to PDF**: Render raw HTML content directly to a PDF file.
+- **Convert URL to PDF**: Capture a full webpage and save it as a PDF.
+- **Background Execution**: Most operations run efficiently without blocking the main UI thread (Android uses `runOnUiThread` for safety).
 
-* `lib`: Contains the Dart code that defines the API of the plugin, and which
-  calls into the native code using `dart:ffi`.
+## Installation
 
-* platform folders (`android`, `ios`, `windows`, etc.): Contains the build files
-  for building and bundling the native code library with the platform application.
-
-## Building and bundling native code
-
-The `pubspec.yaml` specifies FFI plugins as follows:
-
-```yaml
-  plugin:
-    platforms:
-      some_platform:
-        ffiPlugin: true
-```
-
-This configuration invokes the native build for the various target platforms
-and bundles the binaries in Flutter applications using these FFI plugins.
-
-This can be combined with dartPluginClass, such as when FFI is used for the
-implementation of one platform in a federated plugin:
+Add `native_pdf_engine` to your `pubspec.yaml`:
 
 ```yaml
-  plugin:
-    implements: some_other_plugin
-    platforms:
-      some_platform:
-        dartPluginClass: SomeClass
-        ffiPlugin: true
+dependencies:
+  native_pdf_engine: ^0.0.1
 ```
 
-A plugin can have both FFI and method channels:
+## Setup
 
-```yaml
-  plugin:
-    platforms:
-      some_platform:
-        pluginClass: SomeName
-        ffiPlugin: true
+### Android
+
+1. **Internet Permission**: If you are converting URLs, ensure your `android/app/src/main/AndroidManifest.xml` includes:
+   ```xml
+   <uses-permission android:name="android.permission.INTERNET" />
+   ```
+2. **Cleartext Traffic**: If you need to support HTTP URLs (not recommended), allow cleartext traffic in your manifest or network security config.
+
+### iOS / macOS
+
+No special setup is usually required. App Sandbox/Hardened Runtime on macOS may require allowing outgoing network connections (`com.apple.security.network.client`) if fetching URLs.
+
+## Usage
+
+```dart
+import 'package:native_pdf_engine/native_pdf_engine.dart';
+
+void main() async {
+  // 1. Convert HTML String
+  try {
+     await NativePdf.convert(
+       '<h1>Hello World</h1><p>This is a native PDF!</p>',
+       'output/path/document.pdf',
+     );
+     print('PDF Generated!');
+  } catch (e) {
+     print('Error: $e');
+  }
+
+  // 2. Convert URL
+  try {
+     await NativePdf.convertUrl(
+       'https://flutter.dev',
+       'output/path/flutter_website.pdf',
+     );
+     print('URL Captured!');
+  } catch (e) {
+     print('Error: $e');
+  }
+}
 ```
 
-The native build systems that are invoked by FFI (and method channel) plugins are:
+## How It Works
 
-* For Android: Gradle, which invokes the Android NDK for native builds.
-  * See the documentation in android/build.gradle.
-* For iOS and MacOS: Xcode, via CocoaPods.
-  * See the documentation in ios/native_pdf_engine.podspec.
-  * See the documentation in macos/native_pdf_engine.podspec.
-* For Linux and Windows: CMake.
-  * See the documentation in linux/CMakeLists.txt.
-  * See the documentation in windows/CMakeLists.txt.
+This package avoids the complexity of `flutter_inappwebview` or `printing` when you just need a simple, headless PDF generation:
 
-## Binding to native code
+- **Android**: It spins up a headless `WebView`, loads the content, waits for completion (via polling), and draws the view hierarchy onto a `android.graphics.pdf.PdfDocument` Canvas.
+- **iOS/macOS**: It creates a headless `WKWebView`, loads the content, and uses the native `createPDF` configuration API available in WebKit.
 
-To use the native code, bindings in Dart are needed.
-To avoid writing these by hand, they are generated from the header file
-(`src/native_pdf_engine.h`) by `package:ffigen`.
-Regenerate the bindings by running `dart run ffigen --config ffigen.yaml`.
+## License
 
-## Invoking native code
-
-Very short-running native functions can be directly invoked from any isolate.
-For example, see `sum` in `lib/native_pdf_engine.dart`.
-
-Longer-running functions should be invoked on a helper isolate to avoid
-dropping frames in Flutter applications.
-For example, see `sumAsync` in `lib/native_pdf_engine.dart`.
-
-## Flutter help
-
-For help getting started with Flutter, view our
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-
-The plugin project was generated without specifying the `--platforms` flag, so no platforms are currently supported.
-To add platforms, run `flutter create -t plugin_ffi --platforms <platforms> .` in this directory.
-You can also find a detailed instruction on how to add platforms in the `pubspec.yaml` at https://flutter.dev/to/pubspec-plugin-platforms.
+MIT
