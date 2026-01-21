@@ -1,12 +1,12 @@
 ## 2.0.1
 
 * **Fixes**:
-    * feat: add .gitignore and remove ignored files
-    * fix: fixed issue of pdf generation when text for table cell is very long
-    * fix: fixed pipeline
-    * fix: removed whitespace in paragraph starting
-    * fix: fixed column header background color
-    * feat: Update legacy HTML to widgets and browser PDF builder, generating new test and example PDF outputs.
+    * ([#63](https://github.com/alihassan143/htmltopdfwidgets/pull/63)) feat: add .gitignore and remove ignored files by @alihassan143
+    * ([#63](https://github.com/alihassan143/htmltopdfwidgets/pull/63)) fix: fixed issue of pdf generation when text for table cell is very long by @AbhishekDoshi26
+    * ([#63](https://github.com/alihassan143/htmltopdfwidgets/pull/63)) fix: fixed pipeline by @AbhishekDoshi26
+    * ([#63](https://github.com/alihassan143/htmltopdfwidgets/pull/63)) fix: removed whitespace in paragraph starting by @AbhishekDoshi26
+    * ([#63](https://github.com/alihassan143/htmltopdfwidgets/pull/63)) fix: fixed column header background color by @AbhishekDoshi26
+    * ([#61](https://github.com/alihassan143/htmltopdfwidgets/pull/61)) feat: Update legacy HTML to widgets and browser PDF builder, generating new test and example PDF outputs by @AbhishekDoshi26.
 
 ## 2.0.0
 * **New Architecture**: Introduced a "Browser Rendering Engine" architecture for more robust HTML to PDF conversion.
