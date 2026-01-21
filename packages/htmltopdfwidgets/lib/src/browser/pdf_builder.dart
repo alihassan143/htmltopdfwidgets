@@ -285,6 +285,7 @@ class PdfBuilder {
                 inside: pw.BorderSide(color: borderColor, width: borderWidth),
                 outside: pw.BorderSide(color: borderColor, width: borderWidth),
               ),
+        defaultVerticalAlignment: pw.TableCellVerticalAlignment.full,
         defaultColumnWidth: const pw.FlexColumnWidth(),
         children: rows,
       ),

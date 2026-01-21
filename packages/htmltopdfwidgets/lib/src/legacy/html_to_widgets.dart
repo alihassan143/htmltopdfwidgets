@@ -461,6 +461,7 @@ class WidgetsHTMLDecoder {
 
     Widget table = Table(
       border: tableBorder,
+      defaultVerticalAlignment: TableCellVerticalAlignment.full,
       defaultColumnWidth: const FlexColumnWidth(),
       children: allRows,
     );
