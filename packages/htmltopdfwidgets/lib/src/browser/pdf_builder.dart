@@ -285,8 +285,7 @@ class PdfBuilder {
                 inside: pw.BorderSide(color: borderColor, width: borderWidth),
                 outside: pw.BorderSide(color: borderColor, width: borderWidth),
               ),
-        defaultColumnWidth: const pw.IntrinsicColumnWidth(),
-        columnWidths: node.style.width != null ? null : null,
+        defaultColumnWidth: const pw.FlexColumnWidth(),
         children: rows,
       ),
     );
