@@ -462,9 +462,36 @@ class WidgetsHTMLDecoder {
       );
     }
 
+    // Smart layout detection for legacy engine
+    final maxColChars = <int, int>{};
+
+    // Scan the element children to determine column weights
+    for (final section in element.children) {
+      final rows = (['thead', 'tbody', 'tfoot'].contains(section.localName))
+          ? section.children
+          : [section];
+      for (final tr in rows) {
+        if (tr.localName == 'tr') {
+          for (int i = 0; i < tr.children.length; i++) {
+            final cell = tr.children[i];
+            final len = cell.text.length;
+            maxColChars[i] =
+                (maxColChars[i] ?? 0) < len ? len : maxColChars[i]!;
+          }
+        }
+      }
+    }
+
+    Map<int, TableColumnWidth> columnWidths = {};
+    for (var entry in maxColChars.entries) {
+      final weight = entry.value > 1500 ? 3.0 : 1.0;
+      columnWidths[entry.key] = FlexColumnWidth(weight);
+    }
+
     Widget table = Table(
       border: tableBorder,
       defaultVerticalAlignment: TableCellVerticalAlignment.full,
+      columnWidths: columnWidths.isEmpty ? null : columnWidths,
       defaultColumnWidth: const FlexColumnWidth(),
       children: allRows,
     );
