@@ -178,7 +178,11 @@ class WidgetsHTMLDecoder {
               borderStyle: customStyles.dividerBorderStyle));
         }
       } else if (domNode is dom.Text) {
-        if (delta.isNotEmpty && domNode.text.trim().isNotEmpty) {
+        String text = domNode.text;
+        // Normalize whitespace
+        text = text.replaceAll(RegExp(r'\s+'), ' ');
+
+        if (delta.isNotEmpty && text.trim().isNotEmpty) {
           final newlist = List<TextSpan>.from(delta);
           result.add((SizedBox(
               width: double.infinity,
@@ -186,14 +190,13 @@ class WidgetsHTMLDecoder {
                   textAlign: textAlign,
                   text: TextSpan(
                       children: newlist
-                        ..add(TextSpan(
-                            text: domNode.text, style: baseTextStyle)))))));
+                        ..add(TextSpan(text: text, style: baseTextStyle)))))));
 
           textAlign = null;
 
           delta.clear();
-        } else {
-          result.add(Text(domNode.text, style: baseTextStyle));
+        } else if (text.trim().isNotEmpty) {
+          result.add(Text(text.trim(), style: baseTextStyle));
         }
 
         /// Process text nodes and add them to delta
@@ -907,10 +910,20 @@ class WidgetsHTMLDecoder {
         textAlign = attributes.$1;
 
         /// Process text nodes and add them to delta variable
-        delta.add(TextSpan(
-            text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
-            style: baseTextStyle
-                .merge(attributes.$2.merge(customStyles.paragraphStyle))));
+        String text = child.text?.replaceAll(RegExp(r'\n+$'), ' ') ?? "";
+        text = text.replaceAll(RegExp(r'\s+'), ' ');
+
+        // Trim leading space if it's the first element in the paragraph
+        if (delta.isEmpty) {
+          text = text.trimLeft();
+        }
+
+        if (text.isNotEmpty) {
+          delta.add(TextSpan(
+              text: text,
+              style: baseTextStyle
+                  .merge(attributes.$2.merge(customStyles.paragraphStyle))));
+        }
       }
     }
 

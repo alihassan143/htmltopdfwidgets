@@ -818,13 +818,20 @@ class PdfBuilder {
       // Replace multiple whitespace with single space
       text = text.replaceAll(RegExp(r'\s+'), ' ');
 
-      spans.add(pw.TextSpan(
-        text: " $text",
-        style: _mapTextStyle(node.style),
-        annotation: node.tagName == 'a' && node.attributes.containsKey('href')
-            ? pw.AnnotationUrl(node.attributes['href']!)
-            : null,
-      ));
+      // If this is the first span, trim leading whitespace
+      if (spans.isEmpty) {
+        text = text.trimLeft();
+      }
+
+      if (text.isNotEmpty) {
+        spans.add(pw.TextSpan(
+          text: text,
+          style: _mapTextStyle(node.style),
+          annotation: node.tagName == 'a' && node.attributes.containsKey('href')
+              ? pw.AnnotationUrl(node.attributes['href']!)
+              : null,
+        ));
+      }
       return;
     }
 
@@ -851,13 +858,21 @@ class PdfBuilder {
         String text = child.text!;
         text = text.replaceAll(RegExp(r'\s+'), ' ');
 
-        spans.add(pw.TextSpan(
-          text: " $text",
-          style: _mapTextStyle(node.style), // Use parent's computed style
-          annotation: node.tagName == 'a' && node.attributes.containsKey('href')
-              ? pw.AnnotationUrl(node.attributes['href']!)
-              : null,
-        ));
+        // If this is the first span, trim leading whitespace
+        if (spans.isEmpty) {
+          text = text.trimLeft();
+        }
+
+        if (text.isNotEmpty) {
+          spans.add(pw.TextSpan(
+            text: text,
+            style: _mapTextStyle(node.style), // Use parent's computed style
+            annotation:
+                node.tagName == 'a' && node.attributes.containsKey('href')
+                    ? pw.AnnotationUrl(node.attributes['href']!)
+                    : null,
+          ));
+        }
       } else {
         // Recurse for nested elements
         _collectInlineSpans(child, spans);
