@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:native_pdf_engine/native_pdf_engine.dart';
@@ -20,7 +21,7 @@ void main() {
       if (Platform.isMacOS) {
         rethrow;
       } else {
-        print('Skipping non-macOS test: $e');
+        log('Skipping non-macOS test: $e');
       }
     }
   });

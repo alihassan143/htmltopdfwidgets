@@ -88,7 +88,9 @@ class PdfPageLabel {
     final index = (n - 1) % 26;
     final char = String.fromCharCode(65 + index);
     final count = ((n - 1) / 26).floor() + 1;
-    for (var i = 0; i < count; i++) sb.write(char);
+    for (var i = 0; i < count; i++) {
+      sb.write(char);
+    }
     return sb.toString();
   }
 }

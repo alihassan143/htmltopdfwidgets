@@ -7,13 +7,6 @@ import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
 import '../../core/font_manager.dart';
-import 'handlers/relationship_manager.dart';
-import 'models/docx_relationship.dart';
-import 'parsers/block_parser.dart';
-import 'parsers/numbering_parser.dart';
-import 'parsers/section_parser.dart';
-import 'parsers/style_parser.dart';
-import 'reader_context/reader_context.dart';
 
 /// Reads and parses existing .docx files.
 ///

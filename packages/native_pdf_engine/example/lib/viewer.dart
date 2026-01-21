@@ -1,3 +1,5 @@
+// ignore_for_file: unused_field
+
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -167,8 +169,9 @@ class _MainPageState extends State<MainPage>
                   onPressed: documentRef == null
                       ? null
                       : () {
-                          if (controller.isReady)
+                          if (controller.isReady) {
                             controller.goToPage(pageNumber: 1);
+                          }
                         },
                 ),
                 IconButton(
