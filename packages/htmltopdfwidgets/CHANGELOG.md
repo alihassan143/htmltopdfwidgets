@@ -1,5 +1,14 @@
-## 2.0.0
+## 2.0.1
 
+* **Fixes**:
+    * feat: add .gitignore and remove ignored files
+    * fix: fixed issue of pdf generation when text for table cell is very long
+    * fix: fixed pipeline
+    * fix: removed whitespace in paragraph starting
+    * fix: fixed column header background color
+    * feat: Update legacy HTML to widgets and browser PDF builder, generating new test and example PDF outputs.
+
+## 2.0.0
 * **New Architecture**: Introduced a "Browser Rendering Engine" architecture for more robust HTML to PDF conversion.
     * **Style Engine**: Comprehensive CSS parsing and cascading support.
     * **Render Tree**: Intermediate DOM representation with fully computed styles.
