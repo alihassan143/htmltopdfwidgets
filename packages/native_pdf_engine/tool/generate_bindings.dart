@@ -1,6 +1,7 @@
 // Copyright (c) 2025, the Dart project authors.
 // Generates minimal Objective-C bindings for iOS and macOS PDF generation.
 
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:ffigen/ffigen.dart';
@@ -21,10 +22,10 @@ void main() {
     '--show-sdk-path',
   ]).stdout.toString().trim();
 
-  print('iOS SDK: $iosSdkPath');
-  print('macOS SDK: $macosSdkPath');
+  log('iOS SDK: $iosSdkPath');
+  log('macOS SDK: $macosSdkPath');
 
-  print('Generating iOS bindings...');
+  log('Generating iOS bindings...');
 
   // iOS Configuration - use SDK WebKit header for full protocol support
   final iosConfig = FfiGenerator(
@@ -68,9 +69,9 @@ void main() {
     ),
   );
   iosConfig.generate(logger: Logger.root);
-  print('Generated iOS bindings.');
+  log('Generated iOS bindings.');
 
-  print('Generating macOS bindings...');
+  log('Generating macOS bindings...');
 
   // macOS Configuration - use SDK WebKit header for full protocol support
   final macosConfig = FfiGenerator(
@@ -105,18 +106,16 @@ void main() {
     ),
   );
   macosConfig.generate(logger: Logger.root);
-  print('Generated macOS bindings.');
+  log('Generated macOS bindings.');
 
   // Print file sizes
   final iosFile = File('lib/src/native_pdf_engine_ios_bindings.dart');
   final macosFile = File('lib/src/native_pdf_engine_macos_bindings.dart');
   if (iosFile.existsSync()) {
-    print(
-      'iOS bindings: ${(iosFile.lengthSync() / 1024).toStringAsFixed(1)} KB',
-    );
+    log('iOS bindings: ${(iosFile.lengthSync() / 1024).toStringAsFixed(1)} KB');
   }
   if (macosFile.existsSync()) {
-    print(
+    log(
       'macOS bindings: ${(macosFile.lengthSync() / 1024).toStringAsFixed(1)} KB',
     );
   }

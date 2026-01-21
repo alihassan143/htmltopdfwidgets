@@ -46,6 +46,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   pdfrx: ^2.2.24
 
+  synchronized: any
+  http: any
+  url_launcher: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

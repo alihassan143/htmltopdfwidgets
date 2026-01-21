@@ -178,7 +178,11 @@ class WidgetsHTMLDecoder {
               borderStyle: customStyles.dividerBorderStyle));
         }
       } else if (domNode is dom.Text) {
-        if (delta.isNotEmpty && domNode.text.trim().isNotEmpty) {
+        String text = domNode.text;
+        // Normalize whitespace
+        text = text.replaceAll(RegExp(r'\s+'), ' ');
+
+        if (delta.isNotEmpty && text.trim().isNotEmpty) {
           final newlist = List<TextSpan>.from(delta);
           result.add((SizedBox(
               width: double.infinity,
@@ -186,14 +190,13 @@ class WidgetsHTMLDecoder {
                   textAlign: textAlign,
                   text: TextSpan(
                       children: newlist
-                        ..add(TextSpan(
-                            text: domNode.text, style: baseTextStyle)))))));
+                        ..add(TextSpan(text: text, style: baseTextStyle)))))));
 
           textAlign = null;
 
           delta.clear();
-        } else {
-          result.add(Text(domNode.text, style: baseTextStyle));
+        } else if (text.trim().isNotEmpty) {
+          result.add(Text(text.trim(), style: baseTextStyle));
         }
 
         /// Process text nodes and add them to delta
@@ -459,8 +462,36 @@ class WidgetsHTMLDecoder {
       );
     }
 
+    // Smart layout detection for legacy engine
+    final maxColChars = <int, int>{};
+
+    // Scan the element children to determine column weights
+    for (final section in element.children) {
+      final rows = (['thead', 'tbody', 'tfoot'].contains(section.localName))
+          ? section.children
+          : [section];
+      for (final tr in rows) {
+        if (tr.localName == 'tr') {
+          for (int i = 0; i < tr.children.length; i++) {
+            final cell = tr.children[i];
+            final len = cell.text.length;
+            maxColChars[i] =
+                (maxColChars[i] ?? 0) < len ? len : maxColChars[i]!;
+          }
+        }
+      }
+    }
+
+    Map<int, TableColumnWidth> columnWidths = {};
+    for (var entry in maxColChars.entries) {
+      final weight = entry.value > 1500 ? 3.0 : 1.0;
+      columnWidths[entry.key] = FlexColumnWidth(weight);
+    }
+
     Widget table = Table(
       border: tableBorder,
+      defaultVerticalAlignment: TableCellVerticalAlignment.full,
+      columnWidths: columnWidths.isEmpty ? null : columnWidths,
       defaultColumnWidth: const FlexColumnWidth(),
       children: allRows,
     );
@@ -906,10 +937,20 @@ class WidgetsHTMLDecoder {
         textAlign = attributes.$1;
 
         /// Process text nodes and add them to delta variable
-        delta.add(TextSpan(
-            text: child.text?.replaceAll(RegExp(r'\n+$'), '') ?? "",
-            style: baseTextStyle
-                .merge(attributes.$2.merge(customStyles.paragraphStyle))));
+        String text = child.text?.replaceAll(RegExp(r'\n+$'), ' ') ?? "";
+        text = text.replaceAll(RegExp(r'\s+'), ' ');
+
+        // Trim leading space if it's the first element in the paragraph
+        if (delta.isEmpty) {
+          text = text.trimLeft();
+        }
+
+        if (text.isNotEmpty) {
+          delta.add(TextSpan(
+              text: text,
+              style: baseTextStyle
+                  .merge(attributes.$2.merge(customStyles.paragraphStyle))));
+        }
       }
     }
 

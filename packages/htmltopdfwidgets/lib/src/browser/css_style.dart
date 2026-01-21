@@ -9,6 +9,9 @@ enum ObjectFit { contain, cover, fill, fitWidth, fitHeight, none, scaleDown }
 /// Vertical alignment for table cells
 enum VerticalAlign { top, middle, bottom, baseline }
 
+/// Table layout algorithm
+enum TableLayout { auto, fixed }
+
 class CSSStyle {
   final PdfColor? color;
   final PdfColor? backgroundColor;
@@ -34,6 +37,7 @@ class CSSStyle {
   final double? borderRadius;
   final bool? borderCollapse;
   final TextDirection? textDirection;
+  final TableLayout? tableLayout;
 
   const CSSStyle({
     this.color,
@@ -60,6 +64,7 @@ class CSSStyle {
     this.borderRadius,
     this.borderCollapse,
     this.textDirection,
+    this.tableLayout,
   });
 
   /// Merges this style with another style. The other style takes precedence.
@@ -89,6 +94,7 @@ class CSSStyle {
       borderRadius: other.borderRadius ?? borderRadius,
       borderCollapse: other.borderCollapse ?? borderCollapse,
       textDirection: other.textDirection ?? textDirection,
+      tableLayout: other.tableLayout ?? tableLayout,
     );
   }
 
@@ -119,6 +125,7 @@ class CSSStyle {
       verticalAlign: verticalAlign,
       borderRadius: borderRadius,
       borderCollapse: borderCollapse,
+      tableLayout: tableLayout,
     );
   }
 
@@ -146,6 +153,7 @@ class CSSStyle {
     double? borderRadius;
     bool? borderCollapse;
     TextDirection? textDirection;
+    TableLayout? tableLayout;
 
     final declarations = cssString.split(';');
     for (var declaration in declarations) {
@@ -218,6 +226,10 @@ class CSSStyle {
           if (value == 'rtl') textDirection = TextDirection.rtl;
           if (value == 'ltr') textDirection = TextDirection.ltr;
           break;
+        case 'table-layout':
+          if (value == 'fixed') tableLayout = TableLayout.fixed;
+          if (value == 'auto') tableLayout = TableLayout.auto;
+          break;
       }
     }
 
@@ -242,6 +254,7 @@ class CSSStyle {
       borderRadius: borderRadius,
       borderCollapse: borderCollapse,
       textDirection: textDirection,
+      tableLayout: tableLayout,
     );
   }
 

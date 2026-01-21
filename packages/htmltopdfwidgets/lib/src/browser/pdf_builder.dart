@@ -105,7 +105,7 @@ class PdfBuilder {
         // Handle br tags specially in inline context
         if (child.tagName == 'br') {
           if (inlineGroup.isNotEmpty) {
-            widgets.add(_buildRichText(inlineGroup, node.style));
+            widgets.addAll(_buildRichText(inlineGroup, node.style));
             inlineGroup = [];
           }
           widgets.add(pw.SizedBox(height: 8));
@@ -114,7 +114,7 @@ class PdfBuilder {
         }
       } else {
         if (inlineGroup.isNotEmpty) {
-          widgets.add(_buildRichText(inlineGroup, node.style));
+          widgets.addAll(_buildRichText(inlineGroup, node.style));
           inlineGroup = [];
         }
 
@@ -145,7 +145,7 @@ class PdfBuilder {
     }
 
     if (inlineGroup.isNotEmpty) {
-      widgets.add(_buildRichText(inlineGroup, node.style));
+      widgets.addAll(_buildRichText(inlineGroup, node.style));
     }
 
     return widgets;
@@ -203,40 +203,33 @@ class PdfBuilder {
 
     if (spans.isEmpty) return [];
 
-    // If we have a small number of spans, return as single RichText
-    // Estimate: each TextSpan typically takes ~20-40 points in height
-    // A page is ~700 points, so ~15-25 spans per page is safe.
-    // We'll use a conservative chunk size of 8 spans to ensure no overflow.
-    const int maxSpansPerChunk = 8;
-
-    if (spans.length <= maxSpansPerChunk) {
-      return [
-        pw.RichText(
-          overflow: pw.TextOverflow.span,
-          text: pw.TextSpan(children: spans),
-          textAlign: node.style.textAlign ?? pw.TextAlign.left,
-        ),
-      ];
+    // Check if total text length is large. If so, split into chunks.
+    // This allows paragraphs with backgrounds/borders to span pages.
+    int totalLen = 0;
+    for (var s in spans) {
+      if (s is pw.TextSpan) totalLen += (s.text ?? '').length;
     }
 
-    // Split spans into smaller chunks to enable page spanning
-    final widgets = <pw.Widget>[];
-    for (int i = 0; i < spans.length; i += maxSpansPerChunk) {
-      final chunkEnd = (i + maxSpansPerChunk < spans.length)
-          ? i + maxSpansPerChunk
-          : spans.length;
-      final chunk = spans.sublist(i, chunkEnd);
-
-      widgets.add(
-        pw.RichText(
-          overflow: pw.TextOverflow.span,
-          text: pw.TextSpan(children: chunk),
-          textAlign: node.style.textAlign ?? pw.TextAlign.left,
-        ),
-      );
+    if (totalLen > 2000 || spans.length > 20) {
+      final chunks = _splitSpans(spans, 1500);
+      return chunks
+          .map((chunk) => pw.RichText(
+                overflow: pw.TextOverflow.span,
+                text: pw.TextSpan(children: chunk),
+                textAlign: node.style.textAlign ?? pw.TextAlign.left,
+                textDirection: node.style.textDirection,
+              ))
+          .toList();
     }
 
-    return widgets;
+    return [
+      pw.RichText(
+        overflow: pw.TextOverflow.span,
+        text: pw.TextSpan(children: spans),
+        textAlign: node.style.textAlign ?? pw.TextAlign.left,
+        textDirection: node.style.textDirection,
+      )
+    ];
   }
 
   Future<pw.Widget> _buildImage(RenderNode node) async {
@@ -253,7 +246,7 @@ class PdfBuilder {
           child.tagName == 'thead' ||
           child.tagName == 'tfoot') {
         if (child.tagName == 'tr') {
-          rows.add(await _buildTableRow(child,
+          rows.addAll(await _buildTableRows(child,
               isHeaderRow:
                   isFirstRow && child.children.any((c) => c.tagName == 'th')));
           isFirstRow = false;
@@ -262,7 +255,8 @@ class PdfBuilder {
           final isHead = child.tagName == 'thead';
           for (var grandChild in child.children) {
             if (grandChild.tagName == 'tr') {
-              rows.add(await _buildTableRow(grandChild, isHeaderRow: isHead));
+              rows.addAll(
+                  await _buildTableRows(grandChild, isHeaderRow: isHead));
             }
           }
           if (isHead) isFirstRow = false;
@@ -276,6 +270,52 @@ class PdfBuilder {
     final borderWidth = node.style.border?.top.width ?? 0.5;
 
     // Container prevents spanning. Use Padding/SizedBox for margin.
+    // Detect if table is potentially larger than a page to avoid TooManyPageException
+    // when using FlexColumnWidth (which makes columns narrower and taller)
+    final maxColChars = <int, int>{};
+    for (var child in node.children) {
+      final rows = (child.tagName == 'tr' ? [child] : child.children);
+      for (var row in rows) {
+        if (row.tagName == 'tr') {
+          for (int i = 0; i < row.children.length; i++) {
+            final cell = row.children[i];
+            int getLength(RenderNode n) {
+              int l = n.text?.length ?? 0;
+              for (var c in n.children) {
+                l += getLength(c);
+              }
+              return l;
+            }
+
+            final len = getLength(cell);
+            maxColChars[i] =
+                (maxColChars[i] ?? 0) < len ? len : maxColChars[i]!;
+          }
+        }
+      }
+    }
+
+    bool isExtreme = false;
+    for (var val in maxColChars.values) {
+      if (val > 4000) isExtreme = true;
+    }
+
+    // Default to fixed (equal widths) as requested.
+    // If a table has very large cells, we use a weighted flex layout.
+    // IF the table is EXTREME (> 4000 chars), we MUST use Intrinsic to stand a chance
+    // of fitting the row on a single page (since rows cannot span pages).
+    Map<int, pw.TableColumnWidth> columnWidths = {};
+    if (node.style.tableLayout == TableLayout.auto || isExtreme) {
+      // Explicitly requested or extreme content
+      columnWidths = {};
+    } else {
+      for (var entry in maxColChars.entries) {
+        // Give 3x weight to column with massive content (> 1500 chars)
+        final weight = entry.value > 1500 ? 3.0 : 1.0;
+        columnWidths[entry.key] = pw.FlexColumnWidth(weight);
+      }
+    }
+
     return pw.Padding(
       padding: node.style.margin ?? const pw.EdgeInsets.symmetric(vertical: 8),
       child: pw.Table(
@@ -285,20 +325,28 @@ class PdfBuilder {
                 inside: pw.BorderSide(color: borderColor, width: borderWidth),
                 outside: pw.BorderSide(color: borderColor, width: borderWidth),
               ),
+        defaultVerticalAlignment: pw.TableCellVerticalAlignment.full,
+        columnWidths: columnWidths.isEmpty ? null : columnWidths,
         defaultColumnWidth: const pw.FlexColumnWidth(),
         children: rows,
       ),
     );
   }
 
-  Future<pw.TableRow> _buildTableRow(RenderNode node,
+  Future<List<pw.TableRow>> _buildTableRows(RenderNode node,
       {bool isHeaderRow = false}) async {
-    final cells = <pw.Widget>[];
+    final allCellSpans = <List<pw.InlineSpan>>[];
+    final cellStyles = <RenderNode>[];
+    final alignments = <pw.Alignment>[];
+    int maxChunks = 1;
 
+    // First pass: collect all content and determine split points
     for (var child in node.children) {
       if (child.tagName == 'td' || child.tagName == 'th') {
-        final isHeader = child.tagName == 'th' || isHeaderRow;
-        final cellContent = _buildCellContent(child, isHeader);
+        final spans = <pw.InlineSpan>[];
+        _collectInlineSpans(child, spans);
+        allCellSpans.add(spans);
+        cellStyles.add(child);
 
         // Determine cell alignment
         pw.Alignment alignment = pw.Alignment.centerLeft;
@@ -314,35 +362,93 @@ class PdfBuilder {
         } else if (child.style.verticalAlign == VerticalAlign.bottom) {
           alignment = pw.Alignment(alignment.x, 1);
         }
+        alignments.add(alignment);
 
-        cells.add(pw.Container(
-          padding: child.style.padding ?? const pw.EdgeInsets.all(6),
-          color: child.style.backgroundColor ??
-              (isHeader ? PdfColors.grey200 : null),
-          alignment: alignment,
-          child: cellContent,
-        ));
+        // Count total chars to see if we split
+        int totalLen = 0;
+        for (var s in spans) {
+          if (s is pw.TextSpan) totalLen += (s.text ?? '').length;
+        }
+        if (totalLen > 2000) {
+          final chunks = (totalLen / 1500).ceil();
+          if (chunks > maxChunks) maxChunks = chunks;
+        }
       }
     }
 
-    return pw.TableRow(
-      decoration: node.style.backgroundColor != null
-          ? pw.BoxDecoration(color: node.style.backgroundColor)
-          : null,
-      children: cells,
-    );
-  }
-
-  pw.Widget _buildCellContent(RenderNode node, bool isHeader) {
-    // Collect inline content from cell
-    final spans = <pw.InlineSpan>[];
-    _collectInlineSpans(node, spans);
-
-    if (spans.isEmpty) {
-      return pw.Text('');
+    if (maxChunks <= 1) {
+      // Standard non-splitting row
+      final cells = <pw.Widget>[];
+      for (int i = 0; i < allCellSpans.length; i++) {
+        final child = cellStyles[i];
+        final isHeader = child.tagName == 'th' || isHeaderRow;
+        final cellContent = _buildCellRichText(allCellSpans[i], isHeader);
+        cells.add(_wrapCell(child, cellContent, alignments[i], isHeader));
+      }
+      return [
+        pw.TableRow(
+          decoration: node.style.backgroundColor != null
+              ? pw.BoxDecoration(color: node.style.backgroundColor)
+              : null,
+          children: cells,
+        )
+      ];
     }
 
-    // Apply header styling
+    // Splitting mode: Divide long cells into multiple rows
+    final splitCellSpans = <List<List<pw.InlineSpan>>>[];
+    for (var spans in allCellSpans) {
+      splitCellSpans.add(_splitSpans(spans, 1500));
+    }
+
+    final tableRows = <pw.TableRow>[];
+    for (int chunkIdx = 0; chunkIdx < maxChunks; chunkIdx++) {
+      final cells = <pw.Widget>[];
+      for (int cellIdx = 0; cellIdx < splitCellSpans.length; cellIdx++) {
+        final child = cellStyles[cellIdx];
+        final isHeader = child.tagName == 'th' || isHeaderRow;
+        final chunks = splitCellSpans[cellIdx];
+
+        if (chunkIdx < chunks.length) {
+          final cellContent = _buildCellRichText(chunks[chunkIdx], isHeader);
+          // Only show background/decoration on the first chunk row for headers
+          // or if requested specifically.
+          final showDecor = chunkIdx == 0;
+          cells.add(_wrapCell(child, cellContent, alignments[cellIdx],
+              showDecor ? isHeader : false));
+        } else {
+          cells.add(pw.SizedBox());
+        }
+      }
+      tableRows.add(pw.TableRow(children: cells));
+    }
+
+    return tableRows;
+  }
+
+  pw.Widget _wrapCell(RenderNode node, pw.Widget content,
+      pw.Alignment alignment, bool isHeader) {
+    final hasDecoration = node.style.backgroundColor != null || isHeader;
+
+    if (!hasDecoration && alignment == pw.Alignment.centerLeft) {
+      return pw.Padding(
+        padding: node.style.padding ?? const pw.EdgeInsets.all(6),
+        child: content,
+      );
+    } else {
+      return pw.Container(
+        padding: node.style.padding ?? const pw.EdgeInsets.all(6),
+        color:
+            node.style.backgroundColor ?? (isHeader ? PdfColors.grey200 : null),
+        alignment: alignment,
+        child: content,
+      );
+    }
+  }
+
+  pw.Widget _buildCellRichText(List<pw.InlineSpan> spans, bool isHeader) {
+    if (spans.isEmpty) return pw.Text('');
+
     if (isHeader) {
       return pw.RichText(
         overflow: pw.TextOverflow.span,
@@ -358,6 +464,61 @@ class PdfBuilder {
       overflow: pw.TextOverflow.span,
       text: pw.TextSpan(children: spans),
     );
+  }
+
+  List<List<pw.InlineSpan>> _splitSpans(List<pw.InlineSpan> spans, int limit) {
+    final result = <List<pw.InlineSpan>>[];
+    var currentChunk = <pw.InlineSpan>[];
+    int currentLen = 0;
+
+    for (var span in spans) {
+      if (span is pw.TextSpan) {
+        String text = span.text ?? '';
+        if (currentLen + text.length <= limit) {
+          currentChunk.add(span);
+          currentLen += text.length;
+        } else {
+          // Need to split this span or move to next chunk
+          if (currentChunk.isNotEmpty) {
+            result.add(currentChunk);
+            currentChunk = [];
+            currentLen = 0;
+          }
+
+          // Split massive text span into chunks
+          while (text.length > limit) {
+            result.add([
+              pw.TextSpan(
+                text: text.substring(0, limit),
+                style: span.style,
+                annotation: span.annotation,
+              )
+            ]);
+            text = text.substring(limit);
+          }
+          currentChunk.add(pw.TextSpan(
+            text: text,
+            style: span.style,
+            annotation: span.annotation,
+          ));
+          currentLen = text.length;
+        }
+      } else {
+        // WidgetSpan or other, treat as 1 char
+        if (currentLen + 1 > limit && currentChunk.isNotEmpty) {
+          result.add(currentChunk);
+          currentChunk = [];
+          currentLen = 0;
+        }
+        currentChunk.add(span);
+        currentLen += 1;
+      }
+    }
+
+    if (currentChunk.isNotEmpty) {
+      result.add(currentChunk);
+    }
+    return result;
   }
 
   Future<pw.Widget> _buildListItem(
@@ -751,23 +912,41 @@ class PdfBuilder {
     return result;
   }
 
-  pw.Widget _buildRichText(List<RenderNode> nodes, CSSStyle parentStyle) {
+  List<pw.Widget> _buildRichText(List<RenderNode> nodes, CSSStyle parentStyle) {
     final spans = <pw.InlineSpan>[];
 
     for (var node in nodes) {
       _collectInlineSpans(node, spans);
     }
 
-    // Return RichText directly without any wrapper widget.
-    // RichText implements SpanningWidget and can automatically break
-    // content across pages when used in MultiPage layouts.
-    // Wrapping it in Container or Padding prevents this spanning capability.
-    return pw.RichText(
-      overflow: pw.TextOverflow.span,
-      text: pw.TextSpan(children: spans),
-      textAlign: parentStyle.textAlign ?? pw.TextAlign.left,
-      textDirection: parentStyle.textDirection,
-    );
+    if (spans.isEmpty) return [];
+
+    // Check for large content to split into spanning-friendly chunks
+    int totalLen = 0;
+    for (var s in spans) {
+      if (s is pw.TextSpan) totalLen += (s.text ?? '').length;
+    }
+
+    if (totalLen > 2000 || spans.length > 20) {
+      final chunks = _splitSpans(spans, 1500);
+      return chunks
+          .map((chunk) => pw.RichText(
+                overflow: pw.TextOverflow.span,
+                text: pw.TextSpan(children: chunk),
+                textAlign: parentStyle.textAlign ?? pw.TextAlign.left,
+                textDirection: parentStyle.textDirection,
+              ))
+          .toList();
+    }
+
+    return [
+      pw.RichText(
+        overflow: pw.TextOverflow.span,
+        text: pw.TextSpan(children: spans),
+        textAlign: parentStyle.textAlign ?? pw.TextAlign.left,
+        textDirection: parentStyle.textDirection,
+      )
+    ];
   }
 
   void _collectInlineSpans(RenderNode node, List<pw.InlineSpan> spans) {
@@ -817,13 +996,20 @@ class PdfBuilder {
       // Replace multiple whitespace with single space
       text = text.replaceAll(RegExp(r'\s+'), ' ');
 
-      spans.add(pw.TextSpan(
-        text: " $text",
-        style: _mapTextStyle(node.style),
-        annotation: node.tagName == 'a' && node.attributes.containsKey('href')
-            ? pw.AnnotationUrl(node.attributes['href']!)
-            : null,
-      ));
+      // If this is the first span, trim leading whitespace
+      if (spans.isEmpty) {
+        text = text.trimLeft();
+      }
+
+      if (text.isNotEmpty) {
+        spans.add(pw.TextSpan(
+          text: text,
+          style: _mapTextStyle(node.style),
+          annotation: node.tagName == 'a' && node.attributes.containsKey('href')
+              ? pw.AnnotationUrl(node.attributes['href']!)
+              : null,
+        ));
+      }
       return;
     }
 
@@ -850,13 +1036,21 @@ class PdfBuilder {
         String text = child.text!;
         text = text.replaceAll(RegExp(r'\s+'), ' ');
 
-        spans.add(pw.TextSpan(
-          text: " $text",
-          style: _mapTextStyle(node.style), // Use parent's computed style
-          annotation: node.tagName == 'a' && node.attributes.containsKey('href')
-              ? pw.AnnotationUrl(node.attributes['href']!)
-              : null,
-        ));
+        // If this is the first span, trim leading whitespace
+        if (spans.isEmpty) {
+          text = text.trimLeft();
+        }
+
+        if (text.isNotEmpty) {
+          spans.add(pw.TextSpan(
+            text: text,
+            style: _mapTextStyle(node.style), // Use parent's computed style
+            annotation:
+                node.tagName == 'a' && node.attributes.containsKey('href')
+                    ? pw.AnnotationUrl(node.attributes['href']!)
+                    : null,
+          ));
+        }
       } else {
         // Recurse for nested elements
         _collectInlineSpans(child, spans);

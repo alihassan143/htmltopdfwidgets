@@ -998,15 +998,16 @@ class DocxParser {
 
       if (part == 'solid') {
         borderStyle = DocxBorder.single;
-      } else if (part == 'double')
+      } else if (part == 'double') {
         borderStyle = DocxBorder.double;
-      else if (part == 'dotted')
+      } else if (part == 'dotted') {
         borderStyle = DocxBorder.dotted;
-      else if (part == 'dashed')
+      } else if (part == 'dashed') {
         borderStyle = DocxBorder.dashed;
-      else if (part == 'thick')
+      } else if (part == 'thick') {
         borderStyle = DocxBorder
             .thick; // css 'thick' is usually size, but we support 'thick' border style
+      }
     }
 
     return DocxBorderSide(style: borderStyle, size: size, color: color);

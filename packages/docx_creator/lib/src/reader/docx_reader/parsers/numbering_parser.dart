@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:xml/xml.dart';
 
 import '../../../../docx_creator.dart';
-import '../reader_context/reader_context.dart';
 
 /// Parses numbering definitions from numbering.xml.
 class NumberingParser {
@@ -67,7 +66,7 @@ class NumberingParser {
     } catch (e) {}
   }
 
-  /// Parse picture bullet definitions from <w:numPicBullet> elements.
+  /// Parse picture bullet definitions from w:numPicBullet elements.
   void _parsePictureBullets(XmlDocument xml) {
     for (var picBullet in xml.findAllElements('w:numPicBullet')) {
       final id = int.tryParse(picBullet.getAttribute('w:numPicBulletId') ?? '');

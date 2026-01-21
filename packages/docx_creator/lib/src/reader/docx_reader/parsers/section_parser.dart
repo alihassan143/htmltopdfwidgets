@@ -1,9 +1,6 @@
 import 'package:xml/xml.dart';
 
 import '../../../../docx_creator.dart';
-import '../models/docx_relationship.dart';
-import '../reader_context/reader_context.dart';
-import 'block_parser.dart';
 
 /// Parses document section properties (page size, margins, headers, footers).
 class SectionParser {

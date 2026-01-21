@@ -1,6 +1,7 @@
 /// This class defines various constants for supported rendering types
 /// and attributes in a text processing system. It categorizes them into
 /// partial rendering types and global rendering types.
+library;
 
 class BuiltInAttributeKey {
   // Partial rendering types

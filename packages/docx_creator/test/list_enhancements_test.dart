@@ -1,7 +1,5 @@
 import 'package:archive/archive.dart';
 import 'package:docx_creator/docx_creator.dart';
-import 'package:docx_creator/src/reader/docx_reader/parsers/block_parser.dart';
-import 'package:docx_creator/src/reader/docx_reader/reader_context/reader_context.dart';
 import 'package:test/test.dart';
 import 'package:xml/xml.dart';
 

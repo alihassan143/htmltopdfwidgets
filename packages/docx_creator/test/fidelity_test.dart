@@ -1,5 +1,4 @@
 import 'package:docx_creator/docx_creator.dart';
-import 'package:docx_creator/src/reader/docx_reader/models/docx_font.dart';
 import 'package:test/test.dart';
 import 'package:xml/xml.dart';
 
