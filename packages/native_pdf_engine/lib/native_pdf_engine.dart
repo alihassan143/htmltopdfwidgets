@@ -24,7 +24,7 @@ import 'src/native_pdf_engine_macos_bindings.dart' as macos;
 class NativePdf {
   NativePdf._(); // Prevent instantiation
 
-  static Completer<void>? _pendingCompleter;
+  static Completer<dynamic>? _pendingCompleter;
 
   // Keep strong references to prevent garbage collection
   static Object? _activeWebView;
@@ -47,11 +47,11 @@ class NativePdf {
 
     try {
       if (Platform.isIOS) {
-        _convertIOS(html, outputPath, isUrl: false);
+        _convertIOS(html, outputPath: outputPath, isUrl: false);
       } else if (Platform.isMacOS) {
-        _convertMacOS(html, outputPath, isUrl: false);
+        _convertMacOS(html, outputPath: outputPath, isUrl: false);
       } else if (Platform.isAndroid) {
-        _convertAndroid(html, outputPath, isUrl: false);
+        _convertAndroid(html, outputPath: outputPath, isUrl: false);
       } else {
         throw UnsupportedError(
           'Platform not supported. Only iOS and macOS are supported.',
@@ -79,17 +79,79 @@ class NativePdf {
 
     try {
       if (Platform.isIOS) {
-        _convertIOS(url, outputPath, isUrl: true);
+        _convertIOS(url, outputPath: outputPath, isUrl: true);
       } else if (Platform.isMacOS) {
-        _convertMacOS(url, outputPath, isUrl: true);
+        _convertMacOS(url, outputPath: outputPath, isUrl: true);
       } else if (Platform.isAndroid) {
-        _convertAndroid(url, outputPath, isUrl: true);
+        _convertAndroid(url, outputPath: outputPath, isUrl: true);
       } else {
         throw UnsupportedError(
           'Platform not supported. Only iOS and macOS are supported.',
         );
       }
       await _pendingCompleter!.future;
+    } finally {
+      _cleanup();
+    }
+  }
+
+  /// Convert HTML string to PDF data.
+  ///
+  /// [html] - The HTML content to convert.
+  ///
+  /// Returns a [Future] that completes with the PDF data as [Uint8List].
+  /// Throws [Exception] on failure.
+  static Future<Uint8List> convertToData(String html) async {
+    if (_pendingCompleter != null) {
+      throw StateError('A PDF generation is already in progress');
+    }
+    _pendingCompleter = Completer<Uint8List>();
+    _activeOutputPath = null;
+
+    try {
+      if (Platform.isIOS) {
+        _convertIOS(html, isUrl: false);
+      } else if (Platform.isMacOS) {
+        _convertMacOS(html, isUrl: false);
+      } else if (Platform.isAndroid) {
+        _convertAndroid(html, isUrl: false);
+      } else {
+        throw UnsupportedError(
+          'Platform not supported. Only iOS and macOS are supported.',
+        );
+      }
+      return await _pendingCompleter!.future as Uint8List;
+    } finally {
+      _cleanup();
+    }
+  }
+
+  /// Convert URL to PDF data.
+  ///
+  /// [url] - The URL to capture (e.g., https://example.com).
+  ///
+  /// Returns a [Future] that completes with the PDF data as [Uint8List].
+  /// Throws [Exception] on failure.
+  static Future<Uint8List> convertUrlToData(String url) async {
+    if (_pendingCompleter != null) {
+      throw StateError('A PDF generation is already in progress');
+    }
+    _pendingCompleter = Completer<Uint8List>();
+    _activeOutputPath = null;
+
+    try {
+      if (Platform.isIOS) {
+        _convertIOS(url, isUrl: true);
+      } else if (Platform.isMacOS) {
+        _convertMacOS(url, isUrl: true);
+      } else if (Platform.isAndroid) {
+        _convertAndroid(url, isUrl: true);
+      } else {
+        throw UnsupportedError(
+          'Platform not supported. Only iOS and macOS are supported.',
+        );
+      }
+      return await _pendingCompleter!.future as Uint8List;
     } finally {
       _cleanup();
     }
@@ -102,9 +164,9 @@ class NativePdf {
     _activeOutputPath = null;
   }
 
-  static void _completeWithSuccess() {
+  static void _completeWithSuccess([dynamic result]) {
     if (_pendingCompleter != null && !_pendingCompleter!.isCompleted) {
-      _pendingCompleter!.complete();
+      _pendingCompleter!.complete(result);
     }
   }
 
@@ -116,7 +178,7 @@ class NativePdf {
 }
 
 // iOS Implementation
-void _convertIOS(String content, String outputPath, {required bool isUrl}) {
+void _convertIOS(String content, {String? outputPath, required bool isUrl}) {
   // Create WKWebViewConfiguration
   final config = ios.WKWebViewConfiguration.alloc().init();
 
@@ -176,7 +238,7 @@ void _convertIOS(String content, String outputPath, {required bool isUrl}) {
   }
 }
 
-void _handleIOSNavigationFinished(ios.WKWebView webView, String outputPath) {
+void _handleIOSNavigationFinished(ios.WKWebView webView, String? outputPath) {
   // Create PDF configuration
   final pdfConfig = ios.WKPDFConfiguration.alloc().init();
 
@@ -199,10 +261,14 @@ void _handleIOSNavigationFinished(ios.WKWebView webView, String outputPath) {
         final ptr = data.bytes.cast<ffi.Uint8>();
         final len = data.length;
         final bytes = ptr.asTypedList(len);
-        File(outputPath).writeAsBytesSync(bytes);
-        NativePdf._completeWithSuccess();
+        if (outputPath != null) {
+          File(outputPath).writeAsBytesSync(bytes);
+          NativePdf._completeWithSuccess();
+        } else {
+          NativePdf._completeWithSuccess(bytes);
+        }
       } catch (e) {
-        NativePdf._completeWithError(Exception('Failed to write PDF: $e'));
+        NativePdf._completeWithError(Exception('Failed to generate PDF: $e'));
       }
     } else {
       NativePdf._completeWithError(Exception('PDF data is null'));
@@ -216,7 +282,7 @@ void _handleIOSNavigationFinished(ios.WKWebView webView, String outputPath) {
 }
 
 // macOS Implementation
-void _convertMacOS(String content, String outputPath, {required bool isUrl}) {
+void _convertMacOS(String content, {String? outputPath, required bool isUrl}) {
   // Create WKWebViewConfiguration
   final config = macos.WKWebViewConfiguration.alloc().init();
 
@@ -278,7 +344,7 @@ void _convertMacOS(String content, String outputPath, {required bool isUrl}) {
 
 void _handleMacOSNavigationFinished(
   macos.WKWebView webView,
-  String outputPath,
+  String? outputPath,
 ) {
   // Create PDF configuration
   final pdfConfig = macos.WKPDFConfiguration.alloc().init();
@@ -302,10 +368,14 @@ void _handleMacOSNavigationFinished(
         final ptr = data.bytes.cast<ffi.Uint8>();
         final len = data.length;
         final bytes = ptr.asTypedList(len);
-        File(outputPath).writeAsBytesSync(bytes);
-        NativePdf._completeWithSuccess();
+        if (outputPath != null) {
+          File(outputPath).writeAsBytesSync(bytes);
+          NativePdf._completeWithSuccess();
+        } else {
+          NativePdf._completeWithSuccess(bytes);
+        }
       } catch (e) {
-        NativePdf._completeWithError(Exception('Failed to write PDF: $e'));
+        NativePdf._completeWithError(Exception('Failed to generate PDF: $e'));
       }
     } else {
       NativePdf._completeWithError(Exception('PDF data is null'));
@@ -320,8 +390,8 @@ void _handleMacOSNavigationFinished(
 
 // Android Implementation
 void _convertAndroid(
-  String content,
-  String outputPath, {
+  String content, {
+  String? outputPath,
   required bool isUrl,
 }) async {
   final activity = jni.Jni.androidActivity(
@@ -338,7 +408,7 @@ void _convertAndroid(
   final androidActivity = android.Activity.fromReference(activity.reference);
 
   // Use a Completer to bridge the async gap from the UI thread callback
-  final completer = Completer<void>();
+  final completer = Completer<Uint8List?>();
 
   // Implement Runnable
   final runnable = javalang.Runnable.implement(
@@ -424,19 +494,37 @@ void _convertAndroid(
 
           pdfDoc.finishPage(page);
 
-          // 7. Write to file
-          // File.new$1(String) corresponds to File(String pathname)
-          final file = android.File.new$1(outputPath.toJString());
-          // FileOutputStream(File) corresponds to FileOutputStream(File file)
-          final fos = android.FileOutputStream(file);
+          if (outputPath != null) {
+            // 7. Write to file
+            // File.new$1(String) corresponds to File(String pathname)
+            final file = android.File.new$1(outputPath.toJString());
+            // FileOutputStream(File) corresponds to FileOutputStream(File file)
+            final fos = android.FileOutputStream(file);
 
-          pdfDoc.writeTo(fos);
+            pdfDoc.writeTo(fos);
+            fos.close();
+            completer.complete(null);
+          } else {
+            // Write to ByteArrayOutputStream
+            final bos = android.ByteArrayOutputStream();
+            pdfDoc.writeTo(bos);
+            final bytes = bos.toByteArray();
 
-          // 8. Close and Success
+            // JArray<jbyte> (which is Int8) to Uint8List conversion
+            // we need to copy elements.
+            // The JArray can be accessed.
+            final int count = bytes!.length;
+            final uint8List = Uint8List(count);
+            for (var i = 0; i < count; i++) {
+              uint8List[i] = bytes[i] & 0xFF; // Handle signed byte
+            }
+
+            bos.close();
+            completer.complete(uint8List);
+          }
+
+          // 8. Close
           pdfDoc.close();
-          fos.close();
-
-          completer.complete();
         } catch (e) {
           completer.completeError(e);
         }
@@ -449,8 +537,8 @@ void _convertAndroid(
 
   // Wait for completion
   try {
-    await completer.future;
-    NativePdf._completeWithSuccess();
+    final result = await completer.future;
+    NativePdf._completeWithSuccess(result);
   } catch (e) {
     NativePdf._completeWithError(Exception('PDF generation failed: $e'));
   }
