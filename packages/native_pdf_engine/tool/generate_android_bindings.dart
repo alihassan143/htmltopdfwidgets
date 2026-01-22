@@ -4,7 +4,7 @@ import 'package:jnigen/jnigen.dart';
 
 void main(List<String> args) async {
   final packageRoot = Platform.script.resolve('../');
-  
+
   await generateJniBindings(
     Config(
       outputConfig: OutputConfig(

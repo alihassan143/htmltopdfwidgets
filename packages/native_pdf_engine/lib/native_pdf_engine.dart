@@ -246,7 +246,7 @@ void _handleIOSNavigationFinished(ios.WKWebView webView, String? outputPath) {
   final completionHandler = ios.ObjCBlock_ffiVoid_NSData_NSError.listener((
     objc.NSData? data,
     objc.NSError? error,
-  ) {
+  ) async {
     if (error != null) {
       NativePdf._completeWithError(
         Exception(
@@ -262,7 +262,7 @@ void _handleIOSNavigationFinished(ios.WKWebView webView, String? outputPath) {
         final len = data.length;
         final bytes = ptr.asTypedList(len);
         if (outputPath != null) {
-          File(outputPath).writeAsBytesSync(bytes);
+          await File(outputPath).writeAsBytes(bytes);
           NativePdf._completeWithSuccess();
         } else {
           NativePdf._completeWithSuccess(bytes);
@@ -345,7 +345,7 @@ void _convertMacOS(String content, {String? outputPath, required bool isUrl}) {
 void _handleMacOSNavigationFinished(
   macos.WKWebView webView,
   String? outputPath,
-) {
+) async {
   // Create PDF configuration
   final pdfConfig = macos.WKPDFConfiguration.alloc().init();
 
@@ -353,7 +353,7 @@ void _handleMacOSNavigationFinished(
   final completionHandler = macos.ObjCBlock_ffiVoid_NSData_NSError.listener((
     objc.NSData? data,
     objc.NSError? error,
-  ) {
+  ) async {
     if (error != null) {
       NativePdf._completeWithError(
         Exception(
@@ -369,7 +369,7 @@ void _handleMacOSNavigationFinished(
         final len = data.length;
         final bytes = ptr.asTypedList(len);
         if (outputPath != null) {
-          File(outputPath).writeAsBytesSync(bytes);
+          await File(outputPath).writeAsBytes(bytes);
           NativePdf._completeWithSuccess();
         } else {
           NativePdf._completeWithSuccess(bytes);

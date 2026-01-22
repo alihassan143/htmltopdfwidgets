@@ -19,8 +19,8 @@ This package uses `dart:ffi` and `package:jni` to invoke native APIs directly, e
 
 ## Features
 
-- **Convert HTML String to PDF**: Render raw HTML content directly to a PDF file.
-- **Convert URL to PDF**: Capture a full webpage and save it as a PDF.
+- **Convert HTML String to PDF**: Render raw HTML content directly to a PDF file or data.
+- **Convert URL to PDF**: Capture a full webpage and save it as a PDF file or data.
 - **Background Execution**: Most operations run efficiently without blocking the main UI thread (Android uses `runOnUiThread` for safety).
 
 ## Installation
@@ -70,6 +70,22 @@ void main() async {
        'output/path/flutter_website.pdf',
      );
      print('URL Captured!');
+  } catch (e) {
+     print('Error: $e');
+  }
+
+  // 3. Get PDF Data directly (HTML)
+  try {
+     final pdfData = await NativePdf.convertToData('<h1>Direct Data</h1>');
+     print('Got PDF Data: ${pdfData.length} bytes');
+  } catch (e) {
+     print('Error: $e');
+  }
+
+  // 4. Get PDF Data directly (URL)
+  try {
+     final pdfData = await NativePdf.convertUrlToData('https://dart.dev');
+     print('Got PDF Data: ${pdfData.length} bytes');
   } catch (e) {
      print('Error: $e');
   }
