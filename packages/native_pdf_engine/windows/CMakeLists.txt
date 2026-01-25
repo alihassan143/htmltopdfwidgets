@@ -11,19 +11,40 @@ add_library(native_pdf_engine_windows SHARED
 
 target_include_directories(native_pdf_engine_windows PRIVATE "include")
 
-# Link libraries
-# On Windows, we need to link against WebView2Loader using helper or NuGet
-# For Flutter desktop plugins, it's common to expect WebView2 to be available or use a package.
-# Depending on how we distribute, we might need to fetch packages.
-# Using 'packages' via FetchContent or find_package if available.
-# But standard Flutter windows plugin template handles this differently.
+# Download WebView2 NuGet package
+set(WEBVIEW2_VERSION "1.0.2210.55")
+set(WEBVIEW2_URL "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/${WEBVIEW2_VERSION}")
+set(WEBVIEW2_DIR "${CMAKE_CURRENT_BINARY_DIR}/webview2_package")
 
-# We will rely on the standard windows libs for now and assume headers are available 
-# or use a raw implementation if possible, but WebView2 is not in standard libs.
-# We need Microsoft.Web.WebView2 package.
+if(NOT EXISTS "${WEBVIEW2_DIR}")
+    message(STATUS "Downloading Microsoft.Web.WebView2.${WEBVIEW2_VERSION}...")
+    file(DOWNLOAD "${WEBVIEW2_URL}" "${WEBVIEW2_DIR}/webview2.zip" STATUS DOWNLOAD_STATUS)
+    list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
+    if(NOT STATUS_CODE EQUAL 0)
+        message(FATAL_ERROR "Failed to download WebView2 package.")
+    endif()
+    
+    file(ARCHIVE_EXTRACT INPUT "${WEBVIEW2_DIR}/webview2.zip" DESTINATION "${WEBVIEW2_DIR}")
+endif()
 
-# Simplified: We assume usage of the NuGet package manager which Flutter Windows uses.
-# But for a pure plugin, we might need to add it to generic dependencies.
+target_include_directories(native_pdf_engine_windows PRIVATE "${WEBVIEW2_DIR}/build/native/include")
+
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(WEBVIEW2_ARCH "x64")
+else()
+    set(WEBVIEW2_ARCH "x86")
+endif()
+
+target_link_libraries(native_pdf_engine_windows PRIVATE 
+    "${WEBVIEW2_DIR}/build/native/${WEBVIEW2_ARCH}/WebView2Loader.dll.lib"
+)
+
+# Copy WebView2Loader.dll to output directory
+add_custom_command(TARGET native_pdf_engine_windows POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${WEBVIEW2_DIR}/build/native/${WEBVIEW2_ARCH}/WebView2Loader.dll"
+    "$<TARGET_FILE_DIR:native_pdf_engine_windows>"
+)
 
 target_compile_definitions(native_pdf_engine_windows PRIVATE FLUTTER_PLUGIN_IMPL)
 target_link_libraries(native_pdf_engine_windows PRIVATE flutter_wrapper_plugin)
