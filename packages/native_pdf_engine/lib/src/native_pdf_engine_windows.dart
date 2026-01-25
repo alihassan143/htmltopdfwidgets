@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as path;
 
 import 'native_pdf_engine_c_bindings.dart';
 
@@ -14,36 +12,15 @@ class NativePdfWindows {
   static void _init() {
     if (_bindings != null) return;
 
-    // Helper to verify library validity
-    bool tryLoad(DynamicLibrary lib) {
-      try {
-        lib.lookup<NativeFunction<Pointer<Void> Function()>>(
-          'NativePdf_CreateEngine',
-        );
-        _bindings = native_pdf_engine_c_bindings(lib);
-        return true;
-      } catch (_) {
-        return false;
-      }
-    }
-
-    // 1. Try standard open (PATH)
     try {
-      if (tryLoad(DynamicLibrary.open('native_pdf_engine_windows.dll'))) return;
-    } catch (_) {}
-
-    // 2. Try absolute path relative to executable
-    try {
-      final location = path.join(
-        path.dirname(Platform.resolvedExecutable),
-        'native_pdf_engine_windows.dll',
+      final library = DynamicLibrary.open('native_pdf_engine_windows.dll');
+      library.lookup<NativeFunction<Pointer<Void> Function()>>(
+        'NativePdf_CreateEngine',
       );
-      if (tryLoad(DynamicLibrary.open(location))) return;
-    } catch (_) {}
-
-    throw Exception(
-      'Failed to load native_pdf_engine_windows.dll from any location.',
-    );
+      _bindings = native_pdf_engine_c_bindings(library);
+    } catch (e) {
+      throw Exception('Failed to load native_pdf_engine_windows.dll: $e');
+    }
   }
 
   static Future<Uint8List?> convert(

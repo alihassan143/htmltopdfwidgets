@@ -59,3 +59,9 @@ target_link_libraries(native_pdf_engine_windows PRIVATE
   uuid
   shlwapi
 )
+
+# Bundle the library
+set(native_pdf_engine_bundled_libraries
+  $<TARGET_FILE:native_pdf_engine_windows>
+  PARENT_SCOPE
+)

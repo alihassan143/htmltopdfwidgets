@@ -20,3 +20,9 @@ target_include_directories(native_pdf_engine_linux PRIVATE ${GTK_INCLUDE_DIRS} $
 target_link_libraries(native_pdf_engine_linux PRIVATE ${GTK_LIBRARIES} ${WEBKIT_LIBRARIES})
 
 target_compile_definitions(native_pdf_engine_linux PRIVATE FLUTTER_PLUGIN_IMPL)
+
+# Bundle the library
+set(native_pdf_engine_bundled_libraries
+  $<TARGET_FILE:native_pdf_engine_linux>
+  PARENT_SCOPE
+)
