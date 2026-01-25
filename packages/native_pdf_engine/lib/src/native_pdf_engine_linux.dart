@@ -12,19 +12,17 @@ class NativePdfLinux {
   static void _init() {
     if (_bindings != null) return;
     try {
-      // Try opening the shared library
-      _bindings = native_pdf_engine_c_bindings(
-        DynamicLibrary.open('libnative_pdf_engine_linux.so'),
-      );
-    } catch (e) {
       try {
-        // Fallback to process symbols (if statically linked or preloaded)
+        // First try process symbols (static linking)
         _bindings = native_pdf_engine_c_bindings(DynamicLibrary.process());
-      } catch (e2) {
-        throw Exception(
-          'Failed to load libnative_pdf_engine_linux.so: $e\n$e2',
+      } catch (_) {
+        // Fallback to shared library
+        _bindings = native_pdf_engine_c_bindings(
+          DynamicLibrary.open('libnative_pdf_engine_linux.so'),
         );
       }
+    } catch (e) {
+      throw Exception('Failed to load native_pdf_engine_linux: $e');
     }
   }
 
