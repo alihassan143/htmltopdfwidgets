@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:native_pdf_engine/native_pdf_engine.dart';
@@ -19,7 +18,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String? _pdfPath;
-  Uint8List? _pdfBytes;
   String _statusMessage = 'Keep calm and generate PDF';
   bool _isGenerating = false;
 
