@@ -1,0 +1,17 @@
+name: native_pdf_engine_c_bindings
+description: Bindings for native_pdf_engine C++ shims
+output: 'lib/src/native_pdf_engine_c_bindings.dart'
+headers:
+  entry-points:
+    - 'windows/include/native_pdf_engine.h'
+    - 'linux/include/native_pdf_engine.h'
+  include-directives:
+    - 'windows/include/native_pdf_engine.h'
+    - 'linux/include/native_pdf_engine.h'
+preamble: |
+  // ignore_for_file: always_specify_types
+  // ignore_for_file: camel_case_types
+  // ignore_for_file: non_constant_identifier_names
+comments:
+  style: any
+  length: full

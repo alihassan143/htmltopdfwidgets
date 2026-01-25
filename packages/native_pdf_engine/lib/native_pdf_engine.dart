@@ -15,7 +15,9 @@ import 'package:objective_c/objective_c.dart' as objc;
 import 'src/android/java/lang/Runnable.dart' as javalang;
 import 'src/android_bindings.dart' as android;
 import 'src/native_pdf_engine_ios_bindings.dart' as ios;
+import 'src/native_pdf_engine_linux.dart' as linux;
 import 'src/native_pdf_engine_macos_bindings.dart' as macos;
+import 'src/native_pdf_engine_windows.dart' as windows;
 
 /// High-level PDF generation API for iOS and macOS.
 ///
@@ -52,9 +54,21 @@ class NativePdf {
         _convertMacOS(html, outputPath: outputPath, isUrl: false);
       } else if (Platform.isAndroid) {
         _convertAndroid(html, outputPath: outputPath, isUrl: false);
+      } else if (Platform.isWindows) {
+        await windows.NativePdfWindows.convert(
+          html,
+          outputPath: outputPath,
+          isUrl: false,
+        );
+      } else if (Platform.isLinux) {
+        await linux.NativePdfLinux.convert(
+          html,
+          outputPath: outputPath,
+          isUrl: false,
+        );
       } else {
         throw UnsupportedError(
-          'Platform not supported. Only iOS and macOS are supported.',
+          'Platform not supported. Supported: iOS, macOS, Android, Windows, Linux.',
         );
       }
       await _pendingCompleter!.future;
@@ -84,9 +98,21 @@ class NativePdf {
         _convertMacOS(url, outputPath: outputPath, isUrl: true);
       } else if (Platform.isAndroid) {
         _convertAndroid(url, outputPath: outputPath, isUrl: true);
+      } else if (Platform.isWindows) {
+        await windows.NativePdfWindows.convert(
+          url,
+          outputPath: outputPath,
+          isUrl: true,
+        );
+      } else if (Platform.isLinux) {
+        await linux.NativePdfLinux.convert(
+          url,
+          outputPath: outputPath,
+          isUrl: true,
+        );
       } else {
         throw UnsupportedError(
-          'Platform not supported. Only iOS and macOS are supported.',
+          'Platform not supported. Supported: iOS, macOS, Android, Windows, Linux.',
         );
       }
       await _pendingCompleter!.future;
@@ -115,9 +141,23 @@ class NativePdf {
         _convertMacOS(html, isUrl: false);
       } else if (Platform.isAndroid) {
         _convertAndroid(html, isUrl: false);
+      } else if (Platform.isWindows) {
+        final result = await windows.NativePdfWindows.convert(
+          html,
+          outputPath: null,
+          isUrl: false,
+        );
+        return result ?? Uint8List(0);
+      } else if (Platform.isLinux) {
+        final result = await linux.NativePdfLinux.convert(
+          html,
+          outputPath: null,
+          isUrl: false,
+        );
+        return result ?? Uint8List(0);
       } else {
         throw UnsupportedError(
-          'Platform not supported. Only iOS and macOS are supported.',
+          'Platform not supported. Supported: iOS, macOS, Android, Windows, Linux.',
         );
       }
       return await _pendingCompleter!.future as Uint8List;
@@ -146,9 +186,23 @@ class NativePdf {
         _convertMacOS(url, isUrl: true);
       } else if (Platform.isAndroid) {
         _convertAndroid(url, isUrl: true);
+      } else if (Platform.isWindows) {
+        final result = await windows.NativePdfWindows.convert(
+          url,
+          outputPath: null,
+          isUrl: true,
+        );
+        return result ?? Uint8List(0);
+      } else if (Platform.isLinux) {
+        final result = await linux.NativePdfLinux.convert(
+          url,
+          outputPath: null,
+          isUrl: true,
+        );
+        return result ?? Uint8List(0);
       } else {
         throw UnsupportedError(
-          'Platform not supported. Only iOS and macOS are supported.',
+          'Platform not supported. Supported: iOS, macOS, Android, Windows, Linux.',
         );
       }
       return await _pendingCompleter!.future as Uint8List;

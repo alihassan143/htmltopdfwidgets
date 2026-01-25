@@ -1,0 +1,96 @@
+name: Native PDF Engine Desktop Tests
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "packages/native_pdf_engine/**"
+      - ".github/workflows/desktop_test.yaml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "packages/native_pdf_engine/**"
+      - ".github/workflows/desktop_test.yaml"
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Development Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev xvfb
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      - name: Enable Linux Desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Install Dependencies
+        run: flutter pub get
+        working-directory: packages/native_pdf_engine/example
+
+      - name: Verify Analysis
+        run: flutter analyze
+        working-directory: packages/native_pdf_engine
+
+      - name: Run Integration Tests
+        # xvfb-run is required because GTK initialization in the plugin expects a display server.
+        # -d linux runs it on the linux desktop embedding.
+        run: xvfb-run flutter test integration_test/native_pdf_engine_test.dart -d linux
+        working-directory: packages/native_pdf_engine/example
+
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install Dependencies
+        run: flutter pub get
+        working-directory: packages/native_pdf_engine/example
+
+      - name: Verify Analysis
+        run: flutter analyze
+        working-directory: packages/native_pdf_engine
+
+      - name: Run Integration Tests
+        run: flutter test integration_test/native_pdf_engine_test.dart -d windows
+        working-directory: packages/native_pdf_engine/example
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Enable macOS Desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Install Dependencies
+        run: flutter pub get
+        working-directory: packages/native_pdf_engine/example
+
+      - name: Verify Analysis
+        run: flutter analyze
+        working-directory: packages/native_pdf_engine
+
+      - name: Run Integration Tests
+        run: flutter test integration_test/native_pdf_engine_test.dart -d macos
+        working-directory: packages/native_pdf_engine/example
