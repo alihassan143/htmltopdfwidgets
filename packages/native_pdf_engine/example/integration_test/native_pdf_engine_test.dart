@@ -8,7 +8,8 @@ import 'package:path/path.dart' as path;
 // Use IntegrationTestWidgetsFlutterBinding to initialize the Flutter engine
 // which ensures platform channels and FFI plugins are properly registered/loaded.
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
   testWidgets('generate pdf from html to file', (WidgetTester tester) async {
     final tempDir = Directory.systemTemp.createTempSync('pdf_test_');

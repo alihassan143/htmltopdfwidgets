@@ -39,9 +39,13 @@ public:
     wc.lpszClassName = L"NativePdfEngineWindow";
     RegisterClass(&wc);
 
+    // WebView2 requires a visual window parent (even if hidden).
+    // HWND_MESSAGE is a message-only window and cannot host a visual
+    // CoreWebView2Controller. We create a standard Overlapped window but do not
+    // show it.
     hwnd_ = CreateWindowEx(0, L"NativePdfEngineWindow", L"NativeGeneratedPDF",
                            WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                           CW_USEDEFAULT, CW_USEDEFAULT, HWND_MESSAGE, nullptr,
+                           CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr,
                            hInstance, nullptr);
   }
 
