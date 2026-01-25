@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:path/path.dart' as path;
 
 import 'native_pdf_engine_c_bindings.dart';
 
@@ -11,19 +13,37 @@ class NativePdfWindows {
 
   static void _init() {
     if (_bindings != null) return;
-    try {
-      // On Windows, plugins are built as DLLs. process() usually only sees the exe symbols.
-      // We must load the DLL explicitly.
-      final library = DynamicLibrary.open('native_pdf_engine_windows.dll');
-      _bindings = native_pdf_engine_c_bindings(library);
 
-      // Force symbol lookup to ensure the library is valid and symbols are exported
-      _bindings!.NativePdf_CreateEngine;
-    } catch (e) {
-      // If the DLL is missing dependencies (like WebView2Loader.dll), open() throws.
-      // Rethrow with clear message.
-      throw Exception('Failed to load native_pdf_engine_windows.dll: $e');
+    // Helper to verify library validity
+    bool tryLoad(DynamicLibrary lib) {
+      try {
+        lib.lookup<NativeFunction<Pointer<Void> Function()>>(
+          'NativePdf_CreateEngine',
+        );
+        _bindings = native_pdf_engine_c_bindings(lib);
+        return true;
+      } catch (_) {
+        return false;
+      }
     }
+
+    // 1. Try standard open (PATH)
+    try {
+      if (tryLoad(DynamicLibrary.open('native_pdf_engine_windows.dll'))) return;
+    } catch (_) {}
+
+    // 2. Try absolute path relative to executable
+    try {
+      final location = path.join(
+        path.dirname(Platform.resolvedExecutable),
+        'native_pdf_engine_windows.dll',
+      );
+      if (tryLoad(DynamicLibrary.open(location))) return;
+    } catch (_) {}
+
+    throw Exception(
+      'Failed to load native_pdf_engine_windows.dll from any location.',
+    );
   }
 
   static Future<Uint8List?> convert(

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:path/path.dart' as path;
 
 import 'native_pdf_engine_c_bindings.dart';
 
@@ -11,24 +13,43 @@ class NativePdfLinux {
 
   static void _init() {
     if (_bindings != null) return;
-    try {
+
+    // Helper to verify library validity
+    bool tryLoad(DynamicLibrary lib) {
       try {
-        // First try process symbols (static linking)
-        final library = DynamicLibrary.process();
-        _bindings = native_pdf_engine_c_bindings(library);
-        // Force symbol lookup to verify content
-        _bindings!.NativePdf_CreateEngine;
+        lib.lookup<NativeFunction<Pointer<Void> Function()>>(
+          'NativePdf_CreateEngine',
+        );
+        _bindings = native_pdf_engine_c_bindings(lib);
+        return true;
       } catch (_) {
-        // Fallback to shared library
-        final library = DynamicLibrary.open('libnative_pdf_engine_linux.so');
-        _bindings = native_pdf_engine_c_bindings(library);
-        // Force symbol lookup to verify content
-        _bindings!.NativePdf_CreateEngine;
+        return false;
       }
-    } catch (e) {
-      _bindings = null; // Reset if failed
-      throw Exception('Failed to load native_pdf_engine_linux: $e');
     }
+
+    // 1. Try process (static linking or global symbol)
+    try {
+      if (tryLoad(DynamicLibrary.process())) return;
+    } catch (_) {}
+
+    // 2. Try standard open (LD_LIBRARY_PATH)
+    try {
+      if (tryLoad(DynamicLibrary.open('libnative_pdf_engine_linux.so'))) return;
+    } catch (_) {}
+
+    // 3. Try absolute path relative to executable (Flutter bundle)
+    try {
+      final location = path.join(
+        path.dirname(Platform.resolvedExecutable),
+        'lib',
+        'libnative_pdf_engine_linux.so',
+      );
+      if (tryLoad(DynamicLibrary.open(location))) return;
+    } catch (_) {}
+
+    throw Exception(
+      'Failed to load libnative_pdf_engine_linux.so from any location.',
+    );
   }
 
   static Future<Uint8List?> convert(
