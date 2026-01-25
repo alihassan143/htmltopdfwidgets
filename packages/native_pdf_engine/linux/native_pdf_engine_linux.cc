@@ -165,18 +165,30 @@ private:
 
 // C API
 
-void *NativePdf_CreateEngine() { return new PdfEngine(); }
+// We must repeat EXPORT to ensure visibility, and extern "C" to prevent
+// mangling if the header wasn't perfectly consistent or if we want to be
+// explicit.
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void NativePdf_DestroyEngine(void *engine) {
+EXPORT void *NativePdf_CreateEngine() { return new PdfEngine(); }
+
+EXPORT void NativePdf_DestroyEngine(void *engine) {
   if (engine)
     delete static_cast<PdfEngine *>(engine);
 }
 
-void NativePdf_Generate(void *engine, const char *content, bool is_url,
-                        const char *output_path, PdfCompletionCallback callback,
-                        void *user_data) {
+EXPORT void NativePdf_Generate(void *engine, const char *content, bool is_url,
+                               const char *output_path,
+                               PdfCompletionCallback callback,
+                               void *user_data) {
   if (engine) {
     static_cast<PdfEngine *>(engine)->Generate(content, is_url, output_path,
                                                callback, user_data);
   }
 }
+
+#ifdef __cplusplus
+}
+#endif
