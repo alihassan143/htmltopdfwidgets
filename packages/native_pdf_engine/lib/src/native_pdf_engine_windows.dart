@@ -12,23 +12,17 @@ class NativePdfWindows {
   static void _init() {
     if (_bindings != null) return;
     try {
-      // In Flutter Windows, plugins are usually linked.
-      // If we built a shared library via CMake, it might be in the executable directory.
-      // If it's a plugin, Flutter loads it.
-      // We can try looking up symbols in the executable or the specific DLL.
-      _bindings = native_pdf_engine_c_bindings(
-        DynamicLibrary.open('native_pdf_engine_windows.dll'),
-      );
+      // On Windows, plugins are built as DLLs. process() usually only sees the exe symbols.
+      // We must load the DLL explicitly.
+      final library = DynamicLibrary.open('native_pdf_engine_windows.dll');
+      _bindings = native_pdf_engine_c_bindings(library);
+
+      // Force symbol lookup to ensure the library is valid and symbols are exported
+      _bindings!.NativePdf_CreateEngine;
     } catch (e) {
-      // Fallback: in some setups (like 'flutter run'), symbols might be in the runner if statically linked?
-      // But we defined SHARED library in CMake.
-      try {
-        _bindings = native_pdf_engine_c_bindings(DynamicLibrary.process());
-      } catch (e2) {
-        throw Exception(
-          'Failed to load native_pdf_engine_windows.dll: $e\n$e2',
-        );
-      }
+      // If the DLL is missing dependencies (like WebView2Loader.dll), open() throws.
+      // Rethrow with clear message.
+      throw Exception('Failed to load native_pdf_engine_windows.dll: $e');
     }
   }
 

@@ -14,14 +14,19 @@ class NativePdfLinux {
     try {
       try {
         // First try process symbols (static linking)
-        _bindings = native_pdf_engine_c_bindings(DynamicLibrary.process());
+        final library = DynamicLibrary.process();
+        _bindings = native_pdf_engine_c_bindings(library);
+        // Force symbol lookup to verify content
+        _bindings!.NativePdf_CreateEngine;
       } catch (_) {
         // Fallback to shared library
-        _bindings = native_pdf_engine_c_bindings(
-          DynamicLibrary.open('libnative_pdf_engine_linux.so'),
-        );
+        final library = DynamicLibrary.open('libnative_pdf_engine_linux.so');
+        _bindings = native_pdf_engine_c_bindings(library);
+        // Force symbol lookup to verify content
+        _bindings!.NativePdf_CreateEngine;
       }
     } catch (e) {
+      _bindings = null; // Reset if failed
       throw Exception('Failed to load native_pdf_engine_linux: $e');
     }
   }
