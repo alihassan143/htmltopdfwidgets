@@ -12,23 +12,12 @@ class NativePdfLinux {
   static void _init() {
     if (_bindings != null) return;
     try {
-      try {
-        // First try process symbols (static linking)
-        final library = DynamicLibrary.process();
-        library.lookup<NativeFunction<Pointer<Void> Function()>>(
-          'NativePdf_CreateEngine',
-        );
-        _bindings = native_pdf_engine_c_bindings(library);
-      } catch (_) {
-        // Fallback to shared library
-        final library = DynamicLibrary.open('libnative_pdf_engine_linux.so');
-        library.lookup<NativeFunction<Pointer<Void> Function()>>(
-          'NativePdf_CreateEngine',
-        );
-        _bindings = native_pdf_engine_c_bindings(library);
-      }
+      final library = DynamicLibrary.open('libnative_pdf_engine_linux.so');
+      library.lookup<NativeFunction<Pointer<Void> Function()>>(
+        'NativePdf_CreateEngine',
+      );
+      _bindings = native_pdf_engine_c_bindings(library);
     } catch (e) {
-      _bindings = null;
       throw Exception('Failed to load native_pdf_engine_linux: $e');
     }
   }

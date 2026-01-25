@@ -14,9 +14,7 @@ class NativePdfWindows {
 
     try {
       final library = DynamicLibrary.open('native_pdf_engine_windows.dll');
-      library.lookup<NativeFunction<Pointer<Void> Function()>>(
-        'NativePdf_CreateEngine',
-      );
+
       _bindings = native_pdf_engine_c_bindings(library);
     } catch (e) {
       throw Exception('Failed to load native_pdf_engine_windows.dll: $e');
