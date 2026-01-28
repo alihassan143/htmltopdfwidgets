@@ -1,3 +1,16 @@
+## 1.1.4
+
+### Fixed
+- **Critical Word Compatibility**: Fixed issue where documents were not opening in Microsoft Word due to incorrect XML tag ordering.
+  - Reordered `w:rPr` (run properties) children to strictly follow the OOXML schema (e.g., `rFonts` -> `color` -> `sz`).
+  - Reordered `w:tblPr` (table properties) and `w:tcPr` (cell properties) to match schema requirements.
+- **Newline Handling**: Fixed issue where newlines in `DocxText` were ignored. Now converts `\n` to `<w:br/>`.
+- **Web Support**: Fixed `exportToFile` failure on web platforms.
+  - Replaced direct `dart:io` imports with a platform-agnostic `FileSaver` utility.
+  - Added proper web implementation using `dart:js_interop` and `package:web`.
+
+---
+
 ## 1.1.3
 
 ### Fixed

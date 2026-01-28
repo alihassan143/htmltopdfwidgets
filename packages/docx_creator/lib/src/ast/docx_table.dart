@@ -376,48 +376,7 @@ class DocxTable extends DocxBlock {
               },
             );
 
-            // Table Look
-            builder.element('w:tblLook', nest: () {
-              builder.attribute('w:val', look.hex);
-              builder.attribute('w:firstRow', look.firstRow ? '1' : '0');
-              builder.attribute('w:lastRow', look.lastRow ? '1' : '0');
-              builder.attribute('w:firstColumn', look.firstColumn ? '1' : '0');
-              builder.attribute('w:lastColumn', look.lastColumn ? '1' : '0');
-              builder.attribute('w:noHBand', look.noHBand ? '1' : '0');
-              builder.attribute('w:noVBand', look.noVBand ? '1' : '0');
-            });
-
-            // Table Overlap (for floating tables)
-            if (tblOverlap != null) {
-              builder.element('w:tblOverlap', nest: () {
-                builder.attribute('w:val', tblOverlap!);
-              });
-            }
-
-            // Table shading (global)
-            if (style.fill != null) {
-              builder.element('w:shd', nest: () {
-                builder.attribute('w:fill', style.fill!.replaceAll('#', ''));
-                builder.attribute('w:val', 'clear');
-              });
-            }
-            builder.element(
-              'w:tblW',
-              nest: () {
-                builder.attribute('w:w', (width ?? 0).toString());
-                builder.attribute('w:type', widthType.name);
-              },
-            );
-            // Table alignment (justification)
-            if (alignment != null) {
-              builder.element(
-                'w:jc',
-                nest: () {
-                  builder.attribute('w:val', alignment!.name);
-                },
-              );
-            }
-            // Floating table position
+            // Floating table position (tblpPr must be early)
             if (position != null) {
               builder.element(
                 'w:tblpPr',
@@ -441,8 +400,33 @@ class DocxTable extends DocxBlock {
                 },
               );
             }
-            // Borders - only emit if explicitly set or no style ID (relying on default)
-            // If a styleId is set, the borders come from the style definition
+
+            // Table Overlap (for floating tables)
+            if (tblOverlap != null) {
+              builder.element('w:tblOverlap', nest: () {
+                builder.attribute('w:val', tblOverlap!);
+              });
+            }
+
+            builder.element(
+              'w:tblW',
+              nest: () {
+                builder.attribute('w:w', (width ?? 0).toString());
+                builder.attribute('w:type', widthType.name);
+              },
+            );
+
+            // Table alignment (justification)
+            if (alignment != null) {
+              builder.element(
+                'w:jc',
+                nest: () {
+                  builder.attribute('w:val', alignment!.name);
+                },
+              );
+            }
+
+            // Borders - only emit if explicitly set or no style ID
             final hasExplicitBorders = style.borderTop != null ||
                 style.borderBottom != null ||
                 style.borderLeft != null ||
@@ -492,6 +476,15 @@ class DocxTable extends DocxBlock {
                 },
               );
             }
+
+            // Table shading (global)
+            if (style.fill != null) {
+              builder.element('w:shd', nest: () {
+                builder.attribute('w:fill', style.fill!.replaceAll('#', ''));
+                builder.attribute('w:val', 'clear');
+              });
+            }
+
             // Cell margins/padding - only emit if explicitly set
             if (style.cellPadding != null) {
               builder.element(
@@ -528,6 +521,17 @@ class DocxTable extends DocxBlock {
                 },
               );
             }
+
+            // Table Look (Must be last)
+            builder.element('w:tblLook', nest: () {
+              builder.attribute('w:val', look.hex);
+              builder.attribute('w:firstRow', look.firstRow ? '1' : '0');
+              builder.attribute('w:lastRow', look.lastRow ? '1' : '0');
+              builder.attribute('w:firstColumn', look.firstColumn ? '1' : '0');
+              builder.attribute('w:lastColumn', look.lastColumn ? '1' : '0');
+              builder.attribute('w:noHBand', look.noHBand ? '1' : '0');
+              builder.attribute('w:noVBand', look.noVBand ? '1' : '0');
+            });
           },
         );
         // Table Grid - use preserved values or calculate from cells
@@ -849,12 +853,26 @@ class DocxTableCell extends DocxNode {
                 },
               );
             }
-            builder.element(
-              'w:vAlign',
-              nest: () {
-                builder.attribute('w:val', verticalAlign.name);
-              },
-            );
+            // Borders (Must be before shd)
+            if (borderTop != null ||
+                borderBottom != null ||
+                borderLeft != null ||
+                borderRight != null) {
+              builder.element('w:tcBorders', nest: () {
+                if (borderTop != null) {
+                  _buildBorder(builder, 'w:top', borderTop!);
+                }
+                if (borderBottom != null) {
+                  _buildBorder(builder, 'w:bottom', borderBottom!);
+                }
+                if (borderLeft != null) {
+                  _buildBorder(builder, 'w:left', borderLeft!);
+                }
+                if (borderRight != null) {
+                  _buildBorder(builder, 'w:right', borderRight!);
+                }
+              });
+            }
             if (shadingFill != null || themeFill != null) {
               builder.element(
                 'w:shd',
@@ -875,26 +893,12 @@ class DocxTableCell extends DocxNode {
                 },
               );
             }
-            // Borders
-            if (borderTop != null ||
-                borderBottom != null ||
-                borderLeft != null ||
-                borderRight != null) {
-              builder.element('w:tcBorders', nest: () {
-                if (borderTop != null) {
-                  _buildBorder(builder, 'w:top', borderTop!);
-                }
-                if (borderBottom != null) {
-                  _buildBorder(builder, 'w:bottom', borderBottom!);
-                }
-                if (borderLeft != null) {
-                  _buildBorder(builder, 'w:left', borderLeft!);
-                }
-                if (borderRight != null) {
-                  _buildBorder(builder, 'w:right', borderRight!);
-                }
-              });
-            }
+            builder.element(
+              'w:vAlign',
+              nest: () {
+                builder.attribute('w:val', verticalAlign.name);
+              },
+            );
           },
         );
 

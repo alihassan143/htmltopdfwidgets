@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -7,6 +6,7 @@ import 'package:xml/xml.dart';
 
 import '../../docx_creator.dart';
 import '../core/font_manager.dart';
+import '../utils/file_saver.dart';
 
 /// Exports [DocxBuiltDocument] to .docx format.
 class DocxExporter {
@@ -40,8 +40,7 @@ class DocxExporter {
   Future<void> exportToFile(DocxBuiltDocument doc, String filePath) async {
     try {
       final bytes = await exportToBytes(doc);
-      final file = File(filePath);
-      await file.writeAsBytes(bytes);
+      await FileSaver.save(filePath, bytes);
     } catch (e) {
       throw DocxExportException(
         'Failed to write file: $e',

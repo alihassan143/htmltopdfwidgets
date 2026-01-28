@@ -575,63 +575,7 @@ class DocxText extends DocxInline {
           builder.element(
             'w:rPr',
             nest: () {
-              if (isBold) builder.element('w:b');
-              if (isItalic) builder.element('w:i');
-              if (isUnderline) {
-                builder.element(
-                  'w:u',
-                  nest: () {
-                    builder.attribute('w:val', 'single');
-                  },
-                );
-              }
-              if (isStrike) builder.element('w:strike');
-              if (isDoubleStrike) builder.element('w:dstrike');
-              if (isOutline) builder.element('w:outline');
-              if (isShadow) builder.element('w:shadow');
-              if (isEmboss) builder.element('w:emboss');
-              if (isImprint) builder.element('w:imprint');
-              if (isAllCaps) builder.element('w:caps');
-              if (isSmallCaps) builder.element('w:smallCaps');
-              if (isSuperscript || isSubscript) {
-                builder.element(
-                  'w:vertAlign',
-                  nest: () {
-                    builder.attribute(
-                      'w:val',
-                      isSuperscript ? 'superscript' : 'subscript',
-                    );
-                  },
-                );
-              }
-              if (effectiveColorHex != null) {
-                builder.element(
-                  'w:color',
-                  nest: () {
-                    builder.attribute('w:val', effectiveColorHex!);
-                  },
-                );
-              }
-              if (fontSize != null) {
-                builder.element(
-                  'w:sz',
-                  nest: () {
-                    builder.attribute(
-                      'w:val',
-                      (fontSize! * 2).toInt().toString(),
-                    );
-                  },
-                );
-                builder.element(
-                  'w:szCs',
-                  nest: () {
-                    builder.attribute(
-                      'w:val',
-                      (fontSize! * 2).toInt().toString(),
-                    );
-                  },
-                );
-              }
+              // 1. rFonts
               final effectiveFonts = fonts ??
                   (fontFamily != null ? DocxFont.family(fontFamily!) : null);
               if (effectiveFonts != null) {
@@ -671,6 +615,83 @@ class DocxText extends DocxInline {
                   },
                 );
               }
+
+              // 2. b (Bold)
+              if (isBold) builder.element('w:b');
+
+              // 3. i (Italic)
+              if (isItalic) builder.element('w:i');
+
+              // 4. caps (All Caps)
+              if (isAllCaps) builder.element('w:caps');
+
+              // 5. smallCaps
+              if (isSmallCaps) builder.element('w:smallCaps');
+
+              // 6. strike
+              if (isStrike) builder.element('w:strike');
+
+              // 7. dstrike
+              if (isDoubleStrike) builder.element('w:dstrike');
+
+              // 8. outline
+              if (isOutline) builder.element('w:outline');
+
+              // 9. shadow
+              if (isShadow) builder.element('w:shadow');
+
+              // 10. emboss
+              if (isEmboss) builder.element('w:emboss');
+
+              // 11. imprint
+              if (isImprint) builder.element('w:imprint');
+
+              // 12. color
+              if (effectiveColorHex != null) {
+                builder.element(
+                  'w:color',
+                  nest: () {
+                    builder.attribute('w:val', effectiveColorHex!);
+                  },
+                );
+              }
+
+              // 13. spacing
+              if (characterSpacing != null) {
+                builder.element(
+                  'w:spacing',
+                  nest: () {
+                    builder.attribute(
+                      'w:val',
+                      characterSpacing!.toInt().toString(),
+                    );
+                  },
+                );
+              }
+
+              // 14. sz (Font Size)
+              if (fontSize != null) {
+                builder.element(
+                  'w:sz',
+                  nest: () {
+                    builder.attribute(
+                      'w:val',
+                      (fontSize! * 2).toInt().toString(),
+                    );
+                  },
+                );
+                builder.element(
+                  'w:szCs',
+                  nest: () {
+                    builder.attribute(
+                      'w:val',
+                      (fontSize! * 2).toInt().toString(),
+                    );
+                  },
+                );
+              }
+
+              // 15. highlight
               if (highlight != DocxHighlight.none) {
                 builder.element(
                   'w:highlight',
@@ -679,6 +700,31 @@ class DocxText extends DocxInline {
                   },
                 );
               }
+
+              // 16. u (Underline)
+              if (isUnderline) {
+                builder.element(
+                  'w:u',
+                  nest: () {
+                    builder.attribute('w:val', 'single');
+                  },
+                );
+              }
+
+              // 17. bdr (Text Border)
+              if (textBorder != null) {
+                builder.element(
+                  'w:bdr',
+                  nest: () {
+                    builder.attribute('w:val', textBorder!.style.xmlValue);
+                    builder.attribute('w:sz', textBorder!.size.toString());
+                    builder.attribute('w:space', textBorder!.space.toString());
+                    builder.attribute('w:color', textBorder!.color.hex);
+                  },
+                );
+              }
+
+              // 18. shd (Shading)
               if (shadingFill != null || themeFill != null) {
                 builder.element(
                   'w:shd',
@@ -700,26 +746,16 @@ class DocxText extends DocxInline {
                   },
                 );
               }
-              if (characterSpacing != null) {
+
+              // 19. vertAlign
+              if (isSuperscript || isSubscript) {
                 builder.element(
-                  'w:spacing',
+                  'w:vertAlign',
                   nest: () {
                     builder.attribute(
                       'w:val',
-                      characterSpacing!.toInt().toString(),
+                      isSuperscript ? 'superscript' : 'subscript',
                     );
-                  },
-                );
-              }
-              // Text border (box around text)
-              if (textBorder != null) {
-                builder.element(
-                  'w:bdr',
-                  nest: () {
-                    builder.attribute('w:val', textBorder!.style.xmlValue);
-                    builder.attribute('w:sz', textBorder!.size.toString());
-                    builder.attribute('w:space', textBorder!.space.toString());
-                    builder.attribute('w:color', textBorder!.color.hex);
                   },
                 );
               }
@@ -727,15 +763,24 @@ class DocxText extends DocxInline {
           );
         }
 
-        builder.element(
-          'w:t',
-          nest: () {
-            if (content.startsWith(' ') || content.endsWith(' ')) {
-              builder.attribute('xml:space', 'preserve');
-            }
-            builder.text(content);
-          },
-        );
+        final lines = content.split(RegExp(r'\r?\n'));
+        for (var i = 0; i < lines.length; i++) {
+          final line = lines[i];
+          if (line.isNotEmpty) {
+            builder.element(
+              'w:t',
+              nest: () {
+                if (line.startsWith(' ') || line.endsWith(' ')) {
+                  builder.attribute('xml:space', 'preserve');
+                }
+                builder.text(line);
+              },
+            );
+          }
+          if (i < lines.length - 1) {
+            builder.element('w:br');
+          }
+        }
       },
     );
   }
