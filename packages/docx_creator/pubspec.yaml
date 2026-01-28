@@ -1,6 +1,6 @@
 name: docx_creator
 description: A developer-first Dart package for creating professional DOCX documents with fluent API, Markdown/HTML parsing, and comprehensive formatting.
-version: 1.1.4
+version: 1.1.5
 repository: https://github.com/alihassan143/flutter-packages
 homepage: https://github.com/alihassan143/flutter-packages/tree/main/packages/docx_creator
 topics:

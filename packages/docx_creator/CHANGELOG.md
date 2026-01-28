@@ -1,3 +1,13 @@
+## 1.1.5
+
+### Fixed
+- **Web Compatibility**: Removed all direct `dart:io` dependencies to enable full Flutter Web support.
+  - Replaced `dart:io` `File` usages with platform-agnostic `FileSaver` and `FileLoader` abstractions.
+  - Replaced `dart:io` `zlib` compression with `package:archive` for PDF generation and parsing on web.
+  - Updated `ImageResolver` to handle file loading via `FileLoader`.
+
+---
+
 ## 1.1.4
 
 ### Fixed

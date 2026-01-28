@@ -1065,34 +1065,8 @@ class DocxExporter {
             },
           );
         }
-        // CORE RELATIONSHIPS (Styles, Settings, Numbering, etc.)
-        builder.element('Relationship', nest: () {
-          builder.attribute('Id', 'rIdStyles');
-          builder.attribute('Type',
-              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles');
-          builder.attribute('Target', 'styles.xml');
-        });
-
-        builder.element('Relationship', nest: () {
-          builder.attribute('Id', 'rIdSettings');
-          builder.attribute('Type',
-              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings');
-          builder.attribute('Target', 'settings.xml');
-        });
-
-        builder.element('Relationship', nest: () {
-          builder.attribute('Id', 'rIdNumbering');
-          builder.attribute('Type',
-              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering');
-          builder.attribute('Target', 'numbering.xml');
-        });
-
-        builder.element('Relationship', nest: () {
-          builder.attribute('Id', 'rIdFontTable');
-          builder.attribute('Type',
-              'http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable');
-          builder.attribute('Target', 'fontTable.xml');
-        });
+        // CORE RELATIONSHIPS (Styles, Settings, Numbering, etc.) are already added at the top with fixed IDs (rId1-rId4)
+        // We only need conditional relationships here if not added earlier.
 
         if ((doc.footnotes != null && doc.footnotes!.isNotEmpty) ||
             doc.footnotesXml != null) {

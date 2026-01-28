@@ -1,7 +1,8 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import '../../../docx_creator.dart';
+import '../../utils/file_loader_io.dart'
+    if (dart.library.js_interop) '../../utils/file_loader_web.dart';
 import 'pdf_annotations.dart';
 import 'pdf_attachment.dart';
 import 'pdf_form.dart';
@@ -66,19 +67,15 @@ class PdfReader {
 
   /// Loads a PDF from a file path.
   ///
-  /// Throws [FileSystemException] if file cannot be read.
+  /// Throws [Exception] if file cannot be read.
   /// Throws [PdfParseException] if PDF is invalid.
   static Future<PdfDocument> load(String filePath, {String? password}) async {
-    try {
-      final file = File(filePath);
-      if (!await file.exists()) {
-        throw PdfParseException('File not found: $filePath');
-      }
-      final bytes = await file.readAsBytes();
-      return loadFromBytes(bytes, password: password);
-    } on FileSystemException catch (e) {
-      throw PdfParseException('Cannot read file: ${e.message}');
+    final loader = getFileLoader();
+    if (await loader.exists(filePath)) {
+      final bytes = await loader.loadBytes(filePath);
+      if (bytes != null) return loadFromBytes(bytes, password: password);
     }
+    throw PdfParseException('File not found: $filePath');
   }
 
   /// Loads a PDF from bytes.

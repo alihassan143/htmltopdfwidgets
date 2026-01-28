@@ -1,5 +1,6 @@
-import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 
 import 'pdf_parser.dart';
 import 'pdf_types.dart';
@@ -297,7 +298,7 @@ class PdfImageExtractor {
         }
       }
 
-      final compressed = zlib.encode(rawRows.toBytes());
+      final compressed = ZLibEncoder().encode(rawRows.toBytes());
       _writeChunk(png, 'IDAT', Uint8List.fromList(compressed));
 
       // IEND chunk

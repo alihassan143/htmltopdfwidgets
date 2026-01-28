@@ -1,5 +1,6 @@
-import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 
 import 'pdf_encryption.dart';
 import 'pdf_types.dart';
@@ -775,7 +776,7 @@ class PdfParser {
     switch (filter) {
       case 'FlateDecode':
         try {
-          var decoded = Uint8List.fromList(zlib.decode(data));
+          var decoded = Uint8List.fromList(ZLibDecoder().decodeBytes(data));
           // Apply predictor if specified
           if (parms != null && parms.containsKey('Predictor')) {
             final predictor = parms['Predictor'] as int;

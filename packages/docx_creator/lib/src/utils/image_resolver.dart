@@ -1,8 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+
+import 'file_loader_io.dart'
+    if (dart.library.js_interop) 'file_loader_web.dart';
 
 /// Result of an image resolution.
 class ImageResult {
@@ -67,10 +69,10 @@ class ImageResolver {
               _getImageExtension(source, response.headers['content-type']);
         }
       } else {
-        // Handle Local File
-        final file = File(source);
-        if (await file.exists()) {
-          bytes = await file.readAsBytes();
+        // Handle Local File via FileLoader abstraction
+        final loader = getFileLoader();
+        if (await loader.exists(source)) {
+          bytes = await loader.loadBytes(source);
           extension = _getImageExtension(source, null);
         }
       }

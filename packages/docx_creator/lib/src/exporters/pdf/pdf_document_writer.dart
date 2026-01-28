@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 
 /// Low-level PDF 1.4/A document writer with compression support.
 ///
@@ -43,12 +44,12 @@ class PdfDocumentWriter {
     dynamic contentObjData;
     if (compress && contentStream.length > 100) {
       try {
-        final compressed = zlib.encode(utf8.encode(contentStream));
+        final compressed = ZLibEncoder().encode(utf8.encode(contentStream));
         final dict =
             '<< /Filter /FlateDecode /Length ${compressed.length} >>\nstream\n';
         final builder = BytesBuilder();
         builder.add(utf8.encode(dict));
-        builder.add(compressed);
+        builder.add(Uint8List.fromList(compressed));
         builder.add(utf8.encode('\nendstream'));
         contentObjData = builder.toBytes();
       } catch (_) {
@@ -166,7 +167,7 @@ class PdfDocumentWriter {
     } else if (filter == 'FlateDecode' || bytes.length > 1000) {
       // Compress raw image data with FlateDecode
       try {
-        final compressed = zlib.encode(bytes);
+        final compressed = ZLibEncoder().encode(bytes);
         final dict = '<<\n'
             '/Type /XObject\n'
             '/Subtype /Image\n'
@@ -180,7 +181,7 @@ class PdfDocumentWriter {
             'stream\n';
         final builder = BytesBuilder();
         builder.add(utf8.encode(dict));
-        builder.add(compressed);
+        builder.add(Uint8List.fromList(compressed));
         builder.add(utf8.encode('\nendstream'));
         return createObject(builder.toBytes());
       } catch (_) {

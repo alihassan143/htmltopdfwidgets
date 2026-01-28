@@ -33,7 +33,7 @@ class MarkdownParser {
       if (text.isEmpty) return null;
       return DocumentBuilder.buildBlockElement(
         tag: 'p',
-        children: [DocxText(text)],
+        children: [DocxText(_unescape(text))],
       );
     }
     return null;
@@ -91,7 +91,7 @@ class MarkdownParser {
 
   static Future<List<DocxInline>> _parseInline(md.Node node) async {
     if (node is md.Text) {
-      return [DocxText(node.text)];
+      return [DocxText(_unescape(node.text))];
     }
 
     if (node is md.Element) {
@@ -233,7 +233,7 @@ class MarkdownParser {
   }
 
   static Future<String> _extractText(md.Node node) async {
-    if (node is md.Text) return node.text;
+    if (node is md.Text) return _unescape(node.text);
     if (node is md.Element) {
       final buffer = StringBuffer();
       for (var child in node.children ?? []) {
@@ -245,10 +245,28 @@ class MarkdownParser {
   }
 
   static String _extractTextSync(md.Node node) {
-    if (node is md.Text) return node.text;
+    if (node is md.Text) return _unescape(node.text);
     if (node is md.Element) {
       return (node.children ?? []).map(_extractTextSync).join();
     }
     return '';
+  }
+
+  static String _unescape(String text) {
+    // Decode HTML entities (e.g., &amp; -> &, &quot; -> ")
+    // This is necessary because the markdown package escapes special characters,
+    // and DocxText will escape them AGAIN during XML generation, leading to double escaping.
+    // We want the raw characters in our AST.
+
+    // Quick optimization for common cases to avoid parsing
+    if (!text.contains('&')) return text;
+
+    // Use string replacement for standard XML entities
+    return text
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'");
   }
 }

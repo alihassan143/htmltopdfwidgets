@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -7,6 +6,8 @@ import 'package:xml/xml.dart';
 
 import '../../../docx_creator.dart';
 import '../../core/font_manager.dart';
+import '../../utils/file_loader_io.dart'
+    if (dart.library.js_interop) '../../utils/file_loader_web.dart';
 
 /// Reads and parses existing .docx files.
 ///
@@ -20,12 +21,12 @@ import '../../core/font_manager.dart';
 class DocxReader {
   /// Loads a .docx file from the file system.
   static Future<DocxBuiltDocument> load(String filePath) async {
-    final file = File(filePath);
-    if (!await file.exists()) {
-      throw Exception('File not found: $filePath');
+    final loader = getFileLoader();
+    if (await loader.exists(filePath)) {
+      final bytes = await loader.loadBytes(filePath);
+      if (bytes != null) return loadFromBytes(bytes);
     }
-    final bytes = await file.readAsBytes();
-    return loadFromBytes(bytes);
+    throw Exception('File not found: $filePath');
   }
 
   /// Loads a .docx file from bytes.

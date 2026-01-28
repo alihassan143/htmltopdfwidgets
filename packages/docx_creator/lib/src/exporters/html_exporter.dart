@@ -1,14 +1,16 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import '../../docx_creator.dart';
+import '../utils/file_saver.dart';
 
 /// Exports [DocxBuiltDocument] to HTML format.
 class HtmlExporter {
   Future<void> exportToFile(DocxBuiltDocument doc, String filePath) async {
     try {
-      final bytes = export(doc);
-      final file = File(filePath);
-      await file.writeAsString(bytes);
+      final html = export(doc);
+      final bytes = utf8.encode(html);
+      await FileSaver.save(filePath, Uint8List.fromList(bytes));
     } catch (e) {
       throw DocxExportException(
         'Failed to write file: $e',

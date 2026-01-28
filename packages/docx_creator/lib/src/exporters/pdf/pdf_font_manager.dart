@@ -1,6 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 
 import 'pdf_document_writer.dart';
 import 'ttf_parser.dart';
@@ -574,12 +575,12 @@ class PdfFontManager {
     // But writer expects "dictionary + stream" or just bytes?
     // createObject detects list<int>.
     // We need to wrap it with dict.
-    final compressed = zlib.encode(data);
+    final compressed = ZLibEncoder().encode(data);
     final dict =
         '<< /Length ${compressed.length} /Filter /FlateDecode /Length1 ${data.length} >>\nstream\n';
     final builder = BytesBuilder();
     builder.add(utf8.encode(dict));
-    builder.add(compressed);
+    builder.add(Uint8List.fromList(compressed));
     builder.add(utf8.encode('\nendstream'));
     return builder.toBytes();
   }

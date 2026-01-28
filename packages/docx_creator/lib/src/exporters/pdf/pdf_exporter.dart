@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'dart:math' show pi, cos, sin;
 import 'dart:typed_data';
 
 import '../../../docx_creator.dart';
+import '../../utils/file_saver.dart';
 import 'pdf_content_builder.dart';
 import 'pdf_document_writer.dart';
 import 'pdf_font_manager.dart';
@@ -60,7 +60,7 @@ class PdfExporter {
   /// Exports the document to a file.
   Future<void> exportToFile(DocxBuiltDocument doc, String filePath) async {
     final bytes = exportToBytes(doc);
-    await File(filePath).writeAsBytes(bytes);
+    await FileSaver.save(filePath, bytes);
   }
 
   /// Exports the document to bytes.
