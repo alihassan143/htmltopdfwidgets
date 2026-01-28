@@ -1,6 +1,6 @@
-# HTMLtoPDFWidgets Workspace
+# Flutter Packages Workspace
 
-Welcome to the `htmltopdfwidgets` monorepo! This repository contains packages for converting HTML and Markdown to PDF in Flutter, using different rendering engines.
+Welcome to the `flutter-packages` monorepo! This repository contains packages for converting HTML and Markdown to PDF in Flutter, using different rendering engines.
 
 ## Packages
 
